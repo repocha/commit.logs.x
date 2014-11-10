@@ -1,6 +1,7 @@
 import sys
 sys.path.append('..')
 from cha import ConfCha
+from cha import BazaarCha
 
 class SquidCha(ConfCha):
     def parse(self, chalog):
@@ -15,9 +16,9 @@ class SquidCha(ConfCha):
             line = line.strip().lower()
             if len(line) == 0:
                 continue
-            if line.startswith('Changes to squid-'):
+            if line.startswith('changes to squid-'):
                 #Start of a version
-                line = line.replace('Changes to squid-', '')
+                line = line.replace('changes to squid-', '')
                 version = line[:line.find(' ')]
                 self.totalvns += 1 
                 print version
@@ -30,7 +31,7 @@ class SquidCha(ConfCha):
                 self.charepo.append(cha)
                 prevline = line
             else:
-                prevline += line
+                prevline += ' ' + line
         #the last one
         cha = {}
         cha['version'] = version
@@ -46,6 +47,9 @@ class SquidCha(ConfCha):
         for cha in repo:
             count = 0
             for kw in keywords:
+                if len(kw) <= 3:
+                    #try to avoid some too common words like use, via
+                    continue
                 if cha['changes'].find(kw) != -1:
                     count += 1
             if count > 0:
@@ -54,8 +58,18 @@ class SquidCha(ConfCha):
         print len(res)
         return res
 
-squidcha = SquidCha()
-squidcha.parse('squid-3.4-ChangeLog.txt')
-squidcha.getplist('squid.p.all')
-squidcha.select(squidcha.charepo, ['config'] + squidcha.plist)
-#squidcha.select(squidcha.select(squidcha.charepo, ['configur'] + squidcha.plist), ['check'])
+
+
+#squidcha = SquidCha()
+#squidcha.parse('squid-3.4-ChangeLog.txt')
+#squidcha.getplist('squid.p.all')
+#res = squidcha.select(squidcha.charepo, ['config'] + squidcha.plist)
+#squidcha.print2csv(res, 'squid.cha.csv')
+#squidcha.select(squidcha.select(squidcha.charepo, ['configur'] + squidcha.plist), ['check', 'detect'])
+
+squidbzrcha = BazaarCha()
+squidbzrcha.parse('bzr.log.txt')
+squidbzrcha.getplist('squid.p.all')
+res = squidbzrcha.select(squidbzrcha.charepo, ['config'] + squidbzrcha.plist)
+squidbzrcha.print2csv(res, 'squid.bzr.cha.csv')
+

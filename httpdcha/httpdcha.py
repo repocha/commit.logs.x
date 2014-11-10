@@ -5,7 +5,7 @@ from cha import ConfCha
 class HTTPDCha(ConfCha):
     def parse(self, chalog):
         """
-        Parse the squid chang log
+        Parse the httpd chang log
         """
         chl = open(chalog, 'r')
         prevline = ''
@@ -44,24 +44,34 @@ class HTTPDCha(ConfCha):
 
     def select(self, repo, keywords):
         res = []
+        kwcount = {}
         for cha in repo:
             count = 0
             for kw in keywords:
-                if len(kw) <= 3:
+                if len(kw) <= 4:
                     #try to avoid some too common words like use, via
                     continue
                 if cha['changes'].find(kw) != -1:
                     count += 1
+                    if kw not in kwcount:
+                        kwcount[kw] = 0
+                    else:
+                        kwcount[kw] += 1
+                    #cha['changes'] = cha['changes'].replace(kw, '*' + kw + '*')
             if count > 0:
-                print cha['changes'] + '\n'
+                print cha['changes'], cha['version'], '\n'
                 res.append(cha)
         print len(res)
+#        for kw in kwcount:
+#            if kwcount[kw] > 100:
+#                print kw, kwcount[kw]
         return res
 
 httpdcha = HTTPDCha()
 httpdcha.parse('CHANGES_ALL')
-#squidcha.getplist('squid.p.all')
-httpdcha.select(httpdcha.charepo, ['config'])
-#squidcha.select(squidcha.charepo, ['config'] + squidcha.plist)
-httpdcha.select(httpdcha.select(httpdcha.charepo, ['config']), ['check', 'detect'])
+httpdcha.getplist('httpd.p.all')
+#httpdcha.select(httpdcha.charepo, ['config'])
+res = httpdcha.select(httpdcha.charepo, ['config'] + httpdcha.plist)
+httpdcha.print2csv(res, 'httpd.cha.csv.2')
+#httpdcha.select(httpdcha.select(httpdcha.charepo, ['config']), ['check', 'detect'])
 
