@@ -55,6 +55,40 @@ class ConfCha:
         f.close()
 
 
+class GitCha(ConfCha):
+    """
+    Cha for Git
+    """
+    def parse(self, chalog):
+        f = open(chalog, 'r')
+        revno = ''
+        message = ''
+        for line in f:
+            if len(line.strip()) == 0:
+                continue
+            if line.startswith('commit '):
+                if len(revno) > 0:
+                    cha = {}
+                    cha['version'] = revno
+                    cha['changes'] = message.lower()
+                    self.charepo.append(cha)
+                revno = line.replace('commit', '').strip()
+                message = ''
+            elif line.startswith('Author:'):
+                pass
+            elif line.startswith('Date:'):
+                pass
+            else:
+                message += line.strip() + ' '
+        cha = {}
+        cha['version'] = revno
+        cha['changes'] = message
+        self.charepo.append(cha)
+        print len(self.charepo)
+        print self.charepo[0]
+        print self.charepo[-1]
+
+
 class BazaarCha(ConfCha):
     """
     Cha for Bazaar
@@ -99,6 +133,5 @@ class BazaarCha(ConfCha):
         print self.charepo[0]
         print self.charepo[-1]
 
-#hadoopcha = HadoopCha()
-#hadoopcha.parse('./hadoopcha/hadoop.svn.log')
-
+gitcha = GitCha()
+gitcha.parse('./git.log.pg')
