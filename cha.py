@@ -57,14 +57,14 @@ class ConfCha:
 
 class BazaarCha(ConfCha):
     """
-    Work for Bazaar
+    Cha for Bazaar
     """
     def parse(self, chalog):
         f = open(chalog, 'r')
         revno = ''
         message = ''
         for line in f:
-            line = line.strip()
+            line = line.strip().lower()
             if line.startswith('------------------------------------------------------------'):
                 #Handle the old ones
                 if len(revno) > 0:
@@ -99,7 +99,6 @@ class BazaarCha(ConfCha):
         print self.charepo[0]
         print self.charepo[-1]
 
-bzrcha = BazaarCha()
-bzrcha.parse('bzr.log.txt')
-            
+#hadoopcha = HadoopCha()
+#hadoopcha.parse('./hadoopcha/hadoop.svn.log')
 
