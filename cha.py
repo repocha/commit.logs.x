@@ -70,7 +70,7 @@ class GitCha(ConfCha):
                 if len(revno) > 0:
                     cha = {}
                     cha['version'] = revno
-                    cha['changes'] = message.lower()
+                    cha['changes'] = message
                     self.charepo.append(cha)
                 revno = line.replace('commit', '').strip()
                 message = ''
@@ -98,7 +98,7 @@ class BazaarCha(ConfCha):
         revno = ''
         message = ''
         for line in f:
-            line = line.strip().lower()
+            line = line.strip()
             if line.startswith('------------------------------------------------------------'):
                 #Handle the old ones
                 if len(revno) > 0:
