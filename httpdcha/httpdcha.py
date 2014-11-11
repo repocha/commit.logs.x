@@ -11,7 +11,7 @@ class HTTPDCha(ConfCha):
         prevline = ''
         version = ''
         for line in chl:
-            line = line.strip().lower()
+            line = line.strip()
             if len(line) == 0:
                 continue
             if line.find('-*- coding: utf-8 -*-') != -1:
@@ -42,31 +42,8 @@ class HTTPDCha(ConfCha):
         print self.totalcha
         #print self.charepo
 
-    def select(self, repo, keywords):
-        res = []
-        kwcount = {}
-        for cha in repo:
-            count = 0
-            for kw in keywords:
-                if len(kw) <= 4:
-                    #try to avoid some too common words like use, via
-                    continue
-                if cha['changes'].find(kw) != -1:
-                    count += 1
-                    if kw not in kwcount:
-                        kwcount[kw] = 0
-                    else:
-                        kwcount[kw] += 1
-                    #cha['changes'] = cha['changes'].replace(kw, '*' + kw + '*')
-            if count > 0:
-                print cha['changes'], cha['version'], '\n'
-                res.append(cha)
-        print len(res)
-#        for kw in kwcount:
-#            if kwcount[kw] > 100:
-#                print kw, kwcount[kw]
-        return res
-
+"""
+Need to check with the select method
 httpdcha = HTTPDCha()
 httpdcha.parse('CHANGES_ALL')
 httpdcha.getplist('httpd.p.all')
@@ -74,4 +51,4 @@ httpdcha.getplist('httpd.p.all')
 res = httpdcha.select(httpdcha.charepo, ['config'] + httpdcha.plist)
 httpdcha.print2csv(res, 'httpd.cha.csv.2')
 #httpdcha.select(httpdcha.select(httpdcha.charepo, ['config']), ['check', 'detect'])
-
+"""

@@ -17,7 +17,7 @@ class HadoopCha(ConfCha):
                 if len(jirano) > 0:
                     cha = {}
                     cha['version'] = jirano
-                    cha['changes'] = message.lower()
+                    cha['changes'] = message
                     self.charepo.append(cha)
                 #Reset
                 jirano = ''

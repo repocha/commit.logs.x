@@ -13,7 +13,7 @@ class SquidCha(ConfCha):
         prevline = ''
         version = ''
         for line in chl:
-            line = line.strip().lower()
+            line = line.strip()
             if len(line) == 0:
                 continue
             if line.startswith('changes to squid-'):
@@ -41,25 +41,7 @@ class SquidCha(ConfCha):
         print self.totalvns
         print self.totalcha
         #print self.charepo
-
-    def select(self, repo, keywords):
-        res = []
-        for cha in repo:
-            count = 0
-            for kw in keywords:
-                if len(kw) <= 3:
-                    #try to avoid some too common words like use, via
-                    continue
-                if cha['changes'].find(kw) != -1:
-                    count += 1
-            if count > 0:
-                print cha['changes'] + '\n'
-                res.append(cha)
-        print len(res)
-        return res
-
-
-
+    
 #squidcha = SquidCha()
 #squidcha.parse('squid-3.4-ChangeLog.txt')
 #squidcha.getplist('squid.p.all')
