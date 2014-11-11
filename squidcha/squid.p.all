@@ -100,7 +100,7 @@ background_ping_rate
 balance_on_multiple_ip
 broken_posts
 buffered_logs
-cache
+#cache
 cache_dir
 cache_dns_program
 cache_effective_group
@@ -286,7 +286,7 @@ netdb_low
 netdb_ping_period
 never_direct
 nonhierarchical_direct
-note
+#note
 offline_mode
 peer_connect_timeout
 persistent_connection_after_error
