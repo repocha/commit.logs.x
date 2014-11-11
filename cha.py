@@ -23,6 +23,7 @@ class ConfCha:
         Given a list of keywords, return the changes that contains all the keywords
         """
         res = []
+        kwcount = {}
         for cha in repo:
             count = 0
             for kw in keywords:
@@ -35,10 +36,23 @@ class ConfCha:
                 cnt = cha['changes'].lower()
                 if cnt.find(kwl) != -1:
                     count += 1
+                    if kw not in kwcount:
+                        kwcount[kw] = 1
+                    else:
+                        kwcount[kw] += 1
             if count > 0:
-                print cha['changes'] + '\n'
+                #print cha['changes'] + '\n'
                 res.append(cha)
+        print '-----------------------------------------------------------------------------'
+        print 'The too popular keywords (count >= 50): '
+        print '(perhaps we need to comment them out)'
+        for kw in kwcount:
+            if kwcount[kw] >= 50:
+                print kw, kwcount[kw]
+        print '-----------------------------------------------------------------------------'
+        print 'Number of patches/cases we select out:'
         print len(res)
+        print '-----------------------------------------------------------------------------'
         return res
 
 
@@ -54,10 +68,14 @@ class ConfCha:
         f = open(outputfile, 'wb')
         writer = csv.writer(f, delimiter='\t')
         for cha in repo:
-            writer.writerow(['--------------------', '------'])
+            writer.writerow(['----------------------------'])
             writer.writerow([cha['changes'], cha['version']])
         f.close()
 
+    def printinfo(self):
+        print 'Number of patches/cases:', len(self.charepo)
+        print '1st:', self.charepo[0] 
+        print '2nd:', self.charepo[-1]
 
 class GitCha(ConfCha):
     """
@@ -88,9 +106,7 @@ class GitCha(ConfCha):
         cha['version'] = revno
         cha['changes'] = message
         self.charepo.append(cha)
-        print len(self.charepo)
-        print self.charepo[0]
-        print self.charepo[-1]
+        self.printinfo()
 
 
 class BazaarCha(ConfCha):
@@ -133,9 +149,4 @@ class BazaarCha(ConfCha):
                 #if line.find(': ') != -1:
                 #    print line
                 message += ' ' + line
-        print len(self.charepo)
-        print self.charepo[0]
-        print self.charepo[-1]
-
-gitcha = GitCha()
-gitcha.parse('./git.log.pg')
+        self.printinfo()
