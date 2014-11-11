@@ -26,10 +26,14 @@ class ConfCha:
         for cha in repo:
             count = 0
             for kw in keywords:
-                if len(kw) <= 3:
-                    #try to avoid some too common words like use, via
+                kwl = kw.lower()
+                if len(kwl) <= 3:
+                    ###THIS IS A HACK###
+                    #we try to avoid some too common words like use, via
+                    ####################
                     continue
-                if cha['changes'].find(kw) != -1:
+                cnt = cha['changes'].lower()
+                if cnt.find(kwl) != -1:
                     count += 1
             if count > 0:
                 print cha['changes'] + '\n'
@@ -41,7 +45,7 @@ class ConfCha:
     def getplist(self, plist):
         f = open(plist, 'r')
         for p in f:
-            p = p.strip().lower()
+            p = p.strip()
             if len(p) > 0 and p.startswith('#') == False:
                 self.plist.append(p)
         print '#parameters:', len(self.plist)
