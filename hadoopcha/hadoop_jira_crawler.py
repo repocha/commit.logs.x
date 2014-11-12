@@ -35,14 +35,16 @@ class HadoopJIRACrawler(Crawler):
 		    output.write("\n\n-------------------------------------------------------------------------\n")
 		    output.write(html.title.string.encode('utf-8'))
 		    output.write('\n')
-		
+            		
 		    #description part
+            output.write('[DESC]\n')
 		    descriptions = html.find_all("div", "user-content-block")
 		    for description in descriptions:
 			    output.write(description.get_text().encode('utf-8').strip())
 		    output.write('\n')
-	
+            
 		    #comments part
+            output.write('[COMMENTS]\n')
 		    comments = html.find_all("div", "action-body flooded")	
 		    for comment in comments:
 			    output.write(comment.get_text().encode('utf-8'))
