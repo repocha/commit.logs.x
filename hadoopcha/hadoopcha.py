@@ -22,11 +22,13 @@ class HadoopCha(ConfCha):
                 #Reset
                 jirano = ''
                 message = ''
-            elif line.startswith('r') and line.find('|') != -1:
-                assert (line.endswith('line') or line.endswith('lines'))
-            elif line.startswith('HDFS') or line.startswith('MAPRED') or line.startswith('HADOOP') or line.startswith('HDS') or line.startswith('YARN'):
-                jirano = line[:line.find(' ')].replace('.', '').strip()
-                messge = line 
+            #elif line.startswith('r') and line.find('|') != -1:
+            #    assert (line.endswith('line') or line.endswith('lines'))
+            #elif line.startswith('HDFS') or line.startswith('MAPRED') or line.startswith('[HADOOP') or line.startswith('HDS') or line.startswith('YARN'):
+            elif line.startswith('[HADOOP-'):
+		    #jirano = line[:line.find(' ')].replace('.', '').strip()
+                jirano = line[8:line.find(']')]
+		messge = line 
             elif len(line) == 0:
                 pass
             else:
@@ -38,7 +40,7 @@ class HadoopCha(ConfCha):
         #    print cha['version']
 
 hadoopcha = HadoopCha()
-hadoopcha.parse('hadoop.svn.log')
+hadoopcha.parse('hadoop-jira')
 hadoopcha.getplist('hadoop.p.all')
 res = hadoopcha.select(hadoopcha.charepo, ['config'] + hadoopcha.plist)
 hadoopcha.print2csv(res, 'hadoop.svn.cha.csv')
