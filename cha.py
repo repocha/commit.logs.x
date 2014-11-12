@@ -53,6 +53,9 @@ class ConfCha:
         print 'Number of patches/cases we select out:'
         print len(res)
         print '-----------------------------------------------------------------------------'
+        #for kw in keywords:
+        #    if kw not in kwcount:
+        #        print kw
         return res
 
 
