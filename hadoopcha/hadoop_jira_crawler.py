@@ -12,10 +12,12 @@ from bs4 import BeautifulSoup
 
 class HadoopJIRACrawler(Crawler):
     def __init__(self, odir, olog, pfx, f, l):
-        self.fst = f
+        self.output_dir = odir
+        self.output_log = olog
+	self.fst = f
         self.lst = l
         self.prefix = pfx
-        self.pathprefx = self.output_dir + '/' + self.prefix
+        self.pathprefix = self.output_dir + '/' + self.prefix
 
     def crawl(self):
         for index in range(self.fst, self.lst):
@@ -61,6 +63,6 @@ class HadoopJIRACrawler(Crawler):
         output.close()		
 
 
-hadoopjiracrawler = HadoopJIRACrawler('/home/long/Research/Conquid/pages', 'hadoop.jira.logdddd', 'HADOOP-', 1, 11298)
+hadoopjiracrawler = HadoopJIRACrawler('/home/long/Research/Conquid/pages', 'hadoop.jira.log', 'HADOOP-', 1, 11298)
 #hadoopjiracrawler.crawl()
 hadoopjiracrawler.write2log()
