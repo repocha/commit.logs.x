@@ -40,7 +40,7 @@ class HadoopCha(ConfCha):
         #    print cha['version']
 
 hadoopcha = HadoopCha()
-hadoopcha.parse('hadoop-jira')
+hadoopcha.parse('hadoop.jira.log')
 hadoopcha.getplist('hadoop.p.all')
 res = hadoopcha.select(hadoopcha.charepo, ['config'] + hadoopcha.plist)
-hadoopcha.print2csv(res, 'hadoop.svn.cha.csv')
+hadoopcha.print2csv(res, 'hadoop.jira.cha.csv')
