@@ -26,31 +26,31 @@ class HadoopJIRACrawler(Crawler):
 
 
     def write2log(self):
-	output = open(self.output_log, 'a')
-	for num in range(1, 11298):
-		case = open(self.output_dir + "/HADOOP-" + str(num), 'r')	
-		html = BeautifulSoup(case)
+	    output = open(self.output_log, 'a')
+	    for num in range(1, 11298):
+		    case = open(self.output_dir + "/HADOOP-" + str(num), 'r')	
+		    html = BeautifulSoup(case)
 			
-		#title part
-		output.write("\n\n-------------------------------------------------------------------------\n")
-		output.write(html.title.string.encode('utf-8'))
-		output.write('\n')
+		    #title part
+		    output.write("\n\n-------------------------------------------------------------------------\n")
+		    output.write(html.title.string.encode('utf-8'))
+		    output.write('\n')
 		
-		#description part
-		descriptions = html.find_all("div", "user-content-block")
-		for description in descriptions:
-			output.write(description.get_text().encode('utf-8').strip())
-		output.write('\n')
+		    #description part
+		    descriptions = html.find_all("div", "user-content-block")
+		    for description in descriptions:
+			    output.write(description.get_text().encode('utf-8').strip())
+		    output.write('\n')
 	
-		#comments part
-		comments = html.find_all("div", "action-body flooded")	
-		for comment in comments:
-			output.write(comment.get_text().encode('utf-8'))
+		    #comments part
+		    comments = html.find_all("div", "action-body flooded")	
+		    for comment in comments:
+			    output.write(comment.get_text().encode('utf-8'))
 			
-		if num % 10 ==0:
-			print "finish " + str(num)	
+		    if num % 10 ==0:
+			    print "finish " + str(num)	
 	
-	output.close()		
+	    output.close()		
 
 
 hadoopjiracrawler = HadoopJIRACrawler("/home/long/Research/Conquid/pages", "hadoop.jira.log")
