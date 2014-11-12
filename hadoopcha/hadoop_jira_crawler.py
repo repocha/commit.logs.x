@@ -37,14 +37,14 @@ class HadoopJIRACrawler(Crawler):
 		    output.write('\n')
             		
 		    #description part
-            output.write('[DESC]\n')
+     		    output.write('[DESC]\n')
 		    descriptions = html.find_all("div", "user-content-block")
 		    for description in descriptions:
 			    output.write(description.get_text().encode('utf-8').strip())
 		    output.write('\n')
             
 		    #comments part
-            output.write('[COMMENTS]\n')
+            	    output.write('[COMMENTS]\n')
 		    comments = html.find_all("div", "action-body flooded")	
 		    for comment in comments:
 			    output.write(comment.get_text().encode('utf-8'))
@@ -55,6 +55,6 @@ class HadoopJIRACrawler(Crawler):
 	    output.close()		
 
 
-hadoopjiracrawler = HadoopJIRACrawler("/home/long/Research/Conquid/pages", "hadoop.jira.log")
+hadoopjiracrawler = HadoopJIRACrawler("/home/long/Research/Conquid/pages", "hadoop.jira.logger")
 #hadoopjiracrawler.crawl()
 hadoopjiracrawler.write2log()
