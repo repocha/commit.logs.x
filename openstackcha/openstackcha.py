@@ -4,44 +4,40 @@ sys.path.append('..')
 from cha import ConfCha
 from cha import BazaarCha
 
+email_split_string = "-------------- next part --------------"
+
 class OpenStackCha(ConfCha):
     def parse(self, chalog):
+        print chalog
         """
         Parse the squid chang log
         """
-        chl = open(chalog, 'r')
-        startflag = False
-        prevline = ''
-        version = ''
-        for line in chl:
-            line = line.strip()
-            if len(line) == 0:
+        data = open(chalog, 'r').read()
+
+        parts = data.split(email_split_string)
+
+        line = None
+
+        for part in parts:
+            if "swift" not in part.lower():
                 continue
-            if line.startswith('changes to squid-'):
-                #Start of a version
-                line = line.replace('changes to squid-', '')
-                version = line[:line.find(' ')]
-                self.totalvns += 1 
-                print version
-            elif line.startswith('-'):
-                self.totalcha += 1
-                #Handle the previous one
-                cha = {}
-                cha['version'] = version
-                cha['changes'] = prevline
-                self.charepo.append(cha)
-                prevline = line
-            else:
-                prevline += ' ' + line
-        #the last one
-        cha = {}
-        cha['version'] = version
-        cha['changes'] = prevline
-        self.charepo.append(cha)   
-        print len(self.charepo)
-        print self.totalvns
-        print self.totalcha
-        #print self.charepo
+            lines = part.split("\n")
+            for line in lines:
+                if line.startswith("Subject: "):
+                    version = line
+                    break
+
+            if line is None:
+                print "Ehh? no subjects?"
+
+            changes = part
+
+            cha = {}
+            cha['version'] = version
+            cha['changes'] = part
+            self.charepo.append(cha)   
+
+        print "total_chas", len(self.charepo)
     
 #squidcha = SquidCha()
 #squidcha.parse('squid-3.4-ChangeLog.txt')
@@ -51,7 +47,11 @@ class OpenStackCha(ConfCha):
 #squidcha.select(squidcha.select(squidcha.charepo, ['configur'] + squidcha.plist), ['check', 'detect'])
 
 if __name__ == "__main__":
-    pass
+    openstackcha = OpenStackCha()
+    openstackcha.parse("openstack.a")
+    openstackcha.getplist("openstack.p.all")
+    res = openstackcha.select(openstackcha.charepo, openstackcha.plist)
+    openstackcha.print2csv(res, "openstack.csv")
 
 # squidbzrcha = BazaarCha()
 #squidbzrcha.parse('bzr.log.txt')
