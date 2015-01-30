@@ -42,8 +42,8 @@ class HTTPDCha(ConfCha):
         print self.totalcha
         #print self.charepo
 
-"""
-Need to check with the select method
+
+#Need to check with the select method
 httpdcha = HTTPDCha()
 httpdcha.parse('CHANGES_ALL')
 httpdcha.getplist('httpd.p.all')
@@ -51,4 +51,4 @@ httpdcha.getplist('httpd.p.all')
 res = httpdcha.select(httpdcha.charepo, ['config'] + httpdcha.plist)
 httpdcha.print2csv(res, 'httpd.cha.csv.2')
 #httpdcha.select(httpdcha.select(httpdcha.charepo, ['config']), ['check', 'detect'])
-"""
+

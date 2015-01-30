@@ -111,6 +111,37 @@ class GitCha(ConfCha):
         self.charepo.append(cha)
         self.printinfo()
 
+class SVNCha(ConfCha):
+    """
+    Cha for SVN
+    """
+    def parse(self, chalog):
+        f = open(chalog, 'r')
+        revno = ''
+        message = ''
+        for line in f:
+            if len(line.strip()) == 0:
+                continue
+            if line.startswith('------------------------------------------------------------------------'):
+                #Handle the old ones
+                if len(revno) > 0:
+                    cha = {}
+                    cha['version'] = revno
+                    cha['changes'] = message
+                    self.charepo.append(cha)
+                #Reset
+                revno = ''
+                message = ''
+            elif line.startswith('r'):
+                temp_list = line.split()
+                revno = temp_list[0]
+            elif line.startswith('Changed'):
+                pass
+            elif line.startswith('   '):
+                pass
+            else:
+                message += line.strip() + ' '
+        self.printinfo()
 
 class BazaarCha(ConfCha):
     """

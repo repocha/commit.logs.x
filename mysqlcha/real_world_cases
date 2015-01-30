@@ -1,0 +1,16 @@
+"""not changed in current version
+Bug#18443096:  --DEFAULTS-EXTRA-FILE WITH NONEXISTENT FILE CAUSES SEGFAULT Problem: --defaults-file with a nonexistent file argument results in a segfault. Fix: For a non-existent file, the free_used_memory need not be called. A check is made, as to whether the arguments are valid before freeing that memory. 	1f5ea6ce1d4404f6d629d8b2340a42e4d4af539d (n)
+
+?????????????????????
+"branches/5.1: Fix Bug#11894 innodb_file_per_table crashes w/ Windows .sym symbolic link hack The crash was due to un-handled error 3 (path not found). In the case of file per table, change the call to os_file_handle_error_no_exit() from os_file_handle_error(). Also, checks for full path pattern during table create (Windows only), which is used in symbolic link and temp table creation. Approved by:	Heikki "	05f84037e78f3948d828943051e7d1520143965f (n)
+
+
+??????????????????????
+Fix bug #31604: server crash when setting slow_query_log_file/global general_log_file variable Problem: we don't evaluate given expression checking values of the slow_query_log_file/general_log_file, don't check it for NULL. Fix: evaluate the expression, check result returned. 	3d2f493fb42001aac3706b838d8c8bc9f651538e   （**）
+??????????????????????
+
+
+
+"Fix for bug #29015 ""Stack overflow in processing temporary table name when tmpdir path is long"" In create_tmp_table() don't set full table path as a table name. Other code assumes table names to not exceed NAME_LEN bytes. "	0f5a1e5910d48bb0ef0e21ca8d31a0f7b98f3b4c  (n)
+
+Forward port r115 from branches/5.0: Fix bug #16157, a crash when innodb_log_group_home_dir is set to an empty string. This patch is from Heikki. 	fe27cef26c548d35be7f78234541d611e3f31a0a  (**)
