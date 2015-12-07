@@ -78,7 +78,7 @@ class ConfCha:
     def printinfo(self):
         print 'Number of patches/cases:', len(self.charepo)
         print '1st:', self.charepo[0] 
-        print '2nd:', self.charepo[-1]
+        print '2nd:', self.charepo[1]
         print '......'
 
 class GitCha(ConfCha):
@@ -89,6 +89,7 @@ class GitCha(ConfCha):
         f = open(chalog, 'r')
         revno = ''
         message = ''
+        chfiles = []
         for line in f:
             if len(line.strip()) == 0:
                 continue
@@ -97,6 +98,7 @@ class GitCha(ConfCha):
                     cha = {}
                     cha['version'] = revno
                     cha['changes'] = message
+                    cha['chfiles'] = chfiles
                     self.charepo.append(cha)
                 revno = line.replace('commit', '').strip()
                 message = ''
@@ -124,6 +126,7 @@ class SVNCha(ConfCha):
         f = open(chalog, 'r')
         revno = ''
         message = ''
+        chfiles = []
         for line in f:
             if len(line.strip()) == 0:
                 continue
@@ -133,17 +136,19 @@ class SVNCha(ConfCha):
                     cha = {}
                     cha['version'] = revno
                     cha['changes'] = message
+                    cha['chfiles'] = chfiles
                     self.charepo.append(cha)
                 #Reset
                 revno = ''
                 message = ''
+                chfiles = []
             elif line.startswith('r'):
                 temp_list = line.split()
                 revno = temp_list[0]
-            elif line.startswith('Changed'):
+            elif line.startswith('Changed paths:'):
                 pass
-            elif line.startswith('   '):
-                pass
+            elif line.startswith('   M ') or line.startswith('   A ') or line.startswith('   D ') or line.startswith('   R '):
+                chfiles.append(line)
             else:
                 message += line.strip() + ' '
         self.printinfo()

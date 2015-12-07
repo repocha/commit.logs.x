@@ -2,6 +2,10 @@ import sys
 sys.path.append('..')
 from cha import ConfCha
 
+"""
+Deprecated!!!
+"""
+
 class HadoopCha(GitCha):
     """
     For Hadoop JIRA log 
