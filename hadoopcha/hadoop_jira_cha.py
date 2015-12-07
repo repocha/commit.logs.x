@@ -2,9 +2,9 @@ import sys
 sys.path.append('..')
 from cha import ConfCha
 
-class HadoopCha(ConfCha):
+class HadoopCha(GitCha):
     """
-    Cha for Hadoop
+    For Hadoop JIRA log 
     """
     def parse(self, chalog):
         f = open(chalog, 'r')
