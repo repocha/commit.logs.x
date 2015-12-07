@@ -79,6 +79,7 @@ class ConfCha:
         print 'Number of patches/cases:', len(self.charepo)
         print '1st:', self.charepo[0] 
         print '2nd:', self.charepo[-1]
+        print '......'
 
 class GitCha(ConfCha):
     """
@@ -99,15 +100,19 @@ class GitCha(ConfCha):
                     self.charepo.append(cha)
                 revno = line.replace('commit', '').strip()
                 message = ''
+                chfiles = []
             elif line.startswith('Author:'):
                 pass
             elif line.startswith('Date:'):
                 pass
-            else:
+            elif line.startswith('    '):
                 message += line.strip() + ' '
+            else:
+                chfiles.append(line.strip())
         cha = {}
         cha['version'] = revno
         cha['changes'] = message
+        cha['chfiles'] = chfiles
         self.charepo.append(cha)
         self.printinfo()
 
