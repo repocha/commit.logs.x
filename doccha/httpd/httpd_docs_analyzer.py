@@ -15,7 +15,7 @@ def getParamsFromHTML(path):
   doc = fromstring(xml)
   try:
     for dsec in doc.xpath("//div[@class='directive-section']"):
-      print '-------------------------------------------------'
+      #print '-------------------------------------------------'
       p = {}
       for h2 in dsec.iter('h2'):
         # print h2.text_content()
@@ -35,7 +35,7 @@ def getParamsFromHTML(path):
         p['default'] = p['default'].replace(p['name'], '').strip()
       if 'syntax' in p:
         p['syntax']  = p['syntax'].replace(p['name'], '').strip()
-      print p
+      #print p
       pset.append(p)
   except Exception as e:
     print '[ERROR] parse error', e
@@ -44,7 +44,7 @@ def getParamsFromHTML(path):
 
 
 """
-At least works for 2.4.7 
+It rocks, currently, it works for 2.2.10, 2.4.2, and 2.4.7
 """
 def getConfigInfo(dir_path):
   apset = []
@@ -62,4 +62,5 @@ def getConfigInfo(dir_path):
   return apset
 
 #getParametersHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/core.html.en')
-getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.2/docs/manual/mod/')
+apset = getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.2.10/docs/manual/mod/')
+print len(apset)
