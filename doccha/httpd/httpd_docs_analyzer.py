@@ -53,15 +53,28 @@ def getConfigInfo(dir_path):
     if (f.endswith('html') and f + '.en' not in fl) or (f.endswith('html.en')):
       pset = getParamsFromHTML(os.path.join(dir_path, f))  
       for p in pset:
-        if p not in apset:
-          apset.append(p)
-        else: 
-          print '[ERROR] p already exists', p
+        apset.append(p)
     else:
       pass
   return apset
 
+def getModules(plst):
+  """
+  Return the modules from the entire plst
+  """
+  modset = []
+  for p in plst:
+    modhtml = os.path.basename(p['file'])
+    mod = modhtml[:modhtml.find('.html')]
+    if mod not in modset:
+      modset.append(mod)
+  return modset
+
 #getParametersHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/core.html.en')
-print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.2.10/docs/manual/mod/'))
-print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.2/docs/manual/mod/'))
-print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/'))
+pset = getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.2.10/docs/manual/mod/')
+print len(pset)
+print getModules(pset)
+#print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.2/docs/manual/mod/'))
+#print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/'))
+
+
