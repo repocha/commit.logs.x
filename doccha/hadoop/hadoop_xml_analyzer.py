@@ -8,6 +8,10 @@ import os
 import fnmatch
 
 def findDefaultXML(repop):
+  """
+  Hadoop's config file is all named XXX-default.xml,
+  and we want to automatically find these config files given a repository
+  """
   pattern = '*default*.xml'
   flst = []
   for dname, sdname, flist in os.walk(repop):
@@ -20,6 +24,9 @@ def findDefaultXML(repop):
   return flst
 
 def getParamsFromXML(defxml):
+  """
+  Get all the parameters from the config files
+  """
   plst = []
   f = open(defxml)
   xml = f.read()
@@ -35,52 +42,9 @@ def getParamsFromXML(defxml):
     plst.append(p)
   return plst
 
-
-
-#getVersion('deprec.csv', './hadoop-release-file.csv', '', 2)
-
-#getAllDiff('./hadoop-release-file.csv', 'dfs', 1)
-#getAllDiff('./hadoop-release-file.csv', 'mapred', 2)
-
-#    xml = f.read()
-#    f.close()
-#    doc = etree.fromstring(path)
-#    pset = []
-#    ntags = doc.xpath('//configuration/property/name')
-#    for n in ntags:
-#        print n.text
-
-#for i in xrange(1,20):
-#    pset = getParametersHTML('/home/tixu/software/hadoop-dist/hadoop-0.' + str(i) + '.0/docs/hadoop-default.html')
-#    if 'fs.checkpoint.period' in pset:
-#        print i 
-
-#getParametersHTML('/home/tixu/software/hadoop-before-2009/hadoop-0.2.0/docs/hadoop-default.html')
-#getParametersHTML('/home/tixu/software/hadoop-before-2009/hadoop-0.3.0/docs/hadoop-default.html')
-#getParametersHTML('/home/tixu/software/hadoop-before-2009/hadoop-0.4.0/docs/hadoop-default.html')
-#getParametersHTML('/home/tixu/software/hadoop-before-2009/hadoop-0.5.0/docs/hadoop-default.html')
-#getParametersHTML('/home/tixu/software/hadoop-before-2009/hadoop-0.6.0/docs/hadoop-default.html')
-#getParametersHTML('/home/tixu/software/hadoop-before-2009/hadoop-0.7.0/docs/hadoop-default.html')
-#getParametersHTML('/home/tixu/software/hadoop-before-2009/hadoop-0.8.0/docs/hadoop-default.html')
-#s1 = getParametersHTML('/home/tixu/software/hadoop-dist/hadoop-1.2.1/docs/hdfs-default.html')
-
-#set1 = getParametersXML('/home/tixu/software/hadoop-dist/hadoop-0.1.0/conf/hadoop-default.xml')
-#set2 = getParametersXML('/home/tixu/software/hadoop-dist/hadoop-0.2.0/conf/hadoop-default.xml')
-#s2 = getParametersXML('/home/tixu/software/hadoop-dist/hadoop-1.2.1/src/hdfs/hdfs-default.xml')
-
-#s1 = getParametersXML('/home/tixu/software/hadoop-dist/hadoop-2.2.0-src//hadoop-mapreduce-project/hadoop-mapreduce-client/hadoop-mapreduce-client-core/src/main/resources/mapred-default.xml', '')
-#s2 = getParametersXML('/home/tixu/software/hadoop-dist/hadoop-2.2.0-src/hadoop-hdfs-project/hadoop-hdfs/src/main/resources/hdfs-default.xml', '')
-
-#for p in s1:
-#    print p
-
-#pset = parseXML('/home/tixu/software/hadoop-dist/hadoop-2.2.0-src/hadoop-hdfs-project/hadoop-hdfs/src/main/resources/hdfs-default.xml')
-#pset = parseXML('/home/tixu/software/hadoop-dist/hadoop-2.2.0-src//hadoop-mapreduce-project/hadoop-mapreduce-client/hadoop-mapreduce-client-core/src/main/resources/mapred-default.xml')
-
-#pset = parseXML('/home/tixu/software/hadoop-dist/hadoop-2.2.0-src/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml')
-#for p in getParamsFromXML('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/hadoop-2.2.0-src/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml'):
-#  print p
-
+#TODO: put the parameters of each version into a set,
+#also, we need to handle multiple xmls with the same name
+#also, print out all the xml names so that we can remove some of them
 BASE_REPO_DIR = '/media/tianyin/TOSHIBA EXT/software/hadoop-dist/'
 for repo in os.listdir(BASE_REPO_DIR):
   repop = os.path.join(BASE_REPO_DIR, repo)
@@ -89,19 +53,4 @@ for repo in os.listdir(BASE_REPO_DIR):
     for f in findDefaultXML(repop):
         print f
 
-#print len(s1)
-#print len(s2)
-#psetDiff(s1, s2)
-#psetDiff(set2, set3)
 
-#print '--------------------------------------------------------------------------------------'
-
-#getParametersXML('/home/tixu/software/hadoop-before-2009/hadoop-0.3.0/conf/hadoop-default.xml')
-#getParametersXML('/home/tixu/software/hadoop-before-2009/hadoop-0.4.0/conf/hadoop-default.xml')
-#getParametersXML('/home/tixu/software/hadoop-before-2009/hadoop-0.5.0/conf/hadoop-default.xml')
-#getParametersXML('/home/tixu/software/hadoop-before-2009/hadoop-0.6.0/conf/hadoop-default.xml')
-#getParametersXML('/home/tixu/software/hadoop-before-2009/hadoop-0.7.0/conf/hadoop-default.xml')
-#getParametersXML('/home/tixu/software/hadoop-before-2009/hadoop-0.8.0/conf/hadoop-default.xml')
-#getParametersXML('/home/tixu/software/hadoop-before-2009/hadoop-0.9.0/conf/hadoop-default.xml')
-#getParametersXML('/home/tixu/software/hadoop-before-2009/hadoop-0.23.10-src/hadoop-hdfs-project/hadoop-hdfs/src/main/resources/hdfs-default.xml')
-#getParametersXML('/home/tixu/software/hadoop-trunk/hadoop-hdfs-project/hadoop-hdfs/src/main/resources/hdfs-default.xml')
