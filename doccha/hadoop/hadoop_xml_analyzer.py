@@ -3,6 +3,21 @@ from lxml import etree
 from lxml.html import fromstring
 import lxml.html as lh
 import csv
+import subprocess
+import os
+import fnmatch
+
+def findDefaultXML(repop):
+  pattern = '*default*.xml'
+  flst = []
+  for dname, sdname, flist in os.walk(repop):
+    for fname in flist:
+      if fnmatch.fnmatch(fname, pattern):
+        if fname.find('test') != -1:
+          print 'Ignore: ', fname
+        else:
+          flst.append(os.path.join(dname, fname))
+  return flst
 
 def getParamsFromXML(defxml):
   plst = []
@@ -64,6 +79,10 @@ def getParamsFromXML(defxml):
 pset = getParamsFromXML('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/hadoop-2.2.0-src/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml')
 for p in pset:
   print p
+
+for f in findDefaultXML('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/hadoop-2.2.0-src/'):
+  print f
+
 #print len(s1)
 #print len(s2)
 #psetDiff(s1, s2)
