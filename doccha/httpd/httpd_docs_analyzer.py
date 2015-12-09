@@ -62,5 +62,6 @@ def getConfigInfo(dir_path):
   return apset
 
 #getParametersHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/core.html.en')
-apset = getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.2.10/docs/manual/mod/')
-print len(apset)
+print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.2.10/docs/manual/mod/'))
+print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.2/docs/manual/mod/'))
+print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/'))
