@@ -35,6 +35,8 @@ def getParamsFromXML(defxml):
     plst.append(p)
   return plst
 
+
+
 #getVersion('deprec.csv', './hadoop-release-file.csv', '', 2)
 
 #getAllDiff('./hadoop-release-file.csv', 'dfs', 1)
@@ -76,12 +78,16 @@ def getParamsFromXML(defxml):
 #pset = parseXML('/home/tixu/software/hadoop-dist/hadoop-2.2.0-src//hadoop-mapreduce-project/hadoop-mapreduce-client/hadoop-mapreduce-client-core/src/main/resources/mapred-default.xml')
 
 #pset = parseXML('/home/tixu/software/hadoop-dist/hadoop-2.2.0-src/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml')
-pset = getParamsFromXML('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/hadoop-2.2.0-src/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml')
-for p in pset:
-  print p
+#for p in getParamsFromXML('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/hadoop-2.2.0-src/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml'):
+#  print p
 
-for f in findDefaultXML('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/hadoop-2.2.0-src/'):
-  print f
+BASE_REPO_DIR = '/media/tianyin/TOSHIBA EXT/software/hadoop-dist/'
+for repo in os.listdir(BASE_REPO_DIR):
+  repop = os.path.join(BASE_REPO_DIR, repo)
+  if os.path.isdir(repop):
+    print repop, '-----------------------------------------'
+    for f in findDefaultXML(repop):
+        print f
 
 #print len(s1)
 #print len(s2)
