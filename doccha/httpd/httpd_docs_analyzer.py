@@ -73,7 +73,6 @@ def getParamsFromOldHTML(path):
     print 'IGNORE: ', path 
     return []
   #2. then we split the page based on <HR>
-  print path
   dstr = tostring(doc)
   hrSlices = dstr.split('<hr>')
   for hrSlice in hrSlices:
@@ -93,11 +92,11 @@ def getParamsFromOldHTML(path):
       continue
     #print '---------------------------------------------'
     #print hrSlice
-    print pname
+    #print pname
     props = []
     for e in hrdoc.iter():
       if e.tag == 'a':
-        if 'href' in e.attrib:
+        if 'href' in e.attrib and e.attrib['href'].find('directive-dict.html#') != -1:
           if e.attrib['href'] not in PROPS:
             print 'UNKNOWN TAG: ', e.attrib['href']
           else:
@@ -113,25 +112,27 @@ def getParamsFromOldHTML(path):
       props_idx_lst.append(props_idx[prop])
     props_ridx[0] = 'Directive'
     props_idx_lst = sorted(props_idx_lst)
-    print props_ridx
-    print props_idx_lst
+    #print props_ridx
+    #print props_idx_lst
     pmore = {}
     previdx = 0
     for idx in props_idx_lst:
       pmore[props_ridx[previdx]] = hrdoctext[previdx : idx].strip()
       previdx = idx
-    print 'info: ', pmore
+    #print 'info: ', pmore
     if len(pmore) == 0:
       continue
     p = {}
+    p['file'] = path
     p['name'] = pmore['Directive'].replace('Directive', '').replace('The', '').strip()
     if 'Default' in pmore:
       p['default'] = pmore['Default'].replace('Default:', '').strip()
     if 'Syntax' in pmore:
       p['syntax'] = pmore['Syntax'].replace('Syntax', '').strip()
-    print p
+    # print p
     pset.append(p)
-  return []
+  print len(pset)
+  return pset
 
 """
 It rocks, currently, it works for 2.2.10, 2.4.2, and 2.4.7
