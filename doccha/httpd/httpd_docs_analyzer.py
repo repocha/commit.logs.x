@@ -111,15 +111,24 @@ def getParamsFromOldHTML(path):
     for prop in props_idx:
       props_ridx[props_idx[prop]] = prop
       props_idx_lst.append(props_idx[prop])
-    props_ridx[0] = 'name'
+    props_ridx[0] = 'Directive'
     props_idx_lst = sorted(props_idx_lst)
     print props_ridx
     print props_idx_lst
-    p = {}
+    pmore = {}
     previdx = 0
     for idx in props_idx_lst:
-      p[props_ridx[previdx]] = hrdoctext[previdx : idx].strip()
+      pmore[props_ridx[previdx]] = hrdoctext[previdx : idx].strip()
       previdx = idx
+    print 'info: ', pmore
+    if len(pmore) == 0:
+      continue
+    p = {}
+    p['name'] = pmore['Directive'].replace('Directive', '').replace('The', '').strip()
+    if 'Default' in pmore:
+      p['default'] = pmore['Default'].replace('Default:', '').strip()
+    if 'Syntax' in pmore:
+      p['syntax'] = pmore['Syntax'].replace('Syntax', '').strip()
     print p
     pset.append(p)
   return []
@@ -159,7 +168,7 @@ def getModules(plst):
 #print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/'))
 
 #getParamsFromOldHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/core.html')
-getParamsFromOldHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/mod_setenvif.html')
-#getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/', False)
+#getParamsFromOldHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/mod_setenvif.html')
+getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/', False)
 #getParamsFromOldHTML('core_hr.html')
 
