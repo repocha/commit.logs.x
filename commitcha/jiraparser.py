@@ -6,7 +6,6 @@ import lxml.html as lh
 import csv
 from io import StringIO, BytesIO
 
-
 def parse(jpath):
   jira = {}
   f = open(jpath)
@@ -22,4 +21,21 @@ def parse(jpath):
     print 'ERROR: NO TITLE'
   return jira
 
-print parse('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/HADOOP-/HADOOP-2222')
+def filter(jira):
+  """
+  return whether the jira contains the predefined keywords
+  """
+  keywords = [
+          'config', 
+          'option',
+          'propert'
+          ]
+  for kw in keywords:
+    if jira['title'].lower().find(kw) != -1:
+      return True
+    if jira['summary'].lower().find(kw) != -1:
+      return True
+  #none of the keywords is found
+  return False 
+
+print filter(parse('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/HADOOP-/HADOOP-2222'))
