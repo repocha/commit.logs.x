@@ -7,30 +7,45 @@ import os
 
 from lxml import etree
 from lxml import html
-from bs4 import BeautifulSoup
-
 
 class HadoopJIRACrawler(Crawler):
-  def __init__(self, odir, olog, pfx, f, l):
-    self.output_dir = odir
-    self.output_log = olog
+  def __init__(self, odir, pfx, f, l):
+    self.output_dir = os.path.join(odir, pfx)
+    self.output_log = 'jira.' + pfx + '.log'
     self.fst = f
     self.lst = l
     self.prefix = pfx
-    self.pathprefix = self.output_dir + '/' + self.prefix
+    self.pathprefix = os.path.join(self.output_dir, pfx)
+    print 'Download to', self.output_dir
 
   def crawl(self):
+    """
+    Crawl the pages
+    """
     for index in range(self.fst, self.lst):
       number = str(index)
-      url="https://issues.apache.org/jira/browse/" + self.prefix + number
+      url = "https://issues.apache.org/jira/browse/" + self.prefix + number
+      dst = self.pathprefix + number
 
-      page =urllib2.urlopen(url)
-      data=page.read()
+      if os.path.exists(dst) == False or os.stat(dst).st_size == 0:
+        print 'CRAWLING:', self.prefix + number
+        page =urllib2.urlopen(url)
+        data=page.read()
+        fwriter = open(dst, 'w')
+        fwriter.write(data)
+        fwriter.close()
+      else:
+        print 'ALREADY CRAWLED:', self.prefix + number
 
-      fwriter = open(self.pathprefix + number, 'w')
-      fwriter.write(data)
-      fwriter.close()
-
+  def check(self):
+    for index in range(self.fst, self.lst):
+      number = str(index)
+      url = "https://issues.apache.org/jira/browse/" + self.prefix + number
+      dst = self.pathprefix + number
+      if os.path.exists(dst) == False or os.stat(dst).st_size == 0:
+        print 'NEED TO CRAWL:', self.prefix + number
+        return False
+    return True
 
   def write2log(self):
     output = open(self.output_log, 'a')
@@ -62,7 +77,10 @@ class HadoopJIRACrawler(Crawler):
     output.write("\n\n-------------------------------------------------------------------------\n")
     output.close()		
 
-
-hadoopjiracrawler = HadoopJIRACrawler('/home/long/Research/Conquid/pages', 'hadoop.jira.log', 'HADOOP-', 1, 11298)
+ROOT_REPO = '/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/'
+PREFIX = 'HADOOP-'
+# https://issues.apache.org/jira/browse/HADOOP-12635?jql=project%20%3D%20HADOOP
+hadoopjiracrawler = HadoopJIRACrawler(ROOT_REPO, PREFIX, 1, 12635)
+#hadoopjiracrawler.check()
 hadoopjiracrawler.crawl()
 #hadoopjiracrawler.write2log()
