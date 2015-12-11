@@ -60,10 +60,10 @@ def getJIRAInCommits():
           for delim in delims:
             if jirano.find(delim) != -1:
               jirano = jirano[ : jirano.find(delim)]
-          if not re.match('^[A-Z0-9\-]*$', jirano):
+          if not re.match('^[A-Z]*\-[0-9]*$', jirano):
             print 'INVALID JIRA: ', jirano
           #print jirano, ' | ', chg
-          if jirano not in jiras:
+          elif jirano not in jiras:
             jiras.append(jirano)
           chg = chg.replace(pfx, '', 1)
     commitj[cha['version']] = jiras
@@ -75,12 +75,16 @@ def getJIRAInCommits():
 #  print j
 
 def checkJIRAPages():
-  print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
   JIRA_PAGE_DIR = '/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/pages'
-  for jn in getJIRAInCommits():
-    jnp = os.path.join(JIRA_PAGE_DIR, jn)
-    if os.path.exists(jnp) == False:
-      print jn
+  cmap = getJIRAInCommits()
+  print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+  for commit in cmap:
+    for jn in cmap[commit]:
+      jnp = os.path.join(JIRA_PAGE_DIR, jn)
+      if os.path.exists(jnp) == False:
+        print 'NOT CRAWLED: ', jn
+      elif os.stat(jnp).st_size == 0:
+        print 'CORRUPTED: ', jnp
 
 checkJIRAPages()
 
