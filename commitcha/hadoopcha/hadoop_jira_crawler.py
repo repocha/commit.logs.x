@@ -4,7 +4,7 @@ from crawler import Crawler
 
 import urllib2
 import os
-
+import sleep
 from lxml import etree
 from lxml import html
 
@@ -29,11 +29,15 @@ class HadoopJIRACrawler(Crawler):
 
       if os.path.exists(dst) == False or os.stat(dst).st_size == 0:
         print 'CRAWLING:', self.prefix + number
-        page =urllib2.urlopen(url)
-        data=page.read()
-        fwriter = open(dst, 'w')
-        fwriter.write(data)
-        fwriter.close()
+        try:
+          page =urllib2.urlopen(url)
+          data=page.read()
+          fwriter = open(dst, 'w')
+          fwriter.write(data)
+          fwriter.close()
+          time.sleep(1)
+        except:
+          pass
       else:
         print 'ALREADY CRAWLED:', self.prefix + number
 
@@ -80,7 +84,7 @@ class HadoopJIRACrawler(Crawler):
 ROOT_REPO = '/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/'
 PREFIX = 'HADOOP-'
 # https://issues.apache.org/jira/browse/HADOOP-12635?jql=project%20%3D%20HADOOP
-hadoopjiracrawler = HadoopJIRACrawler(ROOT_REPO, PREFIX, 1, 12635)
+hadoopjiracrawler = HadoopJIRACrawler(ROOT_REPO, PREFIX, 1, 12636)
 #hadoopjiracrawler.check()
 hadoopjiracrawler.crawl()
 #hadoopjiracrawler.write2log()
