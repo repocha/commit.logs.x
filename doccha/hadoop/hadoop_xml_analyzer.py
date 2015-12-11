@@ -48,17 +48,18 @@ def findDefaultXML(repop):
           flst.append(os.path.join(dname, fname))
   return flst, ignore
 
-#TODO: put the parameters of each version into a set,
-#also, we need to handle multiple xmls with the same name
-#also, print out all the xml names so that we can remove some of them
 def findXMLFiles(repodir):
+  """
+  Find the xml config files from all the versions
+  """
   xmlsmap = {}
   ignored = []
+  allxmls = []
   for repo in os.listdir(repodir):
-    xmlsmap[repo] = []
     repop = os.path.join(repodir, repo)
+    #xmlsmap[repop] = []
     if os.path.isdir(repop):
-      print repop, '-----------------------------------------'
+      #print repop, '-----------------------------------------'
       xml2anyz, ign = findDefaultXML(repop)
       for ix in ign:
         if ix not in ignored:
@@ -66,14 +67,17 @@ def findXMLFiles(repodir):
       #here we want to dedup because sometimes the same files occur multiple times...
       unqxml2anyz = []
       for xa in xml2anyz:
+        if os.path.basename(xa) not in allxmls:
+          allxmls.append(os.path.basename(xa))
         dup = False
         for uxa in unqxml2anyz:
           if os.path.basename(xa) == os.path.basename(uxa):
             # compare the contents
             if filecmp.cmp(xa, uxa) == False:
-              print '[ERROR] The two config file has the same name but different contents:'
-              print xa
-              print uxa
+              print '---------------------------------------------------------------------'
+              print '| [ERROR] The two config file has the same name but different contents:'
+              print '|', xa
+              print '|', uxa
               print '---------------------------------------------------------------------'
               break
             else:
@@ -81,8 +85,34 @@ def findXMLFiles(repodir):
               break
         if dup == False:
           unqxml2anyz.append(xa)
-      print '#dup xmls: ', str(len(xml2anyz) - len(unqxml2anyz)) 
+      xmlsmap[repop] = unqxml2anyz
+      print '#dup xmls: ', str(len(xml2anyz) - len(unqxml2anyz))
   for ix in ignored:
     print 'IGNORED FILE NAMES: ', ix
-            
-findXMLFiles('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/')
+  for xml in allxmls:
+    print 'XMLS: ', xml
+  return xmlsmap            
+
+xmlsmap = findXMLFiles('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/')
+for d in xmlsmap:
+  print '>>> ', d, len(xmlsmap[d])
+  pmap = {}
+  for xml in xmlsmap[d]:
+    for p in getParamsFromXML(xml):
+      if p['name'] in pmap:
+        if p['default'] != pmap[p['name']]['default']:
+          print '---------------------------------------------------------------------------------------'
+          print '| [ERROR] the default of ', p['name'], 'is different.'
+          print '|', p['default'], '<>', pmap[p['name']]['default'] 
+          if p['file'] == pmap[p['name']]['file']:
+            print '| DIFF IN SAME FILE: '
+            print '|', p['file']
+          else:
+            print '| DIFF IN DIFF FILES: '
+            print '|', p['file']
+            print '|', pmap[p['name']]['file']
+          print '---------------------------------------------------------------------------------------'
+      else:
+        pmap[p['name']] = p
+  print d, len(pmap)
+
