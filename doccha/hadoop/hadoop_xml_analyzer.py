@@ -45,6 +45,7 @@ def findDefaultXML(repop):
           #print 'Ignore: ', dname, fname
           pass
         else:
+          print 'FIND XML: ', os.path.join(dname, fname)
           flst.append(os.path.join(dname, fname))
   return flst, ignore
 
@@ -93,26 +94,70 @@ def findXMLFiles(repodir):
     print 'XMLS: ', xml
   return xmlsmap            
 
-xmlsmap = findXMLFiles('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/')
-for d in xmlsmap:
-  print '>>> ', d, len(xmlsmap[d])
-  pmap = {}
-  for xml in xmlsmap[d]:
-    for p in getParamsFromXML(xml):
-      if p['name'] in pmap:
-        if p['default'] != pmap[p['name']]['default']:
-          print '---------------------------------------------------------------------------------------'
-          print '| [ERROR] the default of ', p['name'], 'is different.'
-          print '|', p['default'], '<>', pmap[p['name']]['default'] 
-          if p['file'] == pmap[p['name']]['file']:
-            print '| DIFF IN SAME FILE: '
-            print '|', p['file']
+def buildParamsMap():
+  """
+  ParamsMap should be in the following format
+  {version : {name : pstruct}}
+  """
+  paramsMap = {}
+  xmlsmap = findXMLFiles('/media/tianyin/TOSHIBA EXT/software/hadoop-dist/')
+  for d in xmlsmap:
+    print '>>> ', d, len(xmlsmap[d])
+    pmap = {}
+    for xml in xmlsmap[d]:
+      for p in getParamsFromXML(xml):
+        if p['name'] in pmap:
+          if p['default'] != pmap[p['name']]['default']:
+            print '---------------------------------------------------------------------------------------'
+            print '| [ERROR] the default of ', p['name'], 'is different.'
+            print '|', p['default'], '<>', pmap[p['name']]['default'] 
+            if p['file'] == pmap[p['name']]['file']:
+              print '| DIFF IN SAME FILE: '
+              print '|', p['file']
+            else:
+              print '| DIFF IN DIFF FILES: '
+              print '|', p['file']
+              print '|', pmap[p['name']]['file']
+            print '---------------------------------------------------------------------------------------'
           else:
-            print '| DIFF IN DIFF FILES: '
-            print '|', p['file']
-            print '|', pmap[p['name']]['file']
-          print '---------------------------------------------------------------------------------------'
-      else:
-        pmap[p['name']] = p
-  print d, len(pmap)
+            pass
+        else:
+          pmap[p['name']] = p
+    #print d, len(pmap)
+    paramsMap[d] = pmap
+  return paramsMap
 
+def getVersionOrder():
+  pass
+
+def checkDefaultDiff():
+  paramsMap = buildParamsMap() 
+  #1. get all the parameters
+  plst = []
+  for v in paramsMap:
+    for p in paramsMap[v]:
+      if p not in plst:
+        plst.append(p)
+  print '#Total params: ', len(plst)
+  pDef = {}
+  for p in plst:
+    pDef[p] = {}
+    for v in paramsMap:
+      if p in paramsMap[v]:
+        if 'default' not in paramsMap[v][p]:
+          paramsMap[v][p]['default'] = ''
+        if paramsMap[v][p]['default'] not in pDef[p]:
+          pDef[p][paramsMap[v][p]['default']] = [paramsMap[v][p]['file']]
+        else:
+          pDef[p][paramsMap[v][p]['default']].append(paramsMap[v][p]['file'])
+  for p in pDef:
+    if len(pDef[p]) > 1: #i.e., it is changed...
+      print p, pDef[p].keys()
+  for p in pDef:
+    if len(pDef[p]) > 1:
+      print '>>> ', p
+      for v in pDef[p]:
+        print v, pDef[p][v]
+
+#checkConsistencyInSameVersion()
+checkDefaultDiff()
