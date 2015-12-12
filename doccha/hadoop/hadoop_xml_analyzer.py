@@ -8,7 +8,9 @@ import os
 import fnmatch
 import filecmp
 
-def getParamsFromXML(defxml):
+#TODO: there are a list of renamed parameters 
+
+def getParamsFromXML(defxml, repo):
   """
   Get all the parameters from the config files
   """
@@ -19,6 +21,7 @@ def getParamsFromXML(defxml):
   doc = fromstring(xml)
   for prop in doc.iter('property'):
     p = {}
+    p['repo'] = repo
     p['file'] = defxml
     for name in prop.iter('name'):
       p['name'] = name.text_content()
@@ -105,7 +108,7 @@ def buildParamsMap():
     print '>>> ', d, len(xmlsmap[d])
     pmap = {}
     for xml in xmlsmap[d]:
-      for p in getParamsFromXML(xml):
+      for p in getParamsFromXML(xml, d):
         if p['name'] in pmap:
           if p['default'] != pmap[p['name']]['default']:
             print '---------------------------------------------------------------------------------------'
@@ -147,9 +150,9 @@ def checkDefaultDiff():
         if 'default' not in paramsMap[v][p]:
           paramsMap[v][p]['default'] = ''
         if paramsMap[v][p]['default'] not in pDef[p]:
-          pDef[p][paramsMap[v][p]['default']] = [paramsMap[v][p]['file']]
+          pDef[p][paramsMap[v][p]['default']] = [os.path.basename(paramsMap[v][p]['repo']) + '|' + os.path.basename(paramsMap[v][p]['file'])]
         else:
-          pDef[p][paramsMap[v][p]['default']].append(paramsMap[v][p]['file'])
+          pDef[p][paramsMap[v][p]['default']].append(os.path.basename(paramsMap[v][p]['repo']) + '|' + os.path.basename(paramsMap[v][p]['file']))
   for p in pDef:
     if len(pDef[p]) > 1: #i.e., it is changed...
       print p, pDef[p].keys()
@@ -161,3 +164,4 @@ def checkDefaultDiff():
 
 #checkConsistencyInSameVersion()
 checkDefaultDiff()
+

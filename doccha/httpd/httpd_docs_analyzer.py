@@ -6,9 +6,14 @@ import lxml.html as lh
 import csv
 from io import StringIO, BytesIO
 
+"""
+TODO: 2.0.35 -- 2.0.42
+"""
+
 def getParamsFromHTML(path):
   """
   This should work for most new HTML manual pages
+  Currently from 2.0.42 -- 2.4.7 
   """
   pset = []
   f = open(path)
@@ -43,7 +48,7 @@ def getParamsFromHTML(path):
 
 def getParamsFromOldHTML(path):
   """
-  This should work for old HTML web pages. 
+  This should work for httpd-1 (1.3.0 -- 1.3.42) 
   The old HTML pages are very hard to analyze as they do not have clear structures, 
   but are plain texts combined with <a>
   We define a set of specific rules to extract the config information
@@ -62,7 +67,7 @@ def getParamsFromOldHTML(path):
   html = f.read()
   f.close()
   doc = fromstring(html)
-  #1. if the page does not have a <H2>Directives</H2> return
+  #1. ignore pages that do not have any directive-dict tags
   hasParams = False
   for e in doc.iter():
     if e.tag == 'a':
@@ -162,14 +167,14 @@ def getModules(plst):
   return modset
 
 #getParametersHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/core.html.en')
-#pset = getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.2.10/docs/manual/mod/')
-#print len(pset)
+pset = getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.0.42/docs/manual/mod/')
+print len(pset)
 #print getModules(pset)
 #print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.2/docs/manual/mod/'))
 #print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/'))
 
 #getParamsFromOldHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/core.html')
 #getParamsFromOldHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/mod_setenvif.html')
-getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/', False)
+#getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.42/htdocs/manual/mod/', False)
 #getParamsFromOldHTML('core_hr.html')
 
