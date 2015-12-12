@@ -52,7 +52,14 @@ def dfilter(dirp, paramspath):
 #print '#JIRA: ', len(js)
 #utils.print2csv(js, 'yarn_jira.csv')
 
-js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/HADOOP-/', 
+#js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/HADOOP-/', 
+#             '/home/tianyin/confcha/doccha/hadoop/params.list')
+#print '#JIRA: ', len(js)
+#utils.print2csv(js, 'hadoop_jira.csv')
+
+PREFIX = 'HDFS-'
+js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/' + PREFIX, 
              '/home/tianyin/confcha/doccha/hadoop/params.list')
 print '#JIRA: ', len(js)
-utils.print2csv(js, 'hadoop_jira.csv')
+sjs = utils.sort(js, PREFIX)
+utils.print2csv(sjs, PREFIX.lower() + 'jira.csv')
