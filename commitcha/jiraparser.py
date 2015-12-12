@@ -7,6 +7,9 @@ import csv
 from io import StringIO, BytesIO
 
 def parse(jpath):
+  """
+  Now we only care about 'title' and 'summary'
+  """
   jira = {}
   f = open(jpath)
   html = f.read()
@@ -21,15 +24,16 @@ def parse(jpath):
     print 'ERROR: NO TITLE'
   return jira
 
-def filter(jira):
+CONFIG_KW = [
+        'config', 
+        'option',
+        'propert'
+        ]
+
+def filter(jira, keywords = CONFIG_KW):
   """
   return whether the jira contains the predefined keywords
   """
-  keywords = [
-          'config', 
-          'option',
-          'propert'
-          ]
   for kw in keywords:
     if jira['title'].lower().find(kw) != -1:
       return True
