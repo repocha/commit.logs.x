@@ -1,5 +1,7 @@
+import utils
 import hadoop_jira_parser
 import os 
+import constant
 
 CONFIG_KW = [
         'config', 
@@ -19,7 +21,7 @@ def filter(jira, keywords = CONFIG_KW):
   #none of the keywords is found
   return False 
 
-def dfilter(dirp, paramspath, output):
+def dfilter(dirp, paramspath):
   """
   Get config-related JIRAs and print to a CSV
   """
@@ -37,12 +39,15 @@ def dfilter(dirp, paramspath, output):
     fp = os.path.join(dirp, f)
     jira = hadoop_jira_parser.parse(fp)
     if jira != None and filter(jira, kws) == True:
-      print f, jira['title'], jira['summary']
-      #if 'summary' in jira:
-      #  print jira['summary']
+      print f, jira['title']
+      jira['id'] = f
+      jira['url'] = constant.getJIRAUrl(f)
+      if 'summary' not in jira:
+        jira['summary'] = ''
       js.append(jira)
   return js
 
 js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/YARN-/', 
              '/home/tianyin/confcha/doccha/hadoop/params.list')
-print len(js)
+print '#JIRA: ', len(js)
+utils.print2csv(js, 'yarn_jira.csv')

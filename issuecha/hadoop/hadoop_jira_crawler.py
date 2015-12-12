@@ -1,7 +1,8 @@
 import sys
-sys.path.append('..')
+sys.path.append('../..')
 from crawler import Crawler
 
+import constant.py
 import urllib2
 import os
 import time
@@ -24,7 +25,8 @@ class HadoopJIRACrawler(Crawler):
     """
     for index in range(self.fst, self.lst):
       number = str(index)
-      url = "https://issues.apache.org/jira/browse/" + self.prefix + number
+      #url = "https://issues.apache.org/jira/browse/" + self.prefix + number
+      url = constant.getJIRAUrl(self.prefix + number)
       dst = self.pathprefix + number
 
       if os.path.exists(dst) == False or os.stat(dst).st_size == 0:
