@@ -162,6 +162,18 @@ def checkDefaultDiff():
       for v in pDef[p]:
         print v, pDef[p][v]
 
+def getAllParams():
+  paramsMap = buildParamsMap() 
+  plst = []
+  for v in paramsMap:
+    for p in paramsMap[v]:
+      if p not in plst:
+        plst.append(p)
+  print '#Total params: ', len(plst)
+  for p in plst:
+    print p
+  return plst
+ 
 #checkConsistencyInSameVersion()
-checkDefaultDiff()
-
+#checkDefaultDiff()
+getAllParams()

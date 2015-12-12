@@ -1,6 +1,4 @@
-import sys
-sys.path.append('..')
-import jiraparser
+import hadoop_jira_parser
 import os 
 
 CONFIG_KW = [
@@ -11,7 +9,7 @@ CONFIG_KW = [
 
 def filter(jira, keywords = CONFIG_KW):
   """
-  return whether the jira contains the predefined keywords
+  Return whether the jira contains the predefined keywords
   """
   for kw in keywords:
     if jira['title'].lower().find(kw) != -1:
@@ -21,18 +19,30 @@ def filter(jira, keywords = CONFIG_KW):
   #none of the keywords is found
   return False 
 
-def dfilter(dirp):
+def dfilter(dirp, paramspath, output):
+  """
+  Get config-related JIRAs and print to a CSV
+  """
   js = []
+  # build keywords
+  kws = []
+  for kw in CONFIG_KW:
+    kws.append(kw)
+  pf = open(paramspath, 'r')
+  for p in pf:
+    kws.append(p.strip().lower())
+  print len(kws)
+  pf.close() 
   for f in os.listdir(dirp):
     fp = os.path.join(dirp, f)
-    jira = jiraparser.parse(fp)
-    if jira != None and filter(jira) == True:
-      print jira['title']
+    jira = hadoop_jira_parser.parse(fp)
+    if jira != None and filter(jira, kws) == True:
+      print f, jira['title'], jira['summary']
       #if 'summary' in jira:
       #  print jira['summary']
       js.append(jira)
   return js
 
-
-js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/FLUME-/')
+js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/YARN-/', 
+             '/home/tianyin/confcha/doccha/hadoop/params.list')
 print len(js)
