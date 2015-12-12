@@ -21,25 +21,9 @@ def parse(jpath):
   for summary in doc.find_class('user-content-block'):
     jira['summary'] = summary.text_content().strip()
   if 'title' not in jira:
+    print jpath
     print 'ERROR: NO TITLE'
+    return None
   return jira
 
-CONFIG_KW = [
-        'config', 
-        'option',
-        'propert'
-        ]
-
-def filter(jira, keywords = CONFIG_KW):
-  """
-  return whether the jira contains the predefined keywords
-  """
-  for kw in keywords:
-    if jira['title'].lower().find(kw) != -1:
-      return True
-    if jira['summary'].lower().find(kw) != -1:
-      return True
-  #none of the keywords is found
-  return False 
-
-print filter(parse('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/HADOOP-/HADOOP-2222'))
+parse('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/HADOOP-/HADOOP-2222')
