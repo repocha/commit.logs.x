@@ -47,7 +47,12 @@ def dfilter(dirp, paramspath):
       js.append(jira)
   return js
 
-js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/YARN-/', 
+#js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/YARN-/', 
+#             '/home/tianyin/confcha/doccha/hadoop/params.list')
+#print '#JIRA: ', len(js)
+#utils.print2csv(js, 'yarn_jira.csv')
+
+js = dfilter('/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/HADOOP-/', 
              '/home/tianyin/confcha/doccha/hadoop/params.list')
 print '#JIRA: ', len(js)
-utils.print2csv(js, 'yarn_jira.csv')
+utils.print2csv(js, 'hadoop_jira.csv')

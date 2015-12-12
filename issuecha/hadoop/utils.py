@@ -5,6 +5,7 @@ def print2csv(issues, output):
   We assume an issue to have the following attr:
   {id, url, title, summary}
   """
+  #TODO: order the JIRAs based on the JIRA#
   with open(output, 'wb') as csvfile:
     csvwriter = csv.writer(csvfile)
     for i in issues:

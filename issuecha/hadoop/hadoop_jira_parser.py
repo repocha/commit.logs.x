@@ -3,7 +3,6 @@ from lxml import etree
 from lxml.html import fromstring
 from lxml.html import tostring
 import lxml.html as lh
-import csv
 from io import StringIO, BytesIO
 
 def parse(jpath):
