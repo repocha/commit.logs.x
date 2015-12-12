@@ -4,7 +4,7 @@ from crawler import Crawler
 
 import urllib2
 import os
-import sleep
+import time
 from lxml import etree
 from lxml import html
 
@@ -82,9 +82,16 @@ class HadoopJIRACrawler(Crawler):
     output.close()		
 
 ROOT_REPO = '/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/'
-PREFIX = 'HADOOP-'
-# https://issues.apache.org/jira/browse/HADOOP-12635?jql=project%20%3D%20HADOOP
-hadoopjiracrawler = HadoopJIRACrawler(ROOT_REPO, PREFIX, 1, 12636)
+#PREFIX = 'HADOOP-'
+#PREFIX = 'HDFS-'
+#PREFIX = 'YARN-'
+#PREFIX = 'MAPREDUCE-'
+PREFIX = 'FLUME-'
+### https://issues.apache.org/jira/browse/HADOOP-12635?jql=project%20%3D%20HADOOP
+### https://issues.apache.org/jira/browse/HDFS-9547?jql=project%20%3D%20HDFS
+### https://issues.apache.org/jira/browse/YARN-4136?jql=project%20%3D%20YARN
+### https://issues.apache.org/jira/browse/MAPREDUCE-6570?jql=project%20%3D%20MAPREDUCE
+hadoopjiracrawler = HadoopJIRACrawler(ROOT_REPO, PREFIX, 1, 2855)
 #hadoopjiracrawler.check()
 hadoopjiracrawler.crawl()
 #hadoopjiracrawler.write2log()
