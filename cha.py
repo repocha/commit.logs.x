@@ -89,6 +89,7 @@ class GitCha(ConfCha):
         f = open(chalog, 'r')
         revno = ''
         message = ''
+        date = ''
         chfiles = []
         for line in f:
             if len(line.strip()) == 0:
@@ -99,6 +100,7 @@ class GitCha(ConfCha):
                     cha['version'] = revno
                     cha['changes'] = message
                     cha['chfiles'] = chfiles
+                    cha['date'] = date
                     self.charepo.append(cha)
                 revno = line.replace('commit', '').strip()
                 message = ''
@@ -106,7 +108,7 @@ class GitCha(ConfCha):
             elif line.startswith('Author:'):
                 pass
             elif line.startswith('Date:'):
-                pass
+                date = line.replace('Date:', '').strip()
             elif line.startswith('    '):
                 message += line.strip() + ' '
             else:
@@ -115,6 +117,7 @@ class GitCha(ConfCha):
         cha['version'] = revno
         cha['changes'] = message
         cha['chfiles'] = chfiles
+        cha['date'] = date
         self.charepo.append(cha)
         self.printinfo()
 
