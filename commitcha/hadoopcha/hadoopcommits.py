@@ -110,28 +110,77 @@ def splitCommit(commitLog):
   return filecha
 
 
-def generateDefaultXmlChangesDump():
+def recordDefXmlCha():
+  """
+  generate a dump recording the changes of the default xmls
+  """
+  chas = []
   hadoopCha = HadoopCha()
   hadoopCha.parse('hadoop.log.name-status')
   chalst = hadoopCha.selectxml()
-  cnt = 0
   for cha in chalst:
+    rescha = {}
     xmls = []
     for f in cha['chfiles']:
-      if f.endswith('yarn-default.xml'):
+      if f.endswith('-default.xml'):
         xmls.append(f)
     if len(xmls) > 0:
-      print cha['version'], cha['changes'], len(xmls)
+      #print cha['version'], cha['changes'], len(xmls)
+      rescha['commit'] = cha['version']
+      rescha['summary'] = cha['changes']
+      rescha['date'] = cha['date']
+      rescha['xmls'] = xmls
       out, err = hadoopCha.chaShow(cha['version'], '/home/tianyin/hadoop')
       filecha = splitCommit(out)
+      rescha['changes'] = filecha
+      chas.append(rescha)
+  return chas
+
+def getChaType(filecha):
+  add = False
+  rmv = False
+  for line in filecha.splitlines():
+    if line.startswith('+++') or line.startswith('---'):
+      continue
+    if line.startswith('+'):
+      add = True
+    elif line.startswith('-'):
+      rmv = True
+    else:
+      pass
+  if add and rmv:
+    return 'R'
+  elif add and rmv == False:
+    return 'A'
+  elif add == False and rmv:
+    return 'M'
+
+
+def dumpDefXmlCha(chas, xmlname):
+  cnt = 0
+  for cha in chas:
+    contains = False
+    filecha = cha['changes']
+    for f in filecha:
+      if f.endswith(xmlname) and getChaType(filecha[f]) == 'M':
+        contains = True
+        break
+    if contains:
+      cnt += 1
+      print '=================================================================='
+      print cha['commit']
+      print '------------------------------------------------------------------'
+      print cha['summary']
+      print cha['date']
+      print '=================================================================='
       for f in filecha:
-        if 'yarn-default.xml' in f:
+        if f.endswith(xmlname) and getChaType(filecha[f]) == 'M':
           print filecha[f]
-          cnt += 1
   print cnt
 
+
 #checkJIRAPages()
-generateDefaultXmlChangesDump()
+dumpDefXmlCha(recordDefXmlCha(), 'hdfs-default.xml')
 
 #hadoopCha = HadoopCha()
 #out, err = hadoopCha.chaShow('bf6aa30a156b3c5cac5469014a5989e0dfdc7256', '/home/tianyin/hadoop')
