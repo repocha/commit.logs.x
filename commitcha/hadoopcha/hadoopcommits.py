@@ -1,5 +1,5 @@
 import sys
-sys.path.append('..')
+sys.path.append('../..')
 from cha import GitCha
 import subprocess
 import os
@@ -13,28 +13,22 @@ class HadoopCha(GitCha):
     res = []
     for cha in self.charepo:
       if 'chfiles' not in cha:
-        print cha
+        #print cha
         return
       hit = False
       for f in cha['chfiles']:
-        if f.endswith('default.xml'): # == True and f.endswith('pom.xml') == False:
+        if f.endswith('default.xml') == True and f.endswith('pom.xml') == False:
           hit = True
           break
       if hit == True:
         res.append(cha)
     return res
 
-  def pcha(self, chalst, repopath):
-    for cha in chalst:
-      commit = cha['version']
-      cmd = ['git', '-C', repopath, 'show', commit]
-      process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE) 
-      out, err = process.communicate()
-      print commit
-      print cha['changes']
-      print out
-      # get the diff using git show commitno
-      # append in a file
+  def chaShow(self, commit, repopath):
+    cmd = ['git', '-C', repopath, 'show', commit]
+    process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE) 
+    out, err = process.communicate()
+    return out, err
 
 def getJIRAInCommits():
   commitj = {}
@@ -75,6 +69,9 @@ def getJIRAInCommits():
 #  print j
 
 def checkJIRAPages():
+  """
+  Check if the commit log is corresponding to a JIRA#
+  """
   JIRA_PAGE_DIR = '/media/tianyin/TOSHIBA EXT/tixu_old/longjin/hadoop-jira/pages'
   cmap = getJIRAInCommits()
   print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
@@ -86,21 +83,57 @@ def checkJIRAPages():
       elif os.stat(jnp).st_size == 0:
         print 'CORRUPTED: ', jnp
 
-checkJIRAPages()
 
-"""
-hadoopCha = HadoopCha()
-hadoopCha.parse('hadoop.log.name-status')
-chalst = hadoopCha.selectxml()
-#hadoopCha.pcha(chalst, '/home/tianyin/hadoop')
-for cha in chalst:
-    isConfRelated = False
-    if 'conf' in cha['changes']:
-      isConfRelated = True
+def splitCommit(commitLog):
+  """
+  Split a commit log into per-file structure
+  """
+  started  = False
+  filecha  = {}
+  lastkey  = ''
+  lastcntt = ''
+  for line in commitLog.splitlines():
+    if line.startswith('diff'):
+      if ' --git ' not in line:
+        raise ValueError('ERROR: starting with \'diff\' but not having \'--git\': ' + line)
+      fc = line.replace('diff', '').replace(' --git ', '').strip()
+      if started:
+        filecha[lastkey] = lastcntt
+      else:
+        started = True
+      lastcntt = ''
+      lastkey = fc
+    else:
+      lastcntt += line + '\n'
+  if started:
+    filecha[lastkey] = lastcntt
+  return filecha
+
+
+def generateDefaultXmlChangesDump():
+  hadoopCha = HadoopCha()
+  hadoopCha.parse('hadoop.log.name-status')
+  chalst = hadoopCha.selectxml()
+  cnt = 0
+  for cha in chalst:
+    xmls = []
     for f in cha['chfiles']:
-      if f.endswith('default.xml'):
-        isConfRelated = True
-        break
-    if isConfRelated == True:
-      print cha['version'], cha['changes'], len(cha['chfiles'])
-"""
+      if f.endswith('yarn-default.xml'):
+        xmls.append(f)
+    if len(xmls) > 0:
+      print cha['version'], cha['changes'], len(xmls)
+      out, err = hadoopCha.chaShow(cha['version'], '/home/tianyin/hadoop')
+      filecha = splitCommit(out)
+      for f in filecha:
+        if 'yarn-default.xml' in f:
+          print filecha[f]
+          cnt += 1
+  print cnt
+
+#checkJIRAPages()
+generateDefaultXmlChangesDump()
+
+#hadoopCha = HadoopCha()
+#out, err = hadoopCha.chaShow('bf6aa30a156b3c5cac5469014a5989e0dfdc7256', '/home/tianyin/hadoop')
+#print out
+#print splitCommit(out) 
