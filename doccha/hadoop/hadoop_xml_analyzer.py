@@ -26,7 +26,7 @@ def getParamsFromXML(defxml, repo):
     for name in prop.iter('name'):
       p['name'] = name.text_content()
     for value in prop.iter('value'):
-      p['default'] = value.text_content()
+      p['value'] = value.text_content()
     plst.append(p)
   return plst
 
@@ -110,10 +110,10 @@ def buildParamsMap():
     for xml in xmlsmap[d]:
       for p in getParamsFromXML(xml, d):
         if p['name'] in pmap:
-          if p['default'] != pmap[p['name']]['default']:
+          if p['value'] != pmap[p['name']]['value']:
             print '---------------------------------------------------------------------------------------'
             print '| [ERROR] the default of ', p['name'], 'is different.'
-            print '|', p['default'], '<>', pmap[p['name']]['default'] 
+            print '|', p['value'], '<>', pmap[p['name']]['value'] 
             if p['file'] == pmap[p['name']]['file']:
               print '| DIFF IN SAME FILE: '
               print '|', p['file']
@@ -147,12 +147,12 @@ def checkDefaultDiff():
     pDef[p] = {}
     for v in paramsMap:
       if p in paramsMap[v]:
-        if 'default' not in paramsMap[v][p]:
-          paramsMap[v][p]['default'] = ''
-        if paramsMap[v][p]['default'] not in pDef[p]:
-          pDef[p][paramsMap[v][p]['default']] = [os.path.basename(paramsMap[v][p]['repo']) + '|' + os.path.basename(paramsMap[v][p]['file'])]
+        if 'value' not in paramsMap[v][p]:
+          paramsMap[v][p]['value'] = ''
+        if paramsMap[v][p]['value'] not in pDef[p]:
+          pDef[p][paramsMap[v][p]['value']] = [os.path.basename(paramsMap[v][p]['repo']) + '|' + os.path.basename(paramsMap[v][p]['file'])]
         else:
-          pDef[p][paramsMap[v][p]['default']].append(os.path.basename(paramsMap[v][p]['repo']) + '|' + os.path.basename(paramsMap[v][p]['file']))
+          pDef[p][paramsMap[v][p]['value']].append(os.path.basename(paramsMap[v][p]['repo']) + '|' + os.path.basename(paramsMap[v][p]['file']))
   for p in pDef:
     if len(pDef[p]) > 1: #i.e., it is changed...
       print p, pDef[p].keys()
@@ -175,5 +175,5 @@ def getAllParams():
   return plst
  
 #checkConsistencyInSameVersion()
-#checkDefaultDiff()
-getAllParams()
+checkDefaultDiff()
+#getAllParams()

@@ -6,6 +6,11 @@ import lxml.html as lh
 import csv
 from io import StringIO, BytesIO
 
+import sys
+sys.path.append('..')
+from params import ParamSet
+import params
+
 """
 TODO: 2.0.35 -- 2.0.42
 """
@@ -25,7 +30,7 @@ def getParamsFromHTML(path):
     p = {}
     for h2 in dsec.iter('h2'):
       # print h2.text_content()
-      p['name'] = h2.text_content().replace('Directive', '').strip()
+      p['name'] = h2.text_content().replace('Directive', '').replace('directive', '').strip()
       p['file'] = path
     for tr in dsec.iter('tr'):
       for th in tr.iter('th'):
@@ -38,9 +43,9 @@ def getParamsFromHTML(path):
             # print td.text_content()
             p['syntax'] = td.text_content().strip()
     if 'default' in p:
-      p['default'] = p['default'].replace(p['name'], '').strip()
-      if 'syntax' in p:
-        p['syntax']  = p['syntax'].replace(p['name'], '').strip()
+      p['default'] = params.normalize(p['name'], p['default'])
+    if 'syntax' in p:
+      p['syntax']  = p['syntax'].replace(p['name'], '').strip()
     #print p
     pset.append(p)
   #end for loop
@@ -55,13 +60,13 @@ def getParamsFromOldHTML(path):
   """
   pset = []
   PROPS = {
-          'directive-dict.html#Syntax'   : 'Syntax',
-          'directive-dict.html#Default'  : 'Default',
-          'directive-dict.html#Context'  : 'Context',
-          'directive-dict.html#Status'   : 'Status',
+          'directive-dict.html#Syntax'        : 'Syntax',
+          'directive-dict.html#Default'       : 'Default',
+          'directive-dict.html#Context'       : 'Context',
+          'directive-dict.html#Status'        : 'Status',
           'directive-dict.html#Compatibility' : 'Compatibility',
-          'directive-dict.html#Override' : 'Override',
-          'directive-dict.html#Module'   : 'Module'
+          'directive-dict.html#Override'      : 'Override',
+          'directive-dict.html#Module'        : 'Module'
           }
   f = open(path)
   html = f.read()
@@ -81,68 +86,69 @@ def getParamsFromOldHTML(path):
   dstr = tostring(doc)
   hrSlices = dstr.split('<hr>')
   for hrSlice in hrSlices:
-    #if hrSlice.find('<p>') != -1:
-    #  hrSlice = hrSlice[ : hrSlice.find('<p>')]
-    if hrSlice.find('<html>') == -1:
-      hrSlice = '<html> ' + hrSlice
-    if hrSlice.find('</html>') == -1:
-      hrSlice = hrSlice + ' </html>'
-    pname = None
-    hrdoc = fromstring(hrSlice)
-    for e in hrdoc.iter():
-      if e.tag == 'a':
-        if 'name' in e.attrib:
-          pname = e.attrib['name']
-    if pname == None:
-      continue
-    #print '---------------------------------------------'
-    #print hrSlice
-    #print pname
-    props = []
-    for e in hrdoc.iter():
-      if e.tag == 'a':
-        if 'href' in e.attrib and e.attrib['href'].find('directive-dict.html#') != -1:
-          if e.attrib['href'] not in PROPS:
-            print 'UNKNOWN TAG: ', e.attrib['href']
-          else:
-            props.append(PROPS[e.attrib['href']])
-    props_idx = {}
-    hrdoctext = hrdoc.text_content()
-    for prop in props:
-      props_idx[prop] = hrdoctext.find(prop)
-    props_ridx = {}
-    props_idx_lst = []
-    for prop in props_idx:
-      props_ridx[props_idx[prop]] = prop
-      props_idx_lst.append(props_idx[prop])
-    props_ridx[0] = 'Directive'
-    props_idx_lst = sorted(props_idx_lst)
-    #print props_ridx
-    #print props_idx_lst
-    pmore = {}
-    previdx = 0
-    for idx in props_idx_lst:
-      pmore[props_ridx[previdx]] = hrdoctext[previdx : idx].strip()
-      previdx = idx
-    #print 'info: ', pmore
-    if len(pmore) == 0:
-      continue
-    p = {}
-    p['file'] = path
-    p['name'] = pmore['Directive'].replace('Directive', '').replace('The', '').strip()
-    if 'Default' in pmore:
-      p['default'] = pmore['Default'].replace('Default:', '').strip()
-    if 'Syntax' in pmore:
-      p['syntax'] = pmore['Syntax'].replace('Syntax', '').strip()
-    # print p
-    pset.append(p)
-  print len(pset)
+    for pSlice in hrSlice.split('\r<P>\r'):
+      hrSlice = pSlice
+      #if hrSlice.find('<p>') != -1:
+      #  hrSlice = hrSlice[ : hrSlice.find('<p>')]
+      if hrSlice.find('<html>') == -1:
+        hrSlice = '<html> ' + hrSlice
+      if hrSlice.find('</html>') == -1:
+        hrSlice = hrSlice + ' </html>'
+      pname = None
+      hrdoc = fromstring(hrSlice)
+      for e in hrdoc.iter():
+        if e.tag == 'a':
+          if 'name' in e.attrib:
+            pname = e.attrib['name']
+      if pname == None:
+        continue
+      #print '---------------------------------------------'
+      #print hrSlice
+      #print pname
+      props = []
+      for e in hrdoc.iter():
+        if e.tag == 'a':
+          if 'href' in e.attrib and e.attrib['href'].find('directive-dict.html#') != -1:
+            if e.attrib['href'] not in PROPS:
+              print 'UNKNOWN TAG: ', e.attrib['href']
+            else:
+              props.append(PROPS[e.attrib['href']])
+      props_idx = {}
+      hrdoctext = hrdoc.text_content()
+      for prop in props:
+        props_idx[prop] = hrdoctext.find(prop)
+      props_ridx = {}
+      props_idx_lst = []
+      for prop in props_idx:
+        props_ridx[props_idx[prop]] = prop
+        props_idx_lst.append(props_idx[prop])
+      props_ridx[0] = 'Directive'
+      props_idx_lst = sorted(props_idx_lst)
+      #print props_ridx
+      #print props_idx_lst
+      pmore = {}
+      previdx = 0
+      for idx in props_idx_lst:
+        pmore[props_ridx[previdx]] = hrdoctext[previdx : idx].strip()
+        previdx = idx
+      #print 'info: ', pmore
+      if len(pmore) == 0:
+        continue
+      p = {}
+      p['file'] = path
+      p['name'] = pmore['Directive'].replace('Directive', '').replace('directive', '').replace('The', '').strip()
+      if 'Default' in pmore:
+        p['default'] = params.normalize(p['name'], pmore['Default'].replace('Default:', ''))
+      if 'Syntax' in pmore:
+        p['syntax'] = pmore['Syntax'].replace('Syntax', '').replace(p['name'], '').strip()
+      # print p
+      pset.append(p)
   return pset
 
 """
 It rocks, currently, it works for 2.2.10, 2.4.2, and 2.4.7
 """
-def getConfigInfo(dir_path, v2 = True):
+def getParamsInfo(dir_path, v2 = True):
   apset = []
   fl = os.listdir(dir_path)
   for f in fl:
@@ -167,14 +173,49 @@ def getModules(plst):
   return modset
 
 #getParametersHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/core.html.en')
-pset = getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.0.42/docs/manual/mod/')
-print len(pset)
+#pset = getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.0.42/docs/manual/mod/')
+#print len(pset)
 #print getModules(pset)
 #print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.2/docs/manual/mod/'))
 #print len(getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/httpd-2.4.7/docs/manual/mod/'))
 
 #getParamsFromOldHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/core.html')
 #getParamsFromOldHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.0/htdocs/manual/mod/mod_setenvif.html')
-#getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.42/htdocs/manual/mod/', False)
+#pset = getConfigInfo('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.42/htdocs/manual/mod/', False)
+for p in getParamsFromOldHTML('/media/tianyin/TOSHIBA EXT/software/httpd-dist/apache_1.3.2/htdocs/manual/mod/mod_imap.html'):
+  print p
+#print len(pset)
 #getParamsFromOldHTML('core_hr.html')
 
+paramset = ParamSet()
+
+HTTPD_REPOS = '/media/tianyin/TOSHIBA EXT/software/httpd-dist'
+with open('httpd-release-file.csv', 'rb') as f:
+  reader = csv.reader(f, delimiter=',')
+  for row in reader:
+    repop = os.path.join(HTTPD_REPOS, row[0])
+    modep = os.path.join(repop, '.' + row[1])
+    if os.path.exists(modep) == False:
+      print modep
+    if row[0].startswith('#'):
+      continue
+    if '1.3.' in row[0]:
+      paramset.addList(getParamsInfo(modep, False))
+    else:
+      paramset.addList(getParamsInfo(modep, True))
+
+print paramset.size()
+paramset.validate()
+
+#vals = paramset.checkValDiff()
+#for pname in vals:
+#  print pname
+#  print '-----'
+"""
+  if len(vals[pname]) > 1:
+    print pname
+    print '-------------------'
+    for val in vals[pname]:
+      print val
+    print '==================='
+"""

@@ -162,7 +162,7 @@ def dumpDefXmlCha(chas, xmlname):
     contains = False
     filecha = cha['changes']
     for f in filecha:
-      if f.endswith(xmlname) and getChaType(filecha[f]) == 'M':
+      if f.endswith(xmlname) and getChaType(filecha[f]) == 'R':
         contains = True
         break
     if contains:
@@ -174,7 +174,7 @@ def dumpDefXmlCha(chas, xmlname):
       print cha['date']
       print '=================================================================='
       for f in filecha:
-        if f.endswith(xmlname) and getChaType(filecha[f]) == 'M':
+        if f.endswith(xmlname) and getChaType(filecha[f]) == 'R':
           print filecha[f]
   print cnt
 
