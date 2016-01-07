@@ -58,7 +58,6 @@ class ConfCha:
         #        print kw
         return res
 
-
     def getplist(self, plist):
         f = open(plist, 'r')
         for p in f:
@@ -87,26 +86,32 @@ class GitCha(ConfCha):
     """
     def parse(self, chalog):
         f = open(chalog, 'r')
-        revno = ''
+        revno = None
         message = ''
-        date = ''
+        date = None
+        merge = None
         chfiles = []
         for line in f:
             if len(line.strip()) == 0:
                 continue
             if line.startswith('commit '):
-                if len(revno) > 0:
+                if revno != None:
                     cha = {}
                     cha['version'] = revno
                     cha['changes'] = message
                     cha['chfiles'] = chfiles
+                    cha['merge'] = merge
                     cha['date'] = date
                     self.charepo.append(cha)
                 revno = line.replace('commit', '').strip()
                 message = ''
+                date = None
+                merge = None
                 chfiles = []
             elif line.startswith('Author:'):
                 pass
+            elif line.startswith('Merge:'):
+                merge = line.replace('Merge:', '').strip()
             elif line.startswith('Date:'):
                 date = line.replace('Date:', '').strip()
             elif line.startswith('    '):
@@ -118,6 +123,7 @@ class GitCha(ConfCha):
         cha['changes'] = message
         cha['chfiles'] = chfiles
         cha['date'] = date
+        cha['merge'] = merge
         self.charepo.append(cha)
         self.printinfo()
 
