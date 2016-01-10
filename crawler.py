@@ -1,3 +1,5 @@
+import urllib2
+import time
 
 class Crawler:
     """
@@ -15,3 +17,12 @@ class Crawler:
 
     def write2log(self):
         pass
+
+def crawl(url, dstpath, intv=1):
+  """
+  Utility function
+  """
+  with open(dstpath, 'w') as of:
+    of.write(urllib2.urlopen(url).read())
+    time.sleep(intv)
+
