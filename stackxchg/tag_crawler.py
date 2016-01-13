@@ -21,8 +21,8 @@ change these for every tag
 WEBSITE = 'http://serverfault.com'
 URL_TEMPLATE = WEBSITE + "/questions/tagged/TAG?page=PN"
 DOWNLOAD_DIR = '/tmp/serverfault_tags_TAG' 
+QUESTION_LST = 'serverfault_tags_TAG_questions.lst'
 
-#Crawl the entry pages of users
 def crawlTagPages(tag):
   """
   Crawl tag pages
@@ -31,12 +31,38 @@ def crawlTagPages(tag):
   while True:
     url = URL_TEMPLATE.replace('TAG', tag).replace('PN', str(i))
     fp  = os.path.join(DOWNLOAD_DIR.replace('TAG', tag), "tag_page_" + str(i))
-    print 'CRAWLING', url
+    print 'CRAWLING: ', url
     crawl(url, fp)
     if containsQuestions(fp):
       i += 1
     else:
       return 
+
+def xtrAllQuestionURLs(dirp, fp):
+  """
+  Extract all the page links
+  """
+  with open(fp, 'w') as lf:
+    fl = os.listdir(dirp)
+    for f in fl:
+      fp = os.path.join(dirp, f)
+      for l in xtrQuestionURLs(fp):
+        lf.write(l + '\n')
+
+
+def xtrQuestionURLs(tpg):
+  """
+  Extract the page link into a file
+  """
+  qlst = []
+  with open(tpg) as f:
+    doc = fromstring(f.read())
+    doc.make_links_absolute(WEBSITE)
+    for qsum in doc.find_class('question-summary'):
+      for qlnk in qsum.find_class('question-hyperlink'):
+        for url in qlnk.iterlinks():
+          qlst.append(url[2])
+  return qlst
 
 def containsQuestions(page):
   """
@@ -51,6 +77,11 @@ def containsQuestions(page):
 if __name__ == "__main__":
   tag = raw_input('Enter the tag name: ')
   print 'Crawling tag pages of "' + tag + '"'
-  if os.path.exists(DOWNLOAD_DIR.replace('TAG', tag)) == False:
-    os.makedirs(DOWNLOAD_DIR.replace('TAG', tag)) 
+  downloadDir = DOWNLOAD_DIR.replace('TAG', tag)
+  questionLst = QUESTION_LST.replace('TAG', tag)
+
+  if os.path.exists(downloadDir) == False:
+    os.makedirs(downloadDir) 
   crawlTagPages(tag)
+  xtrAllQuestionURLs(downloadDir, questionLst)
+  #print xtrQuestionURLs('/tmp/serverfault_tags_vsftpd/tag_page_1')
