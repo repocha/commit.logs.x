@@ -19,13 +19,13 @@ class KWFilter:
   """
   def __init__(self, kwsl, repl):
     self.kwor = kwsl
-    self.replace = repl
+    self.repl = repl
 
   def contains(self, text):
-    for r in repl:
-      text = text.replace(r, repl[r])
-    for kws in kwor:
-      if self.containsAll(text, kws)
+    for r in self.repl:
+      text = text.replace(r, self.repl[r])
+    for kws in self.kwor:
+      if self.containsAll(text, kws):
         return True
     return False
 

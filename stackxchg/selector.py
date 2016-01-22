@@ -12,19 +12,23 @@ sys.path.insert(0, '..')
 from kwfilter import KWFilter
 
 def selectall(dirp, kwfilt, known=None):
+  """
+  Select all the html files in $dirp that matches the keyword-based filter.
+  If the url of the html files is in $known, we ignore it.
+  """
   for f in os.listdir(dirp):
     ppath = os.path.join(dirp, f)
     try:
-      url = select(ppath, kwfilt)
+      url = filter(ppath, kwfilt)
       if known != None and url in known:
         continue
       if url != None:
         print url
-    except:
-      print 'FAILURE: ', ppath
+    except Exception as e:
+      print 'FAILURE: ', ppath, ' | ', str(e)
       continue
 
-def select(pagepath, kwfilt):
+def filter(pagepath, kwfilt):
   """
   Success: return the url
   Failure: return None
@@ -60,6 +64,9 @@ accessKW = [
           ['access', 'denied']
         ]
 
+kwfilt = KWFilter(permKW + accessKW, {'htaccess' : ''})
+selectall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_apache', kwfilt)
+
 #checkAll('/home/xuepeng/everything_about_apache/')
 #checkAll('everything_about_apache_stackoverflow/')
 #print filter('adding-a-reverse-proxy-nginx-or-varnish', ['hello the reverse reverse'])
@@ -71,4 +78,4 @@ accessKW = [
 #    known.append(l.strip())
 #print len(known)
 #filterall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_mysql', accessKW)
-filterall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_mysql', permKW)
+#filterall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_mysql', permKW)
