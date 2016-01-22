@@ -1,81 +1,36 @@
-import os
-import sys
-import simplejson
-import string
 
-from lxml import etree
-from lxml.html import fromstring
-import lxml.html as lh
-from StringIO import StringIO
-
-def filterall(dirp, kws, known=None):
-  for f in os.listdir(dirp):
-    ppath = os.path.join(dirp, f)
-    try:
-      url = filter(ppath, kws)
-      if known != None and url in known:
-        continue
-      if url != None:
-        print url
-    except:
-      print 'FAILURE: ', ppath
-      continue
-
-def filter(pagepath, kwss):
+class KWFilter:
   """
-  Success: return the url
-  Failure: return None
+  This is a simple keyword-based filter. The core function is "contains".
+  Given a text string, the function returns true or false, indicating whether or
+  not the text string is of interest.
+  
+  A filter encloses three types of information:
+  (1) keywords must be included
+  (2) keywords that only one of them needs to be included
+  (3) keywords transformation
+
+  Let me give an example. Among all the html files on ServerFault, 
+  we want to select out all the html files related to 'access denied' or
+  'permission denied'.
+  Also, we want to filter 'htaccess' keywords.
+  So, what we can do is, first replace 'htaccess' to ''; then
+  search [['access', 'deny'], ['permission', 'deny']].
   """
-  conff = []
-  f = open(pagepath)
-  xml = f.read()
-  f.close()
-  doc = fromstring(xml)
-  purl = getlink(doc)
-  for question in doc.find_class('question'):
-    qt = question.text_content().lower()
-    for kws in kwss:
-      if containsAll(qt, kws):
-        return purl
-  for answer in doc.find_class('answer'):
-    at = answer.text_content().lower()
-    for kws in kwss:
-      if containsAll(at, kws):
-        return purl
-  return None
+  def __init__(self, kwsl, repl):
+    self.kwor = kwsl
+    self.replace = repl
 
-def containsAll(text, kws):
-  for kw in kws:
-    if kw not in text:
-      return False
-  return True
+  def contains(self, text):
+    for r in repl:
+      text = text.replace(r, repl[r])
+    for kws in kwor:
+      if self.containsAll(text, kws)
+        return True
+    return False
 
-def getlink(doc):
-  for l in doc.iter('link'):
-    if l.get('rel') == 'canonical':
-      return l.get('href')
-
-permKW = [
-          ['permission', 'deny'],   
-          ['permission', 'denied'], 
-          ['perm', 'deny'],   
-          ['perm', 'denied'], 
-        ]
-
-accessKW = [
-          ['access', 'deny'],
-          ['access', 'denied']
-        ]
-
-#checkAll('/home/xuepeng/everything_about_apache/')
-#checkAll('everything_about_apache_stackoverflow/')
-#print filter('adding-a-reverse-proxy-nginx-or-varnish', ['hello the reverse reverse'])
-#filterall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_apache', accessKW)
-
-#known = []
-#with open('mysql_perm_deny_urls') as f:
-#  for l in f:
-#    known.append(l.strip())
-#print len(known)
-#filterall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_mysql', accessKW)
-filterall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_mysql', permKW)
+  def containsAll(self, text, kws):
+    for kw in kws:
+      if kw not in text:
+        return False
+    return True
