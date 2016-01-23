@@ -1,0 +1,6 @@
+- `tag_crawler.py` : crawl all the urls with a specific _tag_ (e.g., apache-2.2)
+- `case_crawler.py` : crawl the urls 
+- `hparser.py` : utilities to parse a StackExchange html page
+- `kwfilter.py` : the keyword-based filter class
+- `selector.py` : used to select urls from a url pool (e.g., based on keywords) 
+- `merge.py` : utilities to merge different url lists
