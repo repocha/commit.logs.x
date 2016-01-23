@@ -24,8 +24,9 @@ def parseHTML(pagepath):
 
 
 def getstat(doc):
-  for accepted in doc.find_class('accepted-answer'):
-    return 'closed'
+  for answer in doc.find_class('answer'):
+    for accepted in doc.find_class('accepted-answer'):
+      return 'closed'
   return 'open'
 
 def getlink(doc):
@@ -35,6 +36,7 @@ def getlink(doc):
 
 #p = parseHTML('requests-made-to-a-website-with-a-different-domain-url-in-log-files-hacking-att')
 #p = parseHTML('apache-2-2-mod-rewrite-redirect-some-urls-to-https-and-force-http-for-others.1')
+#p = parseHTML('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_apache/13permission-denied-error-from-apache')
 #print p['url']
 #print p['stat']
 #print len(p['question'])

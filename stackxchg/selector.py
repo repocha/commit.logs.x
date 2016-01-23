@@ -1,7 +1,7 @@
 import os
 import sys
 import string
-
+import random
 sys.path.insert(0, '..')
 from kwfilter import KWFilter
 from hparser import parseHTML
@@ -11,6 +11,7 @@ def selectall(dirp, kwfilt, known=None):
   Select all the html files in $dirp that matches the keyword-based filter.
   If the url of the html files is in $known, we ignore it.
   """
+  res = []
   for f in os.listdir(dirp):
     ppath = os.path.join(dirp, f)
     page = parseHTML(ppath)
@@ -20,14 +21,17 @@ def selectall(dirp, kwfilt, known=None):
       url = page['url']
       if known != None and url in known:
         continue
-      print url
+      print 'FOUND URL: ', url
+      res.append(url)
+  random.shuffle(res)
+  return res
 
 def interested(page, kwfilt):
   """
   Success: return the url
   Failure: return None
   """
-  if page['stat'] == 'closed':
+  if page['stat'] == 'open':
     return False
   for question in page['question']:
     if kwfilt.contains(question):
@@ -50,7 +54,9 @@ accessKW = [
         ]
 
 kwfilt = KWFilter(permKW + accessKW, {'htaccess' : 'htakkess'})
-selectall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_apache', kwfilt)
+with open('a', 'w') as f:
+  for url in selectall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_apache', kwfilt):
+    f.write(url + '\n')
 
 #checkAll('/home/xuepeng/everything_about_apache/')
 #checkAll('everything_about_apache_stackoverflow/')
