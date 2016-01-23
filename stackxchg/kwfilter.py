@@ -21,16 +21,19 @@ class KWFilter:
     self.kwor = kwsl
     self.repl = repl
 
-  def contains(self, text):
+  def contains(self, text, tolower=True):
     for r in self.repl:
       text = text.replace(r, self.repl[r])
     for kws in self.kwor:
-      if self.containsAll(text, kws):
+      if self.containsAll(text, kws, tolower):
         return True
     return False
 
-  def containsAll(self, text, kws):
+  def containsAll(self, text, kws, tolower):
     for kw in kws:
+      if tolower == True:
+        kw = kw.lower()
+        text = text.lower()
       if kw not in text:
         return False
     return True

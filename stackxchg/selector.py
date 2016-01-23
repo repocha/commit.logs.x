@@ -1,15 +1,10 @@
 import os
 import sys
-import simplejson
 import string
-
-from lxml import etree
-from lxml.html import fromstring
-import lxml.html as lh
-from StringIO import StringIO
 
 sys.path.insert(0, '..')
 from kwfilter import KWFilter
+from hparser import parseHTML
 
 def selectall(dirp, kwfilt, known=None):
   """
@@ -18,39 +13,29 @@ def selectall(dirp, kwfilt, known=None):
   """
   for f in os.listdir(dirp):
     ppath = os.path.join(dirp, f)
-    try:
-      url = filter(ppath, kwfilt)
+    page = parseHTML(ppath)
+    if page == None: #parsing failure
+      continue
+    if interested(page, kwfilt):
+      url = page['url']
       if known != None and url in known:
         continue
-      if url != None:
-        print url
-    except Exception as e:
-      print 'FAILURE: ', ppath, ' | ', str(e)
-      continue
+      print url
 
-def filter(pagepath, kwfilt):
+def interested(page, kwfilt):
   """
   Success: return the url
   Failure: return None
   """
-  conff = []
-  f = open(pagepath)
-  xml = f.read()
-  f.close()
-  doc = fromstring(xml)
-  purl = getlink(doc)
-  for question in doc.find_class('question'):
-    if kwfilt.contains(question.text_content().lower()):
-      return purl
-  for answer in doc.find_class('answer'):
-    if kwfilt.contains(answer.text_content().lower()):
-      return purl
-  return None
-
-def getlink(doc):
-  for l in doc.iter('link'):
-    if l.get('rel') == 'canonical':
-      return l.get('href')
+  if page['stat'] == 'closed':
+    return False
+  for question in page['question']:
+    if kwfilt.contains(question):
+      return True
+  for answer in page['answer']:
+    if kwfilt.contains(answer):
+      return True
+  return False
 
 permKW = [
           ['permission', 'deny'],   
@@ -64,7 +49,7 @@ accessKW = [
           ['access', 'denied']
         ]
 
-kwfilt = KWFilter(permKW + accessKW, {'htaccess' : ''})
+kwfilt = KWFilter(permKW + accessKW, {'htaccess' : 'htakkess'})
 selectall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_apache', kwfilt)
 
 #checkAll('/home/xuepeng/everything_about_apache/')
