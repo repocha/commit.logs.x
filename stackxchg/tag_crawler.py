@@ -10,78 +10,70 @@ from StringIO import StringIO
 
 sys.path.insert(0, '..')
 from crawler import crawl
+import config
 
 """
-Crawl all the question URLs associated with a given tag
+Crawl all the tags in this site
 """
 
-"""
-change these for every tag
-"""
-WEBSITE = 'http://serverfault.com'
-URL_TEMPLATE = WEBSITE + "/questions/tagged/TAG?page=PN"
-DOWNLOAD_DIR = '/tmp/serverfault_tags_TAG' 
-QUESTION_LST = 'serverfault_tags_TAG_questions.lst'
+SECTION = 'tag_crawler'
+conf = config.getconfig()
 
-def crawlTagPages(tag):
+download_dir = conf.get(SECTION, 'download_dir')
+if os.path.exists(download_dir) == False:
+  os.makedirs(download_dir)
+
+def crawlTagPages():
   """
-  Crawl tag pages
+  Crawl pages that list all the tag information
   """
   i = 1
   while True:
-    url = URL_TEMPLATE.replace('TAG', tag).replace('PN', str(i))
-    fp  = os.path.join(DOWNLOAD_DIR.replace('TAG', tag), "tag_page_" + str(i))
+    url = conf.get(SECTION, 'tags_template').replace('PN', str(i))
+    fp  = os.path.join(download_dir, "tag_page_" + str(i))
     print 'CRAWLING: ', url
     crawl(url, fp)
-    if containsQuestions(fp):
+    if containsTag(fp):
       i += 1
     else:
-      return 
+      return
 
-def xtrAllQuestionURLs(dirp, fp):
-  """
-  Extract all the page links
-  """
-  with open(fp, 'w') as lf:
-    fl = os.listdir(dirp)
-    for f in fl:
-      fp = os.path.join(dirp, f)
-      for l in xtrQuestionURLs(fp):
-        lf.write(l + '\n')
-
-
-def xtrQuestionURLs(tpg):
-  """
-  Extract the page link into a file
-  """
-  qlst = []
-  with open(tpg) as f:
-    doc = fromstring(f.read())
-    doc.make_links_absolute(WEBSITE)
-    for qsum in doc.find_class('question-summary'):
-      for qlnk in qsum.find_class('question-hyperlink'):
-        for url in qlnk.iterlinks():
-          qlst.append(url[2])
-  return qlst
-
-def containsQuestions(page):
+def containsTag(page):
   """
   Whether the page contains questions
   """
   with open(page) as f:
     doc = fromstring(f.read())
-    for qlnk in doc.find_class('question-summary'):
+    for tag in doc.find_class('tag-cell'):
       return True
   return False
 
-if __name__ == "__main__":
-  tag = raw_input('Enter the tag name: ')
-  print 'Crawling tag pages of "' + tag + '"'
-  downloadDir = DOWNLOAD_DIR.replace('TAG', tag)
-  questionLst = QUESTION_LST.replace('TAG', tag)
+def aggrTagsStats():
+  tagstats = {}
+  for f in os.listdir(download_dir):
+    fp = os.path.join(download_dir, f)
+    with open(fp) as f:
+      doc = fromstring(f.read())
+      for tagcell in doc.find_class('tag-cell'):
+        tag = ''
+        cnt = 0
+        for pt in tagcell.find_class('post-tag'):
+          tag = pt.text_content()
+        for im in tagcell.find_class('item-multiplier'):
+          for cnt in im.find_class('item-multiplier-count'):
+            cnt = cnt.text_content()
+        tagstats[tag] = long(cnt)
+  return tagstats
 
-  if os.path.exists(downloadDir) == False:
-    os.makedirs(downloadDir) 
-  crawlTagPages(tag)
-  xtrAllQuestionURLs(downloadDir, questionLst)
-  #print xtrQuestionURLs('/tmp/serverfault_tags_vsftpd/tag_page_1')
+def dumpTags(tosort=True):
+  with open(conf.get(SECTION, 'tag_list'), 'w') as f:
+    stats = aggrTagsStats()
+    if tosort:
+      stats = reversed(sorted(stats.items(), key=lambda x: x[1]))
+    for t in stats:
+      f.write(t[0] + ',' + str(t[1]) + '\n')
+
+if __name__ == "__main__":
+  #crawlTagPages()
+  #tag = raw_input('Enter the tag name: ')
+  dumpTags()
