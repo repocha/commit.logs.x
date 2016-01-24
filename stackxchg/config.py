@@ -1,10 +1,11 @@
-import ConfigParser, os
+import ConfigParser
 
 DEFAULT_CONFIG_FILE = 'stackxchg_craw.cfg'
 
-config = ConfigParser.SafeConfigParser()
-config.read(DEFAULT_CONFIG_FILE)
-
+def getconfig():
+  config = ConfigParser.SafeConfigParser()
+  config.read(DEFAULT_CONFIG_FILE)
+  return config
 
 def dump():
   print '###', DEFAULT_CONFIG_FILE, '##########################################'
@@ -16,4 +17,3 @@ def dump():
 
 if __name__ == "__main__":
   dump()
-  #print config.get('tagged_url_crawler', 'website')
