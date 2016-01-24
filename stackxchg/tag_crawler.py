@@ -20,6 +20,8 @@ SECTION = 'tag_crawler'
 conf = config.getconfig()
 
 download_dir = conf.get(SECTION, 'download_dir')
+tag_list = conf.get(SECTION, 'tag_list')
+
 if os.path.exists(download_dir) == False:
   os.makedirs(download_dir)
 
@@ -48,7 +50,7 @@ def containsTag(page):
       return True
   return False
 
-def aggrTagsStats():
+def aggrTagStatsFromPages():
   tagstats = {}
   for f in os.listdir(download_dir):
     fp = os.path.join(download_dir, f)
@@ -65,9 +67,27 @@ def aggrTagsStats():
         tagstats[tag] = long(cnt)
   return tagstats
 
+def aggrTagStatsFromDump():
+  tagstats = {}
+  with open(tag_list) as f:
+    for l in f:
+      l = l.strip()
+      t = l.split(',')
+      tagstats[t[0]] = t[1]
+  return tagstats
+
+def aggrTagStats():
+  if os.path.exists(tag_list):
+    return aggrTagStatsFromDump()
+  elif os.path.exists(download_dir):
+    return aggrTagStatsFromPages()
+  else:
+    print 'Neither tag dump nor tag pages exists. Needs to redo the crawling'
+    return None
+
 def dumpTags(tosort=True):
-  with open(conf.get(SECTION, 'tag_list'), 'w') as f:
-    stats = aggrTagsStats()
+  with open(tag_list, 'w') as f:
+    stats = aggrTagStatsFromPages()
     if tosort:
       stats = reversed(sorted(stats.items(), key=lambda x: x[1]))
     for t in stats:
