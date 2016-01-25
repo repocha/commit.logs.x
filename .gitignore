@@ -3,6 +3,14 @@
 *.swo
 *.swn
 *.swp
+*.csv
+*.lst
+*.sort
+*.diff
+*.xxx
+*.yyy
+*.zzz
+*.log
 x
 y
 z

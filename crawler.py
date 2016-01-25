@@ -1,14 +1,30 @@
 import urllib2
 import time
 import os
+from lxml.html import fromstring
 
 def crawl(url, dstpath, intv=1):
   """
   Utility function
   """
+  if os.path.exists(dstpath):
+    if validate(dstpath):
+      print 'SKIP (CRAWLED): ', url
+      return
+    else:
+      print 'CORRUPTED: ', url
+      os.remove(dstpath)
   with open(dstpath, 'w') as of:
-    of.write(urllib2.urlopen(url).read())
+    of.write(urllib2.urlopen(url, timeout=5).read())
     time.sleep(intv)
+
+def validate(htmlpath):
+  try:
+    with open(htmlpath) as f:
+      fromstring(f.read())
+    return True
+  except:
+    return False
 
 class Crawler:
   """
@@ -59,8 +75,7 @@ class URLCrawler(Crawler):
     return tocrawl
 
   def crawl(self):
-    tocrawl = self.calibrate()
-    for url in tocrawl:
+    for url in self.urls:
       try:
         crawl(url, os.path.join(self.output_dir, self.url2fname(url)))
         print 'CRAWLED: ', url

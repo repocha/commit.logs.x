@@ -53,8 +53,13 @@ accessKW = [
           ['access', 'denied']
         ]
 
-kwfilt = KWFilter(permKW + accessKW, {'htaccess' : 'htakkess'})
-with open('a', 'w') as f:
+forbidKW = [
+          ['forbidden'],
+          ['401', 'authoriz']
+        ]
+
+kwfilt = KWFilter(permKW + accessKW + forbidKW, {'htaccess' : 'htakkess'})
+with open('a.a', 'w') as f:
   for url in selectall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_apache', kwfilt):
     f.write(url + '\n')
 
