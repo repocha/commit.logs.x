@@ -29,3 +29,5 @@ with open(url_list.replace('TAG', tag)) as f:
 crawler = URLCrawler(urls, case_dir, None)
 crawler.calibrate()
 crawler.crawl()
+
+print 'FINISH CRAWLING TAG \'' + tag + '\''

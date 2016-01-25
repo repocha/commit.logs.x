@@ -5,6 +5,7 @@ import random
 sys.path.insert(0, '..')
 from kwfilter import KWFilter
 from hparser import parseHTML
+import config
 
 def selectall(dirp, kwfilt, known=None):
   """
@@ -55,12 +56,18 @@ accessKW = [
 
 forbidKW = [
           ['forbidden'],
-          ['401', 'authoriz']
+          ['authoriz']
         ]
 
+tag = raw_input('Enter the tag name: ')
+
+SECTION = 'tagged_url_crawler'
+conf = config.getconfig()
+case_dir = conf.get(SECTION, 'case_dir_template').replace('TAG', tag)
+
 kwfilt = KWFilter(permKW + accessKW + forbidKW, {'htaccess' : 'htakkess'})
-with open('a.a', 'w') as f:
-  for url in selectall('/media/tianyin/TOSHIBA EXT/tixu_old/xuepeng/iconfigure/everything_about_apache', kwfilt):
+with open(tag+'_selected.lst', 'w') as f:
+  for url in selectall(case_dir, kwfilt):
     f.write(url + '\n')
 
 #checkAll('/home/xuepeng/everything_about_apache/')
