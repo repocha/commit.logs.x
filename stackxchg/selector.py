@@ -23,7 +23,8 @@ def selectall(dirp, kwfilt, known=None):
       if known != None and url in known:
         continue
       print 'FOUND URL: ', url
-      res.append(url)
+      if url not in res:
+        res.append(url)
   random.shuffle(res)
   return res
 
@@ -66,6 +67,7 @@ conf = config.getconfig()
 case_dir = conf.get(SECTION, 'case_dir_template').replace('TAG', tag)
 
 kwfilt = KWFilter(permKW + accessKW + forbidKW, {'htaccess' : 'htakkess'})
+#kwfilt = KWFilter(permKW + forbidKW, {'htaccess' : 'htakkess'})
 with open(tag+'_selected.lst', 'w') as f:
   for url in selectall(case_dir, kwfilt):
     f.write(url + '\n')
