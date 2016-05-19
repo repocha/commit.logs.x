@@ -1,0 +1,318 @@
+commit ca64c0a13bce947b953e5a243c20b5607b8ece6c
+Author: Jeff Trawick <trawick@apache.org>
+Date:   Sat Dec 29 23:16:24 2001 +0000
+
+    handle the disappearance of apr_lock_create_np() and
+    apr_proc_mutex_create_np() and the new parameter to
+    apr_lock_create() and apr_proc_mutex_create()
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@92653 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/mpm_common.h b/include/mpm_common.h
+index 0ce0f4f..435f0a1 100644
+--- a/include/mpm_common.h
++++ b/include/mpm_common.h
+@@ -254,7 +254,7 @@ const char *ap_mpm_set_lockfile(cmd_parms *cmd, void *dummy,
+  * The system mutex implementation to use for the accept mutex.
+  */
+ #ifdef AP_MPM_WANT_SET_ACCEPT_LOCK_MECH
+-extern apr_lockmech_e_np ap_accept_lock_mech;
++extern apr_lockmech_e ap_accept_lock_mech;
+ const char *ap_mpm_set_accept_lock_mech(cmd_parms *cmd, void *dummy,
+                                         const char *arg);
+ #endif
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index f74642a..4949564 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -364,7 +364,7 @@ static void initialize_tables(server_rec *s, apr_pool_t *ctx)
+ 
+     tmpnam(client_lock_name);
+     sts = apr_lock_create(&client_lock, APR_READWRITE, APR_LOCKALL,
+-                         client_lock_name, ctx);
++                          APR_LOCK_DEFAULT, client_lock_name, ctx);
+     if (sts != APR_SUCCESS) {
+         log_error_and_cleanup("failed to create lock", sts, s);
+         return;
+@@ -382,7 +382,7 @@ static void initialize_tables(server_rec *s, apr_pool_t *ctx)
+ 
+     tmpnam(opaque_lock_name);
+     sts = apr_lock_create(&opaque_lock, APR_MUTEX, APR_LOCKALL,
+-                          opaque_lock_name, ctx);
++                          APR_LOCK_DEFAULT, opaque_lock_name, ctx);
+     if (sts != APR_SUCCESS) {
+         log_error_and_cleanup("failed to create lock", sts, s);
+         return;
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 311af27..ccad112 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -941,8 +941,8 @@ static int init_module(apr_pool_t *p,
+     proxy_available = (ap_find_linked_module("mod_proxy.c") != NULL);
+ 
+     /* create the rewriting lockfiles in the parent */
+-    if ((rv = apr_lock_create (&rewrite_log_lock, APR_MUTEX, APR_LOCKALL,
+-                               NULL, p)) != APR_SUCCESS) {
++    if ((rv = apr_lock_create(&rewrite_log_lock, APR_MUTEX, APR_LOCKALL,
++                              APR_LOCK_DEFAULT, NULL, p)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                      "mod_rewrite: could not create rewrite_log_lock");
+         return HTTP_INTERNAL_SERVER_ERROR;
+@@ -3266,7 +3266,8 @@ static void rewritelock_create(server_rec *s, apr_pool_t *p)
+     lockname = ap_server_root_relative(p, lockname);
+ 
+     /* create the lockfile */
+-    rc = apr_lock_create (&rewrite_mapr_lock_acquire, APR_MUTEX, APR_LOCKALL, lockname, p);
++    rc = apr_lock_create(&rewrite_mapr_lock_acquire, APR_MUTEX, APR_LOCKALL, 
++                         APR_LOCK_DEFAULT, lockname, p);
+     if (rc != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, rc, s,
+                      "mod_rewrite: Parent could not create RewriteLock "
+diff --git a/modules/ssl/ssl_engine_mutex.c b/modules/ssl/ssl_engine_mutex.c
+index 942e399..adb54a4 100644
+--- a/modules/ssl/ssl_engine_mutex.c
++++ b/modules/ssl/ssl_engine_mutex.c
+@@ -68,7 +68,7 @@ int ssl_mutex_init(server_rec *s, apr_pool_t *p)
+ 
+     if (mc->nMutexMode == SSL_MUTEXMODE_NONE) 
+         return TRUE;
+-    if (apr_lock_create(&mc->pMutex, APR_MUTEX, APR_LOCKALL, 
++    if (apr_lock_create(&mc->pMutex, APR_MUTEX, APR_LOCKALL, APR_LOCK_DEFAULT,
+                         mc->szMutexFile, p) != APR_SUCCESS)
+         return FALSE;
+     return TRUE;
+diff --git a/server/mpm/beos/beos.c b/server/mpm/beos/beos.c
+index 1b21d92..55bd91a 100644
+--- a/server/mpm/beos/beos.c
++++ b/server/mpm/beos/beos.c
+@@ -813,7 +813,7 @@ int ap_mpm_run(apr_pool_t *_pconf, apr_pool_t *plog, server_rec *s)
+      * in select at a time
+      */
+     if ((rv = apr_lock_create(&accept_mutex, APR_MUTEX, APR_CROSS_PROCESS,
+-        NULL, pconf)) != APR_SUCCESS) {
++                              APR_LOCK_DEFAULT, NULL, pconf)) != APR_SUCCESS) {
+         /* tsch tsch, can't have more than one thread in the accept loop
+            at a time so we need to fall on our sword... */
+         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+@@ -825,7 +825,7 @@ int ap_mpm_run(apr_pool_t *_pconf, apr_pool_t *plog, server_rec *s)
+      * locks the worker_thread_count so we have ana ccurate count...
+      */
+     if ((rv = apr_lock_create(&worker_thread_count_mutex, APR_MUTEX, APR_CROSS_PROCESS,
+-        NULL, pconf)) != APR_SUCCESS) {
++                              APR_LOCK_DEFAULT, NULL, pconf)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                      "Couldn't create worker thread count lock");
+         return 1;
+diff --git a/server/mpm/experimental/perchild/perchild.c b/server/mpm/experimental/perchild/perchild.c
+index 4000092..4fb3244 100644
+--- a/server/mpm/experimental/perchild/perchild.c
++++ b/server/mpm/experimental/perchild/perchild.c
+@@ -1012,15 +1012,15 @@ static void child_main(int child_num_arg)
+     }
+     apr_pool_create(&thread_pool_parent, pchild);
+     apr_lock_create(&thread_pool_parent_mutex, APR_MUTEX, APR_INTRAPROCESS, 
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+     apr_lock_create(&idle_thread_count_mutex, APR_MUTEX, APR_INTRAPROCESS, 
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+     apr_lock_create(&worker_thread_count_mutex, APR_MUTEX, APR_INTRAPROCESS,
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+     apr_lock_create(&pipe_of_death_mutex, APR_MUTEX, APR_INTRAPROCESS,
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+     apr_lock_create(&thread_accept_mutex, APR_MUTEX, APR_INTRAPROCESS,
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+ 
+     apr_threadattr_create(&worker_thread_attr, pchild);
+     apr_threadattr_detach_set(worker_thread_attr, 1);                                     
+@@ -1295,9 +1295,9 @@ int ap_mpm_run(apr_pool_t *_pconf, apr_pool_t *plog, server_rec *s)
+     ap_lock_fname = apr_psprintf(_pconf, "%s.%u",
+                                  ap_server_root_relative(_pconf, ap_lock_fname),
+                                  my_pid);
+-    rv = SAFE_ACCEPT(apr_lock_create_np(&process_accept_mutex, APR_MUTEX,
+-                                        APR_CROSS_PROCESS, ap_accept_lock_mech,
+-                                        ap_lock_fname, _pconf));
++    rv = SAFE_ACCEPT(apr_lock_create(&process_accept_mutex, APR_MUTEX,
++                                     APR_CROSS_PROCESS, ap_accept_lock_mech,
++                                     ap_lock_fname, _pconf));
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                      "Couldn't create cross-process lock");
+diff --git a/server/mpm/perchild/perchild.c b/server/mpm/perchild/perchild.c
+index 4000092..4fb3244 100644
+--- a/server/mpm/perchild/perchild.c
++++ b/server/mpm/perchild/perchild.c
+@@ -1012,15 +1012,15 @@ static void child_main(int child_num_arg)
+     }
+     apr_pool_create(&thread_pool_parent, pchild);
+     apr_lock_create(&thread_pool_parent_mutex, APR_MUTEX, APR_INTRAPROCESS, 
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+     apr_lock_create(&idle_thread_count_mutex, APR_MUTEX, APR_INTRAPROCESS, 
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+     apr_lock_create(&worker_thread_count_mutex, APR_MUTEX, APR_INTRAPROCESS,
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+     apr_lock_create(&pipe_of_death_mutex, APR_MUTEX, APR_INTRAPROCESS,
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+     apr_lock_create(&thread_accept_mutex, APR_MUTEX, APR_INTRAPROCESS,
+-                    NULL, pchild);
++                    APR_LOCK_DEFAULT, NULL, pchild);
+ 
+     apr_threadattr_create(&worker_thread_attr, pchild);
+     apr_threadattr_detach_set(worker_thread_attr, 1);                                     
+@@ -1295,9 +1295,9 @@ int ap_mpm_run(apr_pool_t *_pconf, apr_pool_t *plog, server_rec *s)
+     ap_lock_fname = apr_psprintf(_pconf, "%s.%u",
+                                  ap_server_root_relative(_pconf, ap_lock_fname),
+                                  my_pid);
+-    rv = SAFE_ACCEPT(apr_lock_create_np(&process_accept_mutex, APR_MUTEX,
+-                                        APR_CROSS_PROCESS, ap_accept_lock_mech,
+-                                        ap_lock_fname, _pconf));
++    rv = SAFE_ACCEPT(apr_lock_create(&process_accept_mutex, APR_MUTEX,
++                                     APR_CROSS_PROCESS, ap_accept_lock_mech,
++                                     ap_lock_fname, _pconf));
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                      "Couldn't create cross-process lock");
+diff --git a/server/mpm/prefork/prefork.c b/server/mpm/prefork/prefork.c
+index 21aca93..8a697ee 100644
+--- a/server/mpm/prefork/prefork.c
++++ b/server/mpm/prefork/prefork.c
+@@ -265,8 +265,8 @@ static void accept_mutex_init(apr_pool_t *p)
+     apr_status_t rv;
+ 
+     expand_lock_fname(p);
+-    rv = apr_lock_create_np(&accept_lock, APR_MUTEX, APR_CROSS_PROCESS, 
+-                            ap_accept_lock_mech, ap_lock_fname, p);
++    rv = apr_lock_create(&accept_lock, APR_MUTEX, APR_CROSS_PROCESS, 
++                         ap_accept_lock_mech, ap_lock_fname, p);
+     if (rv) {
+ 	ap_log_error(APLOG_MARK, APLOG_EMERG, rv, NULL, "couldn't create accept mutex");
+         exit(APEXIT_INIT);
+diff --git a/server/mpm/spmt_os2/spmt_os2.c b/server/mpm/spmt_os2/spmt_os2.c
+index b5b1f49..a5677d0 100644
+--- a/server/mpm/spmt_os2/spmt_os2.c
++++ b/server/mpm/spmt_os2/spmt_os2.c
+@@ -187,7 +187,8 @@ static void accept_mutex_child_init(apr_pool_t *p)
+  */
+ static void accept_mutex_init(apr_pool_t *p)
+ {
+-    apr_status_t rc = apr_lock_create(&accept_mutex, APR_MUTEX, APR_INTRAPROCESS, NULL, p);
++    apr_status_t rc = apr_lock_create(&accept_mutex, APR_MUTEX, APR_INTRAPROCESS, 
++                                      APR_LOCK_DEFAULT, NULL, p);
+ 
+     if (rc != APR_SUCCESS) {
+ 	ap_log_error(APLOG_MARK, APLOG_EMERG, rc, ap_server_conf,
+diff --git a/server/mpm/winnt/mpm_winnt.c b/server/mpm/winnt/mpm_winnt.c
+index 95d5012..b006abc 100644
+--- a/server/mpm/winnt/mpm_winnt.c
++++ b/server/mpm/winnt/mpm_winnt.c
+@@ -988,7 +988,7 @@ static void child_main()
+     if (one_process) {
+         /* Single process mode */
+         apr_lock_create(&start_mutex, APR_MUTEX, APR_CROSS_PROCESS,
+-                        signal_name_prefix, pconf);
++                        APR_LOCK_DEFAULT, signal_name_prefix, pconf);
+         exit_event = CreateEvent(NULL, TRUE, FALSE, exit_event_name);
+     }
+     else {
+@@ -1013,7 +1013,8 @@ static void child_main()
+     ap_run_child_init(pchild, ap_server_conf);
+     
+     allowed_globals.jobsemaphore = CreateSemaphore(NULL, 0, 1000000, NULL);
+-    apr_lock_create(&allowed_globals.jobmutex, APR_MUTEX, APR_INTRAPROCESS, NULL, pchild);
++    apr_lock_create(&allowed_globals.jobmutex, APR_MUTEX, APR_INTRAPROCESS, 
++                    APR_LOCK_DEFAULT, NULL, pchild);
+ 
+     /*
+      * Wait until we have permission to start accepting connections.
+@@ -1040,7 +1041,8 @@ static void child_main()
+                                                     NULL,
+                                                     0,
+                                                     0); /* CONCURRENT ACTIVE THREADS */
+-        apr_lock_create(&qlock, APR_MUTEX, APR_INTRAPROCESS, NULL, pchild);
++        apr_lock_create(&qlock, APR_MUTEX, APR_INTRAPROCESS, APR_LOCK_DEFAULT, 
++                        NULL, pchild);
+     }
+ 
+     /* 
+@@ -1993,8 +1995,9 @@ static int winnt_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *pt
+              * Ths start mutex is used during a restart to prevent more than one 
+              * child process from entering the accept loop at once.
+              */
+-            apr_lock_create(&start_mutex,APR_MUTEX, APR_CROSS_PROCESS, signal_name_prefix,
+-                               ap_server_conf->process->pool);
++            apr_lock_create(&start_mutex,APR_MUTEX, APR_CROSS_PROCESS, 
++                            APR_LOCK_DEFAULT, signal_name_prefix, 
++                            ap_server_conf->process->pool);
+         }
+     }
+     else /* parent_pid != my_pid */
+diff --git a/server/mpm/worker/mpm.h b/server/mpm/worker/mpm.h
+index da992b5..5db5702 100644
+--- a/server/mpm/worker/mpm.h
++++ b/server/mpm/worker/mpm.h
+@@ -73,9 +73,7 @@
+ #define AP_MPM_WANT_SET_LOCKFILE
+ #define AP_MPM_WANT_SET_MAX_REQUESTS
+ #define AP_MPM_WANT_SET_COREDUMPDIR
+-#if APR_HAS_CREATE_LOCKS_NP
+ #define AP_MPM_WANT_SET_ACCEPT_LOCK_MECH
+-#endif /* APR_HAS_CREATE_LOCKS_NP */
+ #define AP_MPM_DISABLE_NAGLE_ACCEPTED_SOCK
+ 
+ #define MPM_SYNC_CHILD_TABLE() (ap_sync_scoreboard_image())
+diff --git a/server/mpm/worker/worker.c b/server/mpm/worker/worker.c
+index f5e11df..2a10529 100644
+--- a/server/mpm/worker/worker.c
++++ b/server/mpm/worker/worker.c
+@@ -1399,20 +1399,14 @@ int ap_mpm_run(apr_pool_t *_pconf, apr_pool_t *plog, server_rec *s)
+                                  ap_server_root_relative(_pconf, ap_lock_fname),
+                                  ap_my_pid);
+ 
+-#if APR_HAS_CREATE_LOCKS_NP
+-    rv = apr_proc_mutex_create_np(&accept_mutex, ap_lock_fname, 
+-                                  ap_accept_lock_mech, _pconf);
+-#else
+-    rv = apr_proc_mutex_create(&accept_mutex, ap_lock_fname, _pconf);
+-#endif /* APR_HAS_CREATE_LOCKS_NP */
+-
++    rv = apr_proc_mutex_create(&accept_mutex, ap_lock_fname, 
++                               ap_accept_lock_mech, _pconf);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                      "Couldn't create accept lock");
+         return 1;
+     }
+ 
+-#if APR_HAS_CREATE_LOCKS_NP
+ #if APR_USE_SYSVSEM_SERIALIZE
+     if (ap_accept_lock_mech == APR_LOCK_DEFAULT || 
+         ap_accept_lock_mech == APR_LOCK_SYSVSEM) {
+@@ -1426,7 +1420,6 @@ int ap_mpm_run(apr_pool_t *_pconf, apr_pool_t *plog, server_rec *s)
+             return 1;
+         }
+     }
+-#endif /* APR_HAS_CREATE_LOCKS_NP */
+ 
+     if (!is_graceful) {
+         ap_run_pre_mpm(pconf, SB_SHARED);
+diff --git a/server/mpm_common.c b/server/mpm_common.c
+index 0e47492..0b452da 100644
+--- a/server/mpm_common.c
++++ b/server/mpm_common.c
+@@ -603,7 +603,7 @@ const char *ap_mpm_set_coredumpdir(cmd_parms *cmd, void *dummy,
+ #endif
+ 
+ #ifdef AP_MPM_WANT_SET_ACCEPT_LOCK_MECH
+-apr_lockmech_e_np ap_accept_lock_mech = APR_LOCK_DEFAULT;
++apr_lockmech_e ap_accept_lock_mech = APR_LOCK_DEFAULT;
+ AP_DECLARE(const char *) ap_mpm_set_accept_lock_mech(cmd_parms *cmd,
+ 						     void *dummy,
+ 						     const char *arg)

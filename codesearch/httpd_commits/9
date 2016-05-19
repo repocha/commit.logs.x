@@ -1,0 +1,47 @@
+commit c5d2cd045cf35263ad1adac42dea8e492891c5a4
+Author: Christophe Jaillet <jailletc36@apache.org>
+Date:   Tue Sep 15 22:20:45 2015 +0000
+
+    Remove code related to 'AuthDigestEnableQueryStringHack'
+    
+    This has been undocumented for about 3 years now (see r1415960)
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1703305 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index e9bf364..7eb567b 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -1628,32 +1628,6 @@ static int authenticate_digest_user(request_rec *r)
+         if (d_uri.query) {
+             ap_unescape_url(d_uri.query);
+         }
+-        else if (r_uri.query) {
+-            /* MSIE compatibility hack.  MSIE has some RFC issues - doesn't
+-             * include the query string in the uri Authorization component
+-             * or when computing the response component.  the second part
+-             * works out ok, since we can hash the header and get the same
+-             * result.  however, the uri from the request line won't match
+-             * the uri Authorization component since the header lacks the
+-             * query string, leaving us incompatable with a (broken) MSIE.
+-             *
+-             * the workaround is to fake a query string match if in the proper
+-             * environment - BrowserMatch MSIE, for example.  the cool thing
+-             * is that if MSIE ever fixes itself the simple match ought to
+-             * work and this code won't be reached anyway, even if the
+-             * environment is set.
+-             */
+-
+-            if (apr_table_get(r->subprocess_env,
+-                              "AuthDigestEnableQueryStringHack")) {
+-
+-                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, APLOGNO(01784)
+-                              "applying AuthDigestEnableQueryStringHack "
+-                              "to uri <%s>", resp->raw_request_uri);
+-
+-               d_uri.query = r_uri.query;
+-            }
+-        }
+ 
+         if (r->method_number == M_CONNECT) {
+             if (!r_uri.hostinfo || strcmp(resp->uri, r_uri.hostinfo)) {

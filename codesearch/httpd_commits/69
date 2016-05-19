@@ -1,0 +1,203 @@
+commit f590ea89e0f1557f652888ed2ff6250e3d00215c
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sun Jul 15 21:14:00 2012 +0000
+
+    Various code clean up
+    
+    Submitted by: Christophe JAILLET <christophe jaillet wanadoo fr>
+    PR: 52893
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1361801 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index d879282..9b7173c 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -629,12 +629,9 @@ static int authz_core_check_section(apr_pool_t *p, server_rec *s,
+ 
+     if (ret != OK) {
+         ap_log_error(APLOG_MARK, APLOG_ERR | APLOG_STARTUP, APR_SUCCESS, s, APLOGNO(01624)
+-                     "%s",
+-                     apr_pstrcat(p, (is_conf
+-                                     ? "<Directory>, <Location>, or similar"
+-                                     : format_authz_command(p, section)),
+-                                 " directive contains only negative "
+-                                 "authorization directives", NULL));
++                     "%s directive contains only negative authorization directives",
++                     is_conf ? "<Directory>, <Location>, or similar"
++                             : format_authz_command(p, section));
+     }
+ 
+     return ret;
+diff --git a/modules/http/http_protocol.c b/modules/http/http_protocol.c
+index 7cbe769..2f78612 100644
+--- a/modules/http/http_protocol.c
++++ b/modules/http/http_protocol.c
+@@ -799,11 +799,9 @@ AP_DECLARE(const char *) ap_get_status_line(int status)
+ }
+ 
+ /* Build the Allow field-value from the request handler method mask.
+- * Note that we always allow TRACE, since it is handled below.
+  */
+ static char *make_allow(request_rec *r)
+ {
+-    char *list;
+     apr_int64_t mask;
+     apr_array_header_t *allow = apr_array_make(r->pool, 10, sizeof(char *));
+     apr_hash_index_t *hi = apr_hash_first(r->pool, methods_registry);
+@@ -831,25 +829,15 @@ static char *make_allow(request_rec *r)
+     if (conf->trace_enable != AP_TRACE_DISABLE)
+         *(const char **)apr_array_push(allow) = "TRACE";
+ 
+-    list = apr_array_pstrcat(r->pool, allow, ',');
+-
+     /* ### this is rather annoying. we should enforce registration of
+        ### these methods */
+     if ((mask & (AP_METHOD_BIT << M_INVALID))
+         && (r->allowed_methods->method_list != NULL)
+         && (r->allowed_methods->method_list->nelts != 0)) {
+-        int i;
+-        char **xmethod = (char **) r->allowed_methods->method_list->elts;
+-
+-        /*
+-         * Append all of the elements of r->allowed_methods->method_list
+-         */
+-        for (i = 0; i < r->allowed_methods->method_list->nelts; ++i) {
+-            list = apr_pstrcat(r->pool, list, ",", xmethod[i], NULL);
+-        }
++        apr_array_cat(allow, r->allowed_methods->method_list);
+     }
+ 
+-    return list;
++    return apr_array_pstrcat(r->pool, allow, ',');
+ }
+ 
+ AP_DECLARE(int) ap_send_http_options(request_rec *r)
+diff --git a/modules/lua/mod_lua.c b/modules/lua/mod_lua.c
+index 115afc6..cb28137 100644
+--- a/modules/lua/mod_lua.c
++++ b/modules/lua/mod_lua.c
+@@ -468,16 +468,15 @@ static const char *register_named_block_function_hook(const char *name,
+ 
+     {
+         cr_ctx ctx;
+-        char buf[32];
+         lua_State *lvm;
+         char *tmp;
+         int rv;
+         ap_directive_t **current;
+         hack_section_baton *baton;
+ 
+-        apr_snprintf(buf, sizeof(buf), "%u", cmd->config_file->line_number);
+-        spec->file_name = apr_pstrcat(cmd->pool, cmd->config_file->name, ":",
+-                                      buf, NULL);
++        spec->file_name = apr_psprintf(cmd->pool, "%s:%u",
++                                       cmd->config_file->name,
++                                       cmd->config_file->line_number);
+         if (function) {
+             spec->function_name = (char *) function;
+         }
+diff --git a/modules/proxy/mod_proxy_ftp.c b/modules/proxy/mod_proxy_ftp.c
+index d5aabd6..8db694a 100644
+--- a/modules/proxy/mod_proxy_ftp.c
++++ b/modules/proxy/mod_proxy_ftp.c
+@@ -1725,7 +1725,7 @@ static int proxy_ftp_handler(request_rec *r, proxy_worker *worker,
+         if (len != 0)
+             buf = apr_pstrcat(p, "LIST ", path, CRLF, NULL);
+         else if (cwd == NULL || strchr(cwd, '/') != NULL)
+-            buf = apr_pstrcat(p, "LIST -lag", CRLF, NULL);
++            buf = "LIST -lag" CRLF;
+         else
+             buf = "LIST" CRLF;
+     }
+diff --git a/modules/proxy/proxy_util.c b/modules/proxy/proxy_util.c
+index fe2ac43..7063b15 100644
+--- a/modules/proxy/proxy_util.c
++++ b/modules/proxy/proxy_util.c
+@@ -373,7 +373,7 @@ PROXY_DECLARE(int) ap_proxyerror(request_rec *r, int statuscode, const char *mes
+             NULL));
+ 
+     /* Allow "error-notes" string to be printed by ap_send_error_response() */
+-    apr_table_setn(r->notes, "verbose-error-to", apr_pstrdup(r->pool, "*"));
++    apr_table_setn(r->notes, "verbose-error-to", "*");
+ 
+     r->status_line = apr_psprintf(r->pool, "%3.3u Proxy Error", statuscode);
+     ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(00898) "%s returned by %s", message,
+diff --git a/modules/session/mod_session.c b/modules/session/mod_session.c
+index e053619..7f855c7 100644
+--- a/modules/session/mod_session.c
++++ b/modules/session/mod_session.c
+@@ -373,7 +373,7 @@ static apr_status_t session_identity_decode(request_rec * r, session_rec * z)
+     }
+ 
+     /* decode what we have */
+-    encoded = apr_pstrcat(r->pool, z->encoded, NULL);
++    encoded = apr_pstrdup(r->pool, z->encoded);
+     pair = apr_strtok(encoded, sep, &last);
+     while (pair && pair[0]) {
+         char *plast = NULL;
+diff --git a/modules/test/mod_policy.c b/modules/test/mod_policy.c
+index d4830aa..473b31c 100644
+--- a/modules/test/mod_policy.c
++++ b/modules/test/mod_policy.c
+@@ -162,11 +162,10 @@ static void handle_policy(request_rec *r, policy_result result,
+                 message, r->uri);
+         apr_table_addn(r->err_headers_out, "Warning", apr_psprintf(r->pool,
+                 "299 %s \"Rejected: %s\"", ap_get_server_name(r), message));
+-        apr_table_setn(
+-                r->notes, "error-notes",
+-                    apr_pstrcat(r->pool, url ? apr_pstrcat(r->pool, "<a href=\"",
+-                            url, "\">", NULL) : "", message, url ? "</a>" : "",
+-                                    NULL));
++        apr_table_setn(r->notes, "error-notes",
++                       url ? apr_pstrcat(r->pool, "<a href=\"", url, "\">",
++                                         message, "</a>", NULL)
++                           : message);
+ 
+         apr_brigade_cleanup(bb);
+         e = ap_bucket_error_create(status, NULL, r->pool,
+diff --git a/server/core.c b/server/core.c
+index c7a9df0..0313757 100644
+--- a/server/core.c
++++ b/server/core.c
+@@ -996,7 +996,7 @@ AP_DECLARE(const char *) ap_get_server_name_for_url(request_rec *r)
+ 
+ #if APR_HAVE_IPV6
+     if (ap_strchr_c(plain_server_name, ':')) { /* IPv6 literal? */
+-        return apr_psprintf(r->pool, "[%s]", plain_server_name);
++        return apr_pstrcat(r->pool, "[", plain_server_name, "]", NULL);
+     }
+ #endif
+     return plain_server_name;
+@@ -1509,7 +1509,7 @@ static const char *set_error_document(cmd_parms *cmd, void *conf_,
+              * a msg and a (local) path.
+              */
+             conf->response_code_strings[index_number] = (what == MSG) ?
+-                    apr_pstrcat(cmd->pool, "\"",msg,NULL) :
++                    apr_pstrcat(cmd->pool, "\"", msg, NULL) :
+                     apr_pstrdup(cmd->pool, msg);
+         }
+     }
+diff --git a/server/provider.c b/server/provider.c
+index ade0f4e..a102dd8 100644
+--- a/server/provider.c
++++ b/server/provider.c
+@@ -136,7 +136,7 @@ AP_DECLARE(apr_array_header_t *) ap_list_provider_names(apr_pool_t *pool,
+     ap_list_provider_names_t *entry;
+     apr_hash_t *provider_group_hash, *h;
+     apr_hash_index_t *hi;
+-    char *val, *key;
++    char *val;
+ 
+     if (global_providers_names == NULL) {
+         return ret;
+@@ -157,7 +157,7 @@ AP_DECLARE(apr_array_header_t *) ap_list_provider_names(apr_pool_t *pool,
+     }
+ 
+     for (hi = apr_hash_first(pool, h); hi; hi = apr_hash_next(hi)) {
+-        apr_hash_this(hi, (void *)&key, NULL, (void *)&val);
++        apr_hash_this(hi, NULL, NULL, (void *)&val);
+         entry = apr_array_push(ret);
+         entry->provider_name = apr_pstrdup(pool, val);
+     }

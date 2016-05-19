@@ -1,0 +1,1041 @@
+commit 55d73051357d236a826bb447f33329addcd6b4a4
+Author: Justin Erenkrantz <jerenkrantz@apache.org>
+Date:   Thu Jan 24 23:47:31 2002 +0000
+
+    Remove mod_auth_db since we've received enough votes (Justin, Ian, and
+    Lars) and ample warning has been posted to dev@httpd.
+    
+    mod_auth_dbm should be able to take over all functionality of mod_auth_db
+    with the AuthDBMType directive.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@93010 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 0377dbf..44f9167 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,4 +1,7 @@
+ Changes with Apache 2.0.31-dev
++
++  *) Remove mod_auth_db.  [Justin Erenkrantz]
++
+   *) Do not install unnecessary pcre headers like config.h and internal.h.
+      [Joe Orton <joe@manyfish.co.uk>]
+ 
+diff --git a/STATUS b/STATUS
+index 836f994..cc71e41 100644
+--- a/STATUS
++++ b/STATUS
+@@ -1,5 +1,5 @@
+ APACHE 2.0 STATUS:						-*-text-*-
+-Last modified at [$Date: 2002/01/24 17:14:55 $]
++Last modified at [$Date: 2002/01/24 23:47:30 $]
+ 
+ Release:
+ 
+@@ -94,14 +94,6 @@ RELEASE SHOWSTOPPERS:
+         Status: Bill has some code in his tree that accomplishes
+                 this, and will commit it Friday after it's tested.
+ 
+-    * Fold mod_auth_db features back into mod_auth_dbm, and depricate it.
+-        This can't wait until we have a 2.0-gold release, if folks need
+-        to move over to auth_dbm, we can't do that to them after 2.0 gold.
+-      Status: Ian says.. auth_dbm can now handle multiple DBM types,
+-              is this still an issue?
+-      Vote: Remove mod_auth_db
+-            +1: Justin, Ian, Lars
+-
+     * Convert all instances of the old apr_lock_t type to the new
+       types (once they are fully supported in APR).
+         Status: Aaron is working on converting INTRAPROCESS
+@@ -365,7 +357,7 @@ RELEASE NON-SHOWSTOPPERS BUT WOULD BE REAL NICE TO WRAP THESE UP:
+         the dbmmanage employs the first-matched dbm format.  This is not
+         necessarily the library that Apache was built with.  Aught to
+         rewrite dbmmanage upon installation to bin/ with the proper library 
+-        for predictable mod_auth_db/dbm administration.
++        for predictable mod_auth_dbm administration.
+         Status: Mladen Turk has posted several patches and ideas.
+                 Key question, part of htpasswd, or a seperate utility?
+                 prefer htpasswd: Lars
+diff --git a/docs/man/dbmmanage.1 b/docs/man/dbmmanage.1
+index fc86f8e..660d142 100644
+--- a/docs/man/dbmmanage.1
++++ b/docs/man/dbmmanage.1
+@@ -158,8 +158,6 @@ must be taken if using programs in other languages, like C, to
+ access these files.
+ .PP
+ Apache's 
+-.B mod_auth_db.c 
+-module corresponds to Berkeley DB 2 library, while
+ .B mod_auth_dbm.c
+ corresponds to the NDBM library.  Also, one can usually use the 
+ .B file
+diff --git a/docs/manual/ebcdic.html b/docs/manual/ebcdic.html
+index 0f5571e..8936ec3 100644
+--- a/docs/manual/ebcdic.html
++++ b/docs/manual/ebcdic.html
+@@ -346,14 +346,6 @@
+       </tr>
+ 
+       <tr>
+-        <td align="LEFT">mod_auth_db</td>
+-
+-        <td align="CENTER">?</td>
+-
+-        <td>with own libdb.a</td>
+-      </tr>
+-
+-      <tr>
+         <td align="LEFT">mod_auth_dbm</td>
+ 
+         <td align="CENTER">?</td>
+diff --git a/docs/manual/howto/auth.html b/docs/manual/howto/auth.html
+index 8b8b46f..ca7cedb 100644
+--- a/docs/manual/howto/auth.html
++++ b/docs/manual/howto/auth.html
+@@ -201,13 +201,10 @@
+     of users, it can be quite slow to search through a plain text
+     file to authenticate the user on each request. Apache also has
+     the ability to store user information in fast database files.
+-    The modules <a href="../mod/mod_auth_db.html">mod_auth_db</a>
+-    and <a href="../mod/mod_auth_dbm.html">mod_auth_dbm</a> provide
+-    the <a
+-    href="../mod/mod_auth_db.html#authdbuserfile">AuthDBUserFile</a>
+-    and <a
++    The <a href="../mod/mod_auth_dbm.html">mod_auth_dbm</a> module
++    provides the <a
+     href="../mod/mod_auth_dbm.html#authdbmuserfile">AuthDBMUserFile</a>
+-    directives respectively. These files can be created and
++    directive. These files can be created and
+     manipulated with the <a
+     href="../programs/dbmmanage.html">dbmmanage</a> program. Many
+     other types of authentication options are available from third
+diff --git a/docs/manual/howto/auth.html.en b/docs/manual/howto/auth.html.en
+index 8b8b46f..ca7cedb 100644
+--- a/docs/manual/howto/auth.html.en
++++ b/docs/manual/howto/auth.html.en
+@@ -201,13 +201,10 @@
+     of users, it can be quite slow to search through a plain text
+     file to authenticate the user on each request. Apache also has
+     the ability to store user information in fast database files.
+-    The modules <a href="../mod/mod_auth_db.html">mod_auth_db</a>
+-    and <a href="../mod/mod_auth_dbm.html">mod_auth_dbm</a> provide
+-    the <a
+-    href="../mod/mod_auth_db.html#authdbuserfile">AuthDBUserFile</a>
+-    and <a
++    The <a href="../mod/mod_auth_dbm.html">mod_auth_dbm</a> module
++    provides the <a
+     href="../mod/mod_auth_dbm.html#authdbmuserfile">AuthDBMUserFile</a>
+-    directives respectively. These files can be created and
++    directive. These files can be created and
+     manipulated with the <a
+     href="../programs/dbmmanage.html">dbmmanage</a> program. Many
+     other types of authentication options are available from third
+diff --git a/docs/manual/mod/directives.html b/docs/manual/mod/directives.html
+index 8eb3ef5..0b0d51e 100644
+--- a/docs/manual/mod/directives.html
++++ b/docs/manual/mod/directives.html
+@@ -109,12 +109,6 @@
+       href="mod_auth.html#authauthoritative">AuthAuthoritative</a></li>
+ 
+       <li><a
+-      href="mod_auth_db.html#authdbauthoritative">AuthDBAuthoritative</a></li>
+-
+-      <li><a
+-      href="mod_auth_db.html#authdbgroupfile">AuthDBGroupFile</a></li>
+-
+-      <li><a
+       href="mod_auth_dbm.html#authdbmauthoritative">AuthDBMAuthoritative</a></li>
+ 
+       <li><a
+@@ -124,9 +118,6 @@
+       href="mod_auth_dbm.html#authdbmgroupfile">AuthDBMGroupFile</a></li>
+ 
+       <li><a
+-      href="mod_auth_db.html#authdbuserfile">AuthDBUserFile</a></li>
+-
+-      <li><a
+       href="mod_auth_dbm.html#authdbmuserfile">AuthDBMUserFile</a></li>
+ 
+       <li><a
+diff --git a/docs/manual/mod/index-bytype.html b/docs/manual/mod/index-bytype.html
+index 42a8f53..2bf7c29 100644
+--- a/docs/manual/mod/index-bytype.html
++++ b/docs/manual/mod/index-bytype.html
+@@ -147,10 +147,6 @@
+ 
+       <dd>User authentication using DBM files.</dd>
+ 
+-      <dt><a href="mod_auth_db.html">mod_auth_db</a></dt>
+-
+-      <dd>User authentication using Berkeley DB files.</dd>
+-
+       <dt><a href="mod_auth_anon.html">mod_auth_anon</a></dt>
+ 
+       <dd>Anonymous user access to authenticated areas.</dd>
+diff --git a/docs/manual/mod/index.html b/docs/manual/mod/index.html
+index 895560f..344314c 100644
+--- a/docs/manual/mod/index.html
++++ b/docs/manual/mod/index.html
+@@ -85,10 +85,6 @@
+ 
+       <dd>Anonymous user access to authenticated areas.</dd>
+ 
+-      <dt><a href="mod_auth_db.html">mod_auth_db</a></dt>
+-
+-      <dd>User authentication using Berkeley DB files.</dd>
+-
+       <dt><a href="mod_auth_dbm.html">mod_auth_dbm</a></dt>
+ 
+       <dd>User authentication using DBM files.</dd>
+diff --git a/docs/manual/mod/mod_auth.html b/docs/manual/mod/mod_auth.html
+index 7353c26..26d3bf5 100644
+--- a/docs/manual/mod/mod_auth.html
++++ b/docs/manual/mod/mod_auth.html
+@@ -31,9 +31,8 @@
+     <p>This module allows the use of HTTP Basic Authentication to
+     restrict access by looking up users in plain text password and
+     group files. Similar functionality and greater scalability is
+-    provided by <a href="mod_auth_dbm.html">mod_auth_dbm</a> and <a
+-    href="mod_auth_db.html">mod_auth_db</a>. HTTP Digest
+-    Authentication is provided by <a
++    provided by <a href="mod_auth_dbm.html">mod_auth_dbm</a>.
++    HTTP Digest Authentication is provided by <a
+     href="mod_auth_digest.html">mod_auth_digest</a>.</p>
+ 
+     <h2>Directives</h2>
+@@ -186,10 +185,8 @@
+     AuthAuthoritative setting.</p>
+ 
+     <p>A common use for this is in conjunction with one of the
+-    database modules; such as <a
+-    href="mod_auth_db.html"><code>mod_auth_db.c</code></a>, <a
+-    href="mod_auth_dbm.html"><code>mod_auth_dbm.c</code></a>,
+-    <code>mod_auth_msql.c</code>, and <a
++    database modules; such as <a href="mod_auth_dbm.html"><code
++    >mod_auth_dbm.c</code></a>, <code>mod_auth_msql.c</code>, and <a
+     href="mod_auth_anon.html"><code>mod_auth_anon.c</code></a>.
+     These modules supply the bulk of the user credential checking;
+     but a few (administrator) related accesses fall through to a
+diff --git a/docs/manual/mod/mod_auth_db.html b/docs/manual/mod/mod_auth_db.html
+deleted file mode 100644
+index d80aca6..0000000
+--- a/docs/manual/mod/mod_auth_db.html
++++ /dev/null
+@@ -1,235 +0,0 @@
+-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+-    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+-
+-<html xmlns="http://www.w3.org/1999/xhtml">
+-  <head>
+-    <meta name="generator" content="HTML Tidy, see www.w3.org" />
+-
+-    <title>Apache module mod_auth_db</title>
+-  </head>
+-  <!-- Background white, links blue (unvisited), navy (visited), red (active) -->
+-
+-  <body bgcolor="#FFFFFF" text="#000000" link="#0000FF"
+-  vlink="#000080" alink="#FF0000">
+-    <!--#include virtual="header.html" -->
+-
+-    <h1 align="CENTER">Module mod_auth_db</h1>
+-
+-    <p>This module provides for user authentication using Berkeley
+-    DB files.</p>
+-
+-    <p><a href="module-dict.html#Status"
+-    rel="Help"><strong>Status:</strong></a> Extension<br />
+-     <a href="module-dict.html#SourceFile"
+-    rel="Help"><strong>Source File:</strong></a>
+-    mod_auth_db.c<br />
+-     <a href="module-dict.html#ModuleIdentifier"
+-    rel="Help"><strong>Module Identifier:</strong></a>
+-    auth_db_module</p>
+-
+-    <h2>Summary</h2>
+-
+-    <p>This module provides an alternative to <a
+-    href="mod_auth_dbm.html">DBM</a> files for those systems which
+-    support DB and not DBM. It is only available in Apache 1.1 and
+-    later.</p>
+-
+-    <p>On some BSD systems (<em>e.g.</em>, FreeBSD and NetBSD) dbm
+-    is automatically mapped to Berkeley DB. You can use either <a
+-    href="mod_auth_dbm.html">mod_auth_dbm</a> or mod_auth_db. The
+-    latter makes it more obvious that it's Berkeley DB. On other
+-    platforms where you want to use the DB library you usually have
+-    to install it first. See <a
+-    href="http://www.sleepycat.com/">http://www.sleepycat.com/</a>
+-    for the distribution. The interface this module uses is the one
+-    from DB version 1.85 and 1.86, but DB version 2.x can also be
+-    used when compatibility mode is enabled.</p>
+-
+-    <h2>Directives</h2>
+-
+-    <ul>
+-      <li><a href="#authdbgroupfile">AuthDBGroupFile</a></li>
+-
+-      <li><a href="#authdbuserfile">AuthDBUserFile</a></li>
+-
+-      <li><a
+-      href="#authdbauthoritative">AuthDBAuthoritative</a></li>
+-    </ul>
+-
+-    <p>See also: <a href="core.html#satisfy">satisfy</a> and <a
+-    href="core.html#require">require</a>.</p>
+-    <hr />
+-
+-    <h2><a id="authdbgroupfile"
+-    name="authdbgroupfile">AuthDBGroupFile directive</a></h2>
+-    <!--%plaintext &lt;?INDEX {\tt AuthDBGroupFile} directive&gt; -->
+-    <a href="directive-dict.html#Syntax"
+-    rel="Help"><strong>Syntax:</strong></a> AuthDBGroupFile
+-    <em>file-path</em><br />
+-     <a href="directive-dict.html#Context"
+-    rel="Help"><strong>Context:</strong></a> directory,
+-    .htaccess<br />
+-     <a href="directive-dict.html#Override"
+-    rel="Help"><strong>Override:</strong></a> AuthConfig<br />
+-     <a href="directive-dict.html#Status"
+-    rel="Help"><strong>Status:</strong></a> Extension<br />
+-     <a href="directive-dict.html#Module"
+-    rel="Help"><strong>Module:</strong></a> mod_auth_db 
+-
+-    <p>The AuthDBGroupFile directive sets the name of a DB file
+-    containing the list of user groups for user authentication.
+-    <em>File-path</em> is the absolute path to the group file.</p>
+-
+-    <p>The group file is keyed on the username. The value for a
+-    user is a comma-separated list of the groups to which the users
+-    belongs. There must be no whitespace within the value, and it
+-    must never contain any colons.</p>
+-
+-    <p>Security: make sure that the AuthDBGroupFile is stored
+-    outside the document tree of the web-server; do <em>not</em>
+-    put it in the directory that it protects. Otherwise, clients
+-    will be able to download the AuthDBGroupFile unless otherwise
+-    protected.</p>
+-
+-    <p>Combining Group and Password DB files: In some cases it is
+-    easier to manage a single database which contains both the
+-    password and group details for each user. This simplifies any
+-    support programs that need to be written: they now only have to
+-    deal with writing to and locking a single DBM file. This can be
+-    accomplished by first setting the group and password files to
+-    point to the same DB file:</p>
+-
+-    <blockquote>
+-      <code>AuthDBGroupFile /www/userbase<br />
+-       AuthDBUserFile /www/userbase</code>
+-    </blockquote>
+-    The key for the single DB record is the username. The value
+-    consists of 
+-
+-    <blockquote>
+-      <code>Unix Crypt-ed Password : List of Groups [ : (ignored)
+-      ]</code>
+-    </blockquote>
+-    The password section contains the Unix crypt() password as
+-    before. This is followed by a colon and the comma separated
+-    list of groups. Other data may optionally be left in the DB
+-    file after another colon; it is ignored by the authentication
+-    module. 
+-
+-    <p>See also <a href="core.html#authname">AuthName</a>, <a
+-    href="core.html#authtype">AuthType</a> and <a
+-    href="#authdbuserfile">AuthDBUserFile</a>.</p>
+-    <hr />
+-
+-    <h2><a id="authdbuserfile"
+-    name="authdbuserfile">AuthDBUserFile</a> directive</h2>
+-    <!--%plaintext &lt;?INDEX {\tt AuthDBUserFile} directive&gt; -->
+-    <a href="directive-dict.html#Syntax"
+-    rel="Help"><strong>Syntax:</strong></a> AuthDBUserFile
+-    <em>file-path</em><br />
+-     <a href="directive-dict.html#Context"
+-    rel="Help"><strong>Context:</strong></a> directory,
+-    .htaccess<br />
+-     <a href="directive-dict.html#Override"
+-    rel="Help"><strong>Override:</strong></a> AuthConfig<br />
+-     <a href="directive-dict.html#Status"
+-    rel="Help"><strong>Status:</strong></a> Extension<br />
+-     <a href="directive-dict.html#Module"
+-    rel="Help"><strong>Module:</strong></a> mod_auth_db 
+-
+-    <p>The AuthDBUserFile directive sets the name of a DB file
+-    containing the list of users and passwords for user
+-    authentication. <em>File-path</em> is the absolute path to the
+-    user file.</p>
+-
+-    <p>The user file is keyed on the username. The value for a user
+-    is the crypt() encrypted password, optionally followed by a
+-    colon and arbitrary data. The colon and the data following it
+-    will be ignored by the server.</p>
+-
+-    <p>Security: make sure that the AuthDBUserFile is stored
+-    outside the document tree of the web-server; do <em>not</em>
+-    put it in the directory that it protects. Otherwise, clients
+-    will be able to download the AuthDBUserFile.</p>
+-
+-    <p>Important compatibility note: The implementation of
+-    "dbmopen" in the apache modules reads the string length of the
+-    hashed values from the DB data structures, rather than relying
+-    upon the string being NULL-appended. Some applications, such as
+-    the Netscape web server, rely upon the string being
+-    NULL-appended, so if you are having trouble using DB files
+-    interchangeably between applications this may be a part of the
+-    problem.</p>
+-
+-    <p>A perl script called
+-    href="../programs/dbmmanage.html"&gt;dbmmanage is included with
+-    Apache. This program can be used to create and update DB format
+-    password files for use with this module.</p>
+-    See also <a href="core.html#authname">AuthName</a>, <a
+-    href="core.html#authtype">AuthType</a> and <a
+-    href="#authdbgroupfile">AuthDBGroupFile</a>. 
+-    <hr />
+-
+-    <h2><a id="authdbauthoritative"
+-    name="authdbauthoritative">AuthDBAuthoritative</a>
+-    directive</h2>
+-    <!--%plaintext &lt;?INDEX {\tt AuthDBAuthoritative} directive&gt; -->
+-    <a href="directive-dict.html#Syntax"
+-    rel="Help"><strong>Syntax:</strong></a> AuthDBAuthoritative
+-    on|off<br />
+-     <a href="directive-dict.html#Default"
+-    rel="Help"><strong>Default:</strong></a>
+-    <code>AuthDBAuthoritative on</code><br />
+-     <a href="directive-dict.html#Context"
+-    rel="Help"><strong>Context:</strong></a> directory,
+-    .htaccess<br />
+-     <a href="directive-dict.html#Override"
+-    rel="Help"><strong>Override:</strong></a> AuthConfig<br />
+-     <a href="directive-dict.html#Status"
+-    rel="Help"><strong>Status:</strong></a> Base<br />
+-     <a href="directive-dict.html#Module"
+-    rel="Help"><strong>Module:</strong></a> mod_auth 
+-
+-    <p>Setting the AuthDBAuthoritative directive explicitly to
+-    <strong>'off'</strong> allows for both authentication and
+-    authorization to be passed on to lower level modules (as
+-    defined in the <code>Configuration</code> and
+-    <code>modules.c</code> file if there is <strong>no
+-    userID</strong> or <strong>rule</strong> matching the supplied
+-    userID. If there is a userID and/or rule specified; the usual
+-    password and access checks will be applied and a failure will
+-    give an Authorization Required reply.</p>
+-
+-    <p>So if a userID appears in the database of more than one
+-    module; or if a valid <code>Require</code> directive applies to
+-    more than one module; then the first module will verify the
+-    credentials; and no access is passed on; regardless of the
+-    AuthAuthoritative setting.</p>
+-
+-    <p>A common use for this is in conjunction with one of the
+-    basic auth modules; such as <a
+-    href="mod_auth.html"><code>mod_auth.c</code></a>. Whereas this
+-    DB module supplies the bulk of the user credential checking; a
+-    few (administrator) related accesses fall through to a lower
+-    level with a well protected .htpasswd file.</p>
+-
+-    <p>By default, control is not passed on and an unknown userID
+-    or rule will result in an Authorization Required reply. Not
+-    setting it thus keeps the system secure and forces an NCSA
+-    compliant behaviour.</p>
+-
+-    <p>Security: Do consider the implications of allowing a user to
+-    allow fall-through in his .htaccess file; and verify that this
+-    is really what you want; Generally it is easier to just secure
+-    a single .htpasswd file, than it is to secure a database which
+-    might have more access interfaces.</p>
+-
+-    <p>See also <a href="core.html#authname">AuthName</a>, <a
+-    href="core.html#authtype">AuthType</a> and <a
+-    href="#authdbgroupfile">AuthDBGroupFile</a>.</p>
+-
+-    <p><!--#include virtual="footer.html" -->
+-    </p>
+-  </body>
+-</html>
+-
+diff --git a/docs/manual/new_features_2_0.html.de b/docs/manual/new_features_2_0.html.de
+index 040ae6c..c833459 100644
+--- a/docs/manual/new_features_2_0.html.de
++++ b/docs/manual/new_features_2_0.html.de
+@@ -182,10 +182,6 @@
+       <a href="mod/mod_auth_dbm.html#authdbmtype">AuthDBMType</a>
+       unterst&uuml;tzt.</dd>
+ 
+-      <dt><strong>mod_auth_db</strong></dt>
+-
+-      <dd>Berkeley DB 3.0 wird jetzt unterst&uuml;tzt</dd>
+-
+       <dt><strong>mod_proxy</strong></dt>
+ 
+       <dd>Neue &lt;Proxy&gt;-Konfigurationssektionen bringen eine besser
+diff --git a/docs/manual/new_features_2_0.html.en b/docs/manual/new_features_2_0.html.en
+index 57c4487..9561013 100644
+--- a/docs/manual/new_features_2_0.html.en
++++ b/docs/manual/new_features_2_0.html.en
+@@ -184,7 +184,8 @@
+ 
+       <dt><strong>mod_auth_db</strong></dt>
+ 
+-      <dd>Now supports Berkeley DB 3.0</dd>
++      <dd>Has been removed in favor of mod_auth_dbm with the AuthDBMType
++      directive.</dd>
+ 
+       <dt><strong>mod_proxy</strong></dt>
+ 
+diff --git a/docs/manual/new_features_2_0.html.fr b/docs/manual/new_features_2_0.html.fr
+index 624b3ad..9ae5f6d 100644
+--- a/docs/manual/new_features_2_0.html.fr
++++ b/docs/manual/new_features_2_0.html.fr
+@@ -79,10 +79,6 @@
+     concernant les modules&nbsp;:</a></h2>
+ 
+     <dl>
+-      <dt><strong>mod_auth_db</strong></dt>
+-
+-      <dd>Il accepte maintenant les bases Berkeley DB 3.0.</dd>
+-
+       <dt><strong>mod_auth_digest</strong></dt>
+ 
+       <dd>Il inclut une nouvelle gestion des sessions en utilisant
+diff --git a/docs/manual/programs/dbmmanage.html b/docs/manual/programs/dbmmanage.html
+index a060f54..f6adb19 100644
+--- a/docs/manual/programs/dbmmanage.html
++++ b/docs/manual/programs/dbmmanage.html
+@@ -99,8 +99,7 @@
+      care  must  be  taken  if using programs in other languages,
+      like C, to access these files.
+ 
+-     Apache's <strong>mod_auth_db.c</strong> module corresponds to Berkeley  DB  2
+-     library,   while  <strong>mod_auth_dbm.c</strong>  corresponds  to  the  NDBM
++     Apache's <strong>mod_auth_dbm.c</strong>  corresponds  to  the  NDBM
+      library.  Also, one can usually use the  <strong>file</strong>  program  sup-
+      plied  with  most Unix systems to see what format a DBM file
+      is in.
+diff --git a/docs/manual/sitemap.html b/docs/manual/sitemap.html
+index e250fb2..e735f5b 100644
+--- a/docs/manual/sitemap.html
++++ b/docs/manual/sitemap.html
+@@ -140,7 +140,6 @@ Server on HPUX</a></li>
+ <li><a href="mod/mod_asis.html">Apache module mod_asis</a></li>
+ <li><a href="mod/mod_auth.html">Apache module mod_auth</a></li>
+ <li><a href="mod/mod_auth_anon.html">Apache module mod_auth_anon.c</a></li>
+-<li><a href="mod/mod_auth_db.html">Apache module mod_auth_db</a></li>
+ <li><a href="mod/mod_auth_dbm.html">Apache module mod_auth_dbm</a></li>
+ <li><a href="mod/mod_auth_digest.html">Apache module mod_auth_digest</a></li>
+ <li><a href="mod/mod_auth_ldap.html">Apache module mod_ldap</a></li>
+@@ -198,4 +197,4 @@ Server on HPUX</a></li>
+ 
+     <!--#include virtual="footer.html" -->
+   </body>
+-</html>
+\ No newline at end of file
++</html>
+diff --git a/docs/manual/sitemap.html.en b/docs/manual/sitemap.html.en
+index e250fb2..e735f5b 100644
+--- a/docs/manual/sitemap.html.en
++++ b/docs/manual/sitemap.html.en
+@@ -140,7 +140,6 @@ Server on HPUX</a></li>
+ <li><a href="mod/mod_asis.html">Apache module mod_asis</a></li>
+ <li><a href="mod/mod_auth.html">Apache module mod_auth</a></li>
+ <li><a href="mod/mod_auth_anon.html">Apache module mod_auth_anon.c</a></li>
+-<li><a href="mod/mod_auth_db.html">Apache module mod_auth_db</a></li>
+ <li><a href="mod/mod_auth_dbm.html">Apache module mod_auth_dbm</a></li>
+ <li><a href="mod/mod_auth_digest.html">Apache module mod_auth_digest</a></li>
+ <li><a href="mod/mod_auth_ldap.html">Apache module mod_ldap</a></li>
+@@ -198,4 +197,4 @@ Server on HPUX</a></li>
+ 
+     <!--#include virtual="footer.html" -->
+   </body>
+-</html>
+\ No newline at end of file
++</html>
+diff --git a/modules/aaa/config.m4 b/modules/aaa/config.m4
+index 4c78084..d83ef28 100644
+--- a/modules/aaa/config.m4
++++ b/modules/aaa/config.m4
+@@ -25,11 +25,6 @@ APACHE_MODULE(auth_dbm, DBM-based access databases, , , most, [
+   fi
+ ])
+ 
+-APACHE_MODULE(auth_db, DB-based access databases, , , , [
+-  AC_CHECK_HEADERS(db.h,,enable_auth_db=no)
+-  AC_SEARCH_LIBS(dbopen,[c db],,enable_auth_db=no)
+-]) 
+-
+ APACHE_MODULE(auth_digest, RFC2617 Digest authentication, , , most, [
+   ap_old_cppflags=$CPPFLAGS
+   CPPFLAGS="$CPPFLAGS -I$APR_SOURCE_DIR/include -I$abs_builddir/srclib/apr/include"
+diff --git a/modules/aaa/mod_auth_db.c b/modules/aaa/mod_auth_db.c
+deleted file mode 100644
+index 412506c..0000000
+--- a/modules/aaa/mod_auth_db.c
++++ /dev/null
+@@ -1,419 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2001 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- *
+- * Portions of this software are based upon public domain software
+- * originally written at the National Center for Supercomputing Applications,
+- * University of Illinois, Urbana-Champaign.
+- */
+-
+-/*
+- * mod_auth_db: authentication
+- * 
+- * Original work by Rob McCool & Brian Behlendorf.
+- * 
+- * Adapted to Apache by rst (mod_auth_dbm)
+- *
+- * Adapted for Berkeley DB by Andrew Cohen 
+- *
+- * apache 2 port by Brian Martin 
+- *
+- * mod_auth_db was based on mod_auth_dbm.
+- * 
+- * Warning, this is not a drop in replacement for mod_auth_dbm, 
+- * for people wanting to switch from dbm to Berkeley DB.
+- * It requires the use of AuthDBUserFile and AuthDBGroupFile
+- *           instead of   AuthDBMUserFile    AuthDBMGroupFile
+- *
+- * Also, in the configuration file you need to specify
+- *  auth_db_module rather than auth_dbm_module
+- *
+- * On some BSD systems (e.g. FreeBSD and NetBSD) dbm is automatically
+- * mapped to Berkeley DB. You can use either mod_auth_dbm or
+- * mod_auth_db. The latter makes it more obvious that it's Berkeley.
+- * On other platforms where you want to use the DB library you
+- * usually have to install it first. See http://www.sleepycat.com/
+- * for the distribution. The interface this module uses is the
+- * one from DB version 1.85 and 1.86, but DB version 2.x
+- * can also be used when compatibility mode is enabled.
+- *
+- * dirkx - Added Authoritative control to allow passing on to lower  
+- *         modules if and only if the userid is not known to this
+- *         module. A known user with a faulty or absent password still
+- *         causes an AuthRequired. The default is 'Authoritative', i.e.
+- *         no control is passed along.
+- */
+-
+-#include "apr_lib.h"
+-
+-#define APR_WANT_STRFUNC
+-#include "apr_want.h"
+-
+-#include "ap_config.h"
+-#include "httpd.h"
+-#include "http_config.h"
+-#include "http_core.h"
+-#include "http_log.h"
+-#include "http_protocol.h"
+-#include "http_request.h"  /* for ap_hook_(check_user_id | auth_check) */
+-
+-#ifdef HAVE_DB_H
+-#include <db.h>
+-#endif
+-
+-#if   defined(DB_VERSION_MAJOR) && (DB_VERSION_MAJOR == 3)
+-#define DB_VER 3
+-#elif defined(DB_VERSION_MAJOR) && (DB_VERSION_MAJOR == 2)
+-#define DB_VER 2
+-#else
+-#define DB_VER 1
+-#endif
+-
+-typedef struct {
+-
+-    char *auth_dbpwfile;
+-    char *auth_dbgrpfile;
+-    int auth_dbauthoritative;
+-} db_auth_config_rec;
+-
+-static void *create_db_auth_dir_config(apr_pool_t *p, char *d)
+-{
+-    db_auth_config_rec *conf = apr_palloc(p, sizeof(*conf));
+-
+-    conf->auth_dbpwfile = NULL;
+-    conf->auth_dbgrpfile = NULL;
+-    conf->auth_dbauthoritative = 1;	/* fortress is secure by default */
+-    return conf;
+-}
+-
+-static const char *set_db_slot(cmd_parms *cmd, void *offset, const char *f, const char *t)
+-{
+-    if (!t || strcmp(t, "db"))
+-	return DECLINE_CMD;
+-
+-    return ap_set_file_slot(cmd, offset, f);
+-}
+-
+-static const command_rec db_auth_cmds[] =
+-{
+-    AP_INIT_TAKE1("AuthDBUserFile", ap_set_file_slot,
+-     (void *) APR_XtOffsetOf(db_auth_config_rec, auth_dbpwfile),
+-     OR_AUTHCFG, "db database file containing user IDs and passwords"),
+-    AP_INIT_TAKE1("AuthDBGroupFile", ap_set_file_slot,
+-     (void *) APR_XtOffsetOf(db_auth_config_rec, auth_dbgrpfile),
+-     OR_AUTHCFG, "db database file containing group names and member user IDs"),
+-    AP_INIT_TAKE12("AuthUserFile", set_db_slot,
+-     (void *) APR_XtOffsetOf(db_auth_config_rec, auth_dbpwfile),
+-     OR_AUTHCFG, NULL),
+-    AP_INIT_TAKE12("AuthGroupFile", set_db_slot,
+-     (void *) APR_XtOffsetOf(db_auth_config_rec, auth_dbgrpfile),
+-     OR_AUTHCFG, NULL),
+-    AP_INIT_FLAG("AuthDBAuthoritative", ap_set_flag_slot,
+-     (void *) APR_XtOffsetOf(db_auth_config_rec, auth_dbauthoritative),
+-     OR_AUTHCFG,
+-     "Set to 'no' to allow access control to be passed along to lower modules if the userID is not known to this module"),
+-    {NULL}
+-};
+-
+-module AP_MODULE_DECLARE_DATA auth_db_module;
+-
+-static char *get_db_pw(request_rec *r, char *user, const char *auth_dbpwfile)
+-{
+-    DB *f;
+-    DBT d, q;
+-    char *pw = NULL;
+-#if DB_VER > 1
+-    int retval;
+-#endif
+-
+-    memset(&d, 0, sizeof(d));
+-    memset(&q, 0, sizeof(q));
+-
+-    q.data = user;
+-    q.size = strlen(q.data);
+-
+-#if DB_VER == 3
+-    db_create(&f, NULL, 0);
+-    if ((retval = f->open(f, auth_dbpwfile, NULL, DB_HASH, DB_RDONLY, 0664)) != 0) {
+-	char * reason;
+-	switch(retval) {
+-	case DB_OLD_VERSION:
+-	    reason = "Old database version.  Upgrade to version 3";
+-	    break;
+-
+-	case EEXIST:
+-	    reason = "DB_CREATE and DB_EXCL were specified and the file exists";
+-	    break;
+-
+-	case EINVAL:
+-	    reason = "An invalid flag value or parameter was specified";
+-	    break;
+-
+-	case ENOENT:
+-	    reason = "A non-existent re_source file was specified";
+-	    break;
+-
+-	default:
+-	    reason = "And I don't know why";
+-	    break;
+-	}
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+-		      "could not open db auth file %s: %s", 
+-		      auth_dbpwfile, reason);
+-	return NULL;
+-    }
+-#elif DB_VER == 2
+-    if ((retval = db_open(auth_dbpwfile, DB_HASH, DB_RDONLY, 0664, NULL, NULL, &f)) != 0) {
+-	char * reason;
+-	switch(retval) {
+-
+-	case EEXIST:
+-	    reason = "DB_CREATE and DB_EXCL were specified and the file exists.";
+-	    break;
+-
+-	case EINVAL:
+-	    reason = "An invalid flag value or parameter was specified";
+-	    break;
+-
+-	case ENOENT:
+-	    reason = "A non-existent re_source file was specified";
+-	    break;
+-
+-	default:
+-	    reason = "And I don't know why";
+-	    break;
+-	}
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+-		      "could not open db auth file %s: %s", 
+-		      auth_dbpwfile, reason);
+-	return NULL;
+-    }
+-#else
+-    if (!(f = dbopen(auth_dbpwfile, O_RDONLY, 0664, DB_HASH, NULL))) {
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+-		      "could not open db auth file: %s", auth_dbpwfile);
+-	return NULL;
+-    }
+-#endif
+-
+-#if DB_VER == 3 || DB_VER == 2
+-    if (!((f->get) (f, NULL, &q, &d, 0))) {
+-#else
+-    if (!((f->get) (f, &q, &d, 0))) {
+-#endif
+-	pw = apr_palloc(r->pool, d.size + 1);
+-	strncpy(pw, d.data, d.size);
+-	pw[d.size] = '\0';	/* Terminate the string */
+-    }
+-
+-#if DB_VER == 3 || DB_VER == 2
+-    (f->close) (f, 0);
+-#else
+-    (f->close) (f);
+-#endif
+-    return pw;
+-}
+-
+-/* We do something strange with the group file.  If the group file
+- * contains any : we assume the format is
+- *      key=username value=":"groupname [":"anything here is ignored]
+- * otherwise we now (0.8.14+) assume that the format is
+- *      key=username value=groupname
+- * The first allows the password and group files to be the same 
+- * physical DB file;   key=username value=password":"groupname[":"anything]
+- *
+- * mark@telescope.org, 22Sep95
+- */
+-
+-static char *get_db_grp(request_rec *r, char *user, const char *auth_dbgrpfile)
+-{
+-    char *grp_data = get_db_pw(r, user, auth_dbgrpfile);
+-    char *grp_colon;
+-    char *grp_colon2;
+-
+-    if (grp_data == NULL)
+-	return NULL;
+-
+-    if ((grp_colon = strchr(grp_data, ':')) != NULL) {
+-	grp_colon2 = strchr(++grp_colon, ':');
+-	if (grp_colon2)
+-	    *grp_colon2 = '\0';
+-	return grp_colon;
+-    }
+-    return grp_data;
+-}
+-
+-static int db_authenticate_basic_user(request_rec *r)
+-{
+-    db_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                    &auth_db_module);
+-    const char *sent_pw;
+-    char *real_pw, *colon_pw;
+-    apr_status_t invalid_pw;
+-    int res;
+-
+-    if ((res = ap_get_basic_auth_pw(r, &sent_pw)))
+-	return res;
+-
+-    if (!conf->auth_dbpwfile) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+-		      "DB file %s not found", conf->auth_dbpwfile);
+-	return DECLINED;
+-    }
+-
+-    if (!(real_pw = get_db_pw(r, r->user, conf->auth_dbpwfile))) {
+-	if (!(conf->auth_dbauthoritative))
+-	    return DECLINED;
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+-		    "DB user %s not found: %s", r->user, r->filename);
+-	ap_note_basic_auth_failure(r);
+-	return HTTP_UNAUTHORIZED;
+-    }
+-    /* Password is up to first : if exists */
+-    colon_pw = strchr(real_pw, ':');
+-    if (colon_pw) {
+-	*colon_pw = '\0';
+-    }
+-
+-    invalid_pw = apr_password_validate(sent_pw, real_pw);
+-
+-    if (invalid_pw != APR_SUCCESS) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+-		      "DB user %s: authentication failure for \"%s\": "
+-                      "Password Mismatch",
+-		      r->user, r->uri);
+-	ap_note_basic_auth_failure(r);
+-	return HTTP_UNAUTHORIZED;
+-    }
+-    return OK;
+-}
+-
+-/* Checking ID */
+-
+-static int db_check_auth(request_rec *r)
+-{
+-    db_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                    &auth_db_module);
+-    char *user = r->user;
+-    int m = r->method_number;
+-
+-    const apr_array_header_t *reqs_arr = ap_requires(r);
+-    require_line *reqs = reqs_arr ? (require_line *) reqs_arr->elts : NULL;
+-
+-    register int x;
+-    const char *t;
+-    char *w;
+-
+-    if (!conf->auth_dbgrpfile)
+-	return DECLINED;
+-    if (!reqs_arr)
+-	return DECLINED;
+-
+-    for (x = 0; x < reqs_arr->nelts; x++) {
+-
+-	if (!(reqs[x].method_mask & (AP_METHOD_BIT << m)))
+-	    continue;
+-
+-	t = reqs[x].requirement;
+-	w = ap_getword_white(r->pool, &t);
+-
+-	if (!strcmp(w, "group") && conf->auth_dbgrpfile) {
+-	    const char *orig_groups, *groups;
+-	    char *v;
+-
+-	    if (!(groups = get_db_grp(r, user, conf->auth_dbgrpfile))) {
+-		if (!(conf->auth_dbauthoritative))
+-		    return DECLINED;
+-		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+-			      "user %s not in DB group file %s: %s",
+-			      user, conf->auth_dbgrpfile, r->filename);
+-		ap_note_basic_auth_failure(r);
+-		return HTTP_UNAUTHORIZED;
+-	    }
+-	    orig_groups = groups;
+-	    while (t[0]) {
+-		w = ap_getword_white(r->pool, &t);
+-		groups = orig_groups;
+-		while (groups[0]) {
+-		    v = ap_getword(r->pool, &groups, ',');
+-		    if (!strcmp(v, w))
+-			return OK;
+-		}
+-	    }
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+-			  "user %s not in right group: %s", user, r->filename);
+-	    ap_note_basic_auth_failure(r);
+-	    return HTTP_UNAUTHORIZED;
+-	}
+-    }
+-
+-    return DECLINED;
+-}
+-
+-static void register_hooks(apr_pool_t *p)
+-{
+-    ap_hook_check_user_id(db_authenticate_basic_user, NULL, NULL,
+-                          APR_HOOK_MIDDLE);
+-    ap_hook_auth_checker(db_check_auth, NULL, NULL, APR_HOOK_MIDDLE);
+-}
+-
+-module AP_MODULE_DECLARE_DATA auth_db_module =
+-{
+-    STANDARD20_MODULE_STUFF,
+-    create_db_auth_dir_config,	/* dir config creater */
+-    NULL,			/* dir merger --- default is to override */
+-    NULL,			/* server config */
+-    NULL,			/* merge server config */
+-    db_auth_cmds,		/* command apr_table_t */
+-    register_hooks		/* register hooks */
+-};
+-
+diff --git a/modules/aaa/mod_auth_db.module b/modules/aaa/mod_auth_db.module
+deleted file mode 100644
+index 525075c..0000000
+--- a/modules/aaa/mod_auth_db.module
++++ /dev/null
+@@ -1,37 +0,0 @@
+-Name: db_auth_module
+-ConfigStart
+-	# XXX: this needs updating for apache-2.0 configuration method
+-    DB_VERSION=''
+-    DB_LIB=''
+-    if ./build/TestCompile func db_open; then
+-        DB_VERSION='Berkeley-DB/2.x'
+-    else
+-        if ./build/TestCompile lib db db_open; then
+-            DB_VERSION='Berkeley-DB/2.x'
+-            DB_LIB='-ldb'
+-        else
+-            if ./build/TestCompile func dbopen; then
+-                DB_VERSION='Berkeley-DB/1.x'
+-            else
+-                if ./build/TestCompile lib db dbopen; then
+-                    DB_VERSION='Berkeley-DB/1.x'
+-                    DB_LIB='-ldb'
+-                fi
+-            fi 
+-        fi
+-    fi
+-    if [ ".$DB_VERSION" != . ]; then
+-        if [ ".$DB_LIB" != . ]; then
+-            LIBS="$LIBS $DB_LIB"
+-            echo "      using $DB_VERSION for mod_auth_db ($DB_LIB)"
+-        else
+-            echo "      using $DB_VERSION for mod_auth_db (-lc)"
+-        fi
+-    else
+-        echo "Error: Neither Berkeley-DB/1.x nor Berkeley-DB/2.x library found."
+-        echo "       Either disable mod_auth_db or provide us with the paths"
+-        echo "       to the Berkeley-DB include and library files."
+-        echo "       (Hint: INCLUDES, LDFLAGS, LIBS)"
+-        exit 1
+-    fi
+-ConfigEnd

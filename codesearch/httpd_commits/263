@@ -1,0 +1,925 @@
+commit ee00dc788ff0fe5974ec5263616a5db741eef3ff
+Author: Ryan Bloom <rbb@apache.org>
+Date:   Fri Nov 19 18:49:20 1999 +0000
+
+    Finish the conversion from fprintf(stderr -> ap_log_err.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@84135 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index a198610..9159eaa 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -257,7 +257,8 @@ module MODULE_VAR_EXPORT digest_auth_module;
+ #ifdef HAVE_SHMEM_MM
+ static ap_status_t cleanup_tables(void *not_used)
+ {
+-    fprintf(stderr, "Digest: cleaning up shared memory\n");
++    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                 "Digest: cleaning up shared memory");
+     fflush(stderr);
+ 
+     if (client_mm) {
+diff --git a/modules/filters/mod_include.c b/modules/filters/mod_include.c
+index c288cab..30d709d 100644
+--- a/modules/filters/mod_include.c
++++ b/modules/filters/mod_include.c
+@@ -202,8 +202,9 @@ static void add_include_vars(request_rec *r, char *timefmt)
+    ap_status_t status = ap_getc(&c, f); \
+    if (status != APR_SUCCESS) { /* either EOF or error -- needs error handling if latter */ \
+        if (status != APR_EOF) { \
+-           fprintf(stderr, "encountered error in GET_CHAR macro, " \
+-                   "mod_include.\n"); \
++           ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, \
++                        "encountered error in GET_CHAR macro, " \
++                        "mod_include."); \
+        } \
+        FLUSH_BUF(r); \
+        ap_close(f); \
+@@ -247,8 +248,9 @@ static int find_string(ap_file_t *in, const char *str, request_rec *r, int print
+    ap_status_t status = ap_getc(&c, f); \
+    if (status != APR_SUCCESS) { /* either EOF or error -- needs error handling if latter */ \
+        if (status != APR_EOF) { \
+-           fprintf(stderr, "encountered error in GET_CHAR macro, " \
+-                   "mod_include.\n"); \
++           ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, \
++                        "encountered error in GET_CHAR macro, " \
++                        "mod_include."); \
+        } \
+        ap_close(f); \
+        return r; \
+diff --git a/modules/mappers/mod_negotiation.c b/modules/mappers/mod_negotiation.c
+index d2fd832..162c997 100644
+--- a/modules/mappers/mod_negotiation.c
++++ b/modules/mappers/mod_negotiation.c
+@@ -580,8 +580,9 @@ static void parse_negotiate_header(request_rec *r, negotiation_state *neg)
+     }
+ 
+ #ifdef NEG_DEBUG
+-    fprintf(stderr, "dont_fiddle_headers=%d use_rvsa=%d ua_supports_trans=%d "
+-            "send_alternates=%d, may_choose=%d\n",
++    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++            "dont_fiddle_headers=%d use_rvsa=%d ua_supports_trans=%d "
++            "send_alternates=%d, may_choose=%d",
+             neg->dont_fiddle_headers, neg->use_rvsa,  
+             neg->ua_supports_trans, neg->send_alternates, neg->may_choose);
+ #endif
+@@ -1757,9 +1758,10 @@ static int is_variant_better_rvsa(negotiation_state *neg, var_rec *variant,
+     */
+ 
+ #ifdef NEG_DEBUG
+-    fprintf(stderr, "Variant: file=%s type=%s lang=%s sourceq=%1.3f "
++    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++           "Variant: file=%s type=%s lang=%s sourceq=%1.3f "
+            "mimeq=%1.3f langq=%1.3f charq=%1.3f encq=%1.3f "
+-           "q=%1.5f definite=%d\n",            
++           "q=%1.5f definite=%d",            
+             (variant->file_name ? variant->file_name : ""),
+             (variant->mime_type ? variant->mime_type : ""),
+             (variant->content_languages
+@@ -1827,8 +1829,9 @@ static int is_variant_better(negotiation_state *neg, var_rec *variant,
+      */
+ 
+ #ifdef NEG_DEBUG
+-    fprintf(stderr, "Variant: file=%s type=%s lang=%s sourceq=%1.3f "
+-           "mimeq=%1.3f langq=%1.3f langidx=%d charq=%1.3f encq=%1.3f \n",
++    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++           "Variant: file=%s type=%s lang=%s sourceq=%1.3f "
++           "mimeq=%1.3f langq=%1.3f langidx=%d charq=%1.3f encq=%1.3f ",
+             (variant->file_name ? variant->file_name : ""),
+             (variant->mime_type ? variant->mime_type : ""),
+             (variant->content_languages
+diff --git a/modules/mappers/mod_so.c b/modules/mappers/mod_so.c
+index 7809292..cd5c472 100644
+--- a/modules/mappers/mod_so.c
++++ b/modules/mappers/mod_so.c
+@@ -318,14 +318,16 @@ static const char *load_file(cmd_parms *cmd, void *dummy, char *filename)
+ 
+ static const char *load_file(cmd_parms *cmd, void *dummy, char *filename)
+ {
+-    fprintf(stderr, "WARNING: LoadFile not supported on this platform\n");
++    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                 "WARNING: LoadFile not supported on this platform");
+     return NULL;
+ }
+ 
+ static const char *load_module(cmd_parms *cmd, void *dummy, 
+ 	                       char *modname, char *filename)
+ {
+-    fprintf(stderr, "WARNING: LoadModule not supported on this platform\n");
++    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                 "WARNING: LoadModule not supported on this platform");
+     return NULL;
+ }
+ 
+diff --git a/modules/proxy/mod_proxy.c b/modules/proxy/mod_proxy.c
+index a940b94..ef3a2a6 100644
+--- a/modules/proxy/mod_proxy.c
++++ b/modules/proxy/mod_proxy.c
+@@ -581,26 +581,31 @@ static const char *
+ 
+ 	if (ap_proxy_is_ipaddr(New, parms->pool)) {
+ #if DEBUGGING
+-	    fprintf(stderr, "Parsed addr %s\n", inet_ntoa(New->addr));
+-	    fprintf(stderr, "Parsed mask %s\n", inet_ntoa(New->mask));
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "Parsed addr %s", inet_ntoa(New->addr));
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "Parsed mask %s", inet_ntoa(New->mask));
+ #endif
+ 	}
+ 	else if (ap_proxy_is_domainname(New, parms->pool)) {
+ 	    ap_str_tolower(New->name);
+ #if DEBUGGING
+-	    fprintf(stderr, "Parsed domain %s\n", New->name);
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "Parsed domain %s", New->name);
+ #endif
+ 	}
+ 	else if (ap_proxy_is_hostname(New, parms->pool)) {
+ 	    ap_str_tolower(New->name);
+ #if DEBUGGING
+-	    fprintf(stderr, "Parsed host %s\n", New->name);
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "Parsed host %s", New->name);
+ #endif
+ 	}
+ 	else {
+ 	    ap_proxy_is_word(New, parms->pool);
+ #if DEBUGGING
+-	    fprintf(stderr, "Parsed word %s\n", New->name);
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "Parsed word %s", New->name);
+ #endif
+ 	}
+     }
+diff --git a/modules/proxy/proxy_util.c b/modules/proxy/proxy_util.c
+index 7a21e06..2d55a81 100644
+--- a/modules/proxy/proxy_util.c
++++ b/modules/proxy/proxy_util.c
+@@ -981,17 +981,19 @@ int ap_proxy_is_ipaddr(struct dirconn_entry *This, ap_context_t *p)
+ 	bits = 8 * quads;
+ 
+ 	if (bits != 32)		/* no warning for fully qualified IP address */
+-	    fprintf(stderr, "Warning: NetMask not supplied with IP-Addr; guessing: %s/%ld\n",
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "Warning: NetMask not supplied with IP-Addr; guessing: %s/%ld",
+ 		    inet_ntoa(This->addr), bits);
+     }
+ 
+     This->mask.s_addr = htonl(INADDR_NONE << (32 - bits));
+ 
+     if (*addr == '\0' && (This->addr.s_addr & ~This->mask.s_addr) != 0) {
+-	fprintf(stderr, "Warning: NetMask and IP-Addr disagree in %s/%ld\n",
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, "Warning: NetMask and IP-Addr disagree in %s/%ld\n",
+ 		inet_ntoa(This->addr), bits);
+ 	This->addr.s_addr &= This->mask.s_addr;
+-	fprintf(stderr, "         Set to %s/%ld\n",
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "         Set to %s/%ld",
+ 		inet_ntoa(This->addr), bits);
+     }
+ 
+@@ -1026,17 +1028,23 @@ static int proxy_match_ipaddr(struct dirconn_entry *This, request_rec *r)
+ 
+ 	if (This->addr.s_addr == (addr.s_addr & This->mask.s_addr)) {
+ #if DEBUGGING
+-	    fprintf(stderr, "1)IP-Match: %s[%s] <-> ", host, inet_ntoa(addr));
+-	    fprintf(stderr, "%s/", inet_ntoa(This->addr));
+-	    fprintf(stderr, "%s\n", inet_ntoa(This->mask));
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "1)IP-Match: %s[%s] <-> ", host, inet_ntoa(addr));
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "%s/", inet_ntoa(This->addr));
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "%s", inet_ntoa(This->mask));
+ #endif
+ 	    return 1;
+ 	}
+ #if DEBUGGING
+ 	else {
+-	    fprintf(stderr, "1)IP-NoMatch: %s[%s] <-> ", host, inet_ntoa(addr));
+-	    fprintf(stderr, "%s/", inet_ntoa(This->addr));
+-	    fprintf(stderr, "%s\n", inet_ntoa(This->mask));
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "1)IP-NoMatch: %s[%s] <-> ", host, inet_ntoa(addr));
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "%s/", inet_ntoa(This->addr));
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "%s", inet_ntoa(This->mask));
+ 	}
+ #endif
+     }
+@@ -1048,7 +1056,8 @@ static int proxy_match_ipaddr(struct dirconn_entry *This, request_rec *r)
+ 
+ 	if (found != NULL) {
+ #if DEBUGGING
+-	    fprintf(stderr, "2)IP-NoMatch: hostname=%s msg=%s\n", host, found);
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "2)IP-NoMatch: hostname=%s msg=%s", host, found);
+ #endif
+ 	    return 0;
+ 	}
+@@ -1063,17 +1072,23 @@ static int proxy_match_ipaddr(struct dirconn_entry *This, request_rec *r)
+ 	    ip_list = (struct in_addr *) *ip_listptr;
+ 	    if (This->addr.s_addr == (ip_list->s_addr & This->mask.s_addr)) {
+ #if DEBUGGING
+-		fprintf(stderr, "3)IP-Match: %s[%s] <-> ", found, inet_ntoa(*ip_list));
+-		fprintf(stderr, "%s/", inet_ntoa(This->addr));
+-		fprintf(stderr, "%s\n", inet_ntoa(This->mask));
++		ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++                       "3)IP-Match: %s[%s] <-> ", found, inet_ntoa(*ip_list));
++		ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++                       "%s/", inet_ntoa(This->addr));
++		ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++                       "%s", inet_ntoa(This->mask));
+ #endif
+ 		return 1;
+ 	    }
+ #if DEBUGGING
+ 	    else {
+-		fprintf(stderr, "3)IP-NoMatch: %s[%s] <-> ", found, inet_ntoa(*ip_list));
+-		fprintf(stderr, "%s/", inet_ntoa(This->addr));
+-		fprintf(stderr, "%s\n", inet_ntoa(This->mask));
++		ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++                       "3)IP-NoMatch: %s[%s] <-> ", found, inet_ntoa(*ip_list));
++		ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++                       "%s/", inet_ntoa(This->addr));
++		ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++                       "%s", inet_ntoa(This->mask));
+ 	    }
+ #endif
+ 	}
+@@ -1098,7 +1113,8 @@ int ap_proxy_is_domainname(struct dirconn_entry *This, ap_context_t *p)
+ 
+ #if 0
+     if (addr[i] == ':') {
+-	fprintf(stderr, "@@@@ handle optional port in proxy_is_domainname()\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "@@@@ handle optional port in proxy_is_domainname()");
+ 	/* @@@@ handle optional port */
+     }
+ #endif
+@@ -1151,7 +1167,8 @@ int ap_proxy_is_hostname(struct dirconn_entry *This, ap_context_t *p)
+ 
+ #if 0
+     if (addr[i] == ':') {
+-	fprintf(stderr, "@@@@ handle optional port in proxy_is_hostname()\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "@@@@ handle optional port in proxy_is_hostname()");
+ 	/* @@@@ handle optional port */
+     }
+ #endif
+diff --git a/os/beos/beosd.c b/os/beos/beosd.c
+index 1e3c0cc..cb369c7 100644
+--- a/os/beos/beosd.c
++++ b/os/beos/beosd.c
+@@ -80,7 +80,8 @@ void beosd_detach(void)
+ 	exit(0);
+     else if (x == -1) {
+ 	perror("fork");
+-	fprintf(stderr, "%s: unable to fork new process\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: unable to fork new process", ap_server_argv0);
+ 	exit(1);
+     }
+ */
+@@ -88,13 +89,15 @@ void beosd_detach(void)
+ 
+     if ((pgrp = setsid()) == -1) {
+ 	perror("setsid");
+-	fprintf(stderr, "%s: setsid failed\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: setsid failed", ap_server_argv0);
+ 	exit(1);
+     }
+ 
+     /* close out the standard file descriptors */
+     if (freopen("/dev/null", "r", stdin) == NULL) {
+-	fprintf(stderr, "%s: unable to replace stdin with /dev/null: %s\n",
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: unable to replace stdin with /dev/null: %s",
+ 		ap_server_argv0, strerror(errno));
+ 	/* continue anyhow -- note we can't close out descriptor 0 because we
+ 	 * have nothing to replace it with, and if we didn't have a descriptor
+@@ -103,7 +106,8 @@ void beosd_detach(void)
+ 	 */
+     }
+     if (freopen("/dev/null", "w", stdout) == NULL) {
+-	fprintf(stderr, "%s: unable to replace stdout with /dev/null: %s\n",
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: unable to replace stdout with /dev/null: %s",
+ 		ap_server_argv0, strerror(errno));
+     }
+     /* stderr is a tricky one, we really want it to be the error_log,
+diff --git a/os/unix/unixd.c b/os/unix/unixd.c
+index 62b45c2..7a6b3ad 100644
+--- a/os/unix/unixd.c
++++ b/os/unix/unixd.c
+@@ -76,7 +76,8 @@ void unixd_detach(void)
+ 	exit(0);
+     else if (x == -1) {
+ 	perror("fork");
+-	fprintf(stderr, "%s: unable to fork new process\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: unable to fork new process", ap_server_argv0);
+ 	exit(1);
+     }
+     RAISE_SIGSTOP(DETACH);
+@@ -84,13 +85,15 @@ void unixd_detach(void)
+ #ifndef NO_SETSID
+     if ((pgrp = setsid()) == -1) {
+ 	perror("setsid");
+-	fprintf(stderr, "%s: setsid failed\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: setsid failed", ap_server_argv0);
+ 	exit(1);
+     }
+ #elif defined(NEXT) || defined(NEWSOS)
+     if (setpgrp(0, getpid()) == -1 || (pgrp = getpgrp(0)) == -1) {
+ 	perror("setpgrp");
+-	fprintf(stderr, "%s: setpgrp or getpgrp failed\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: setpgrp or getpgrp failed", ap_server_argv0);
+ 	exit(1);
+     }
+ #elif defined(OS2) || defined(TPF)
+@@ -102,14 +105,16 @@ void unixd_detach(void)
+ #else
+     if ((pgrp = setpgrp(getpid(), 0)) == -1) {
+ 	perror("setpgrp");
+-	fprintf(stderr, "%s: setpgrp failed\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: setpgrp failed", ap_server_argv0);
+ 	exit(1);
+     }
+ #endif
+ 
+     /* close out the standard file descriptors */
+     if (freopen("/dev/null", "r", stdin) == NULL) {
+-	fprintf(stderr, "%s: unable to replace stdin with /dev/null: %s\n",
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: unable to replace stdin with /dev/null: %s",
+ 		ap_server_argv0, strerror(errno));
+ 	/* continue anyhow -- note we can't close out descriptor 0 because we
+ 	 * have nothing to replace it with, and if we didn't have a descriptor
+@@ -118,8 +123,9 @@ void unixd_detach(void)
+ 	 */
+     }
+     if (freopen("/dev/null", "w", stdout) == NULL) {
+-	fprintf(stderr, "%s: unable to replace stdout with /dev/null: %s\n",
+-		ap_server_argv0, strerror(errno));
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: unable to replace stdout with /dev/null: %s",
++		     ap_server_argv0, strerror(errno));
+     }
+     /* stderr is a tricky one, we really want it to be the error_log,
+      * but we haven't opened that yet.  So leave it alone for now and it'll
+diff --git a/server/mpm/mpmt_beos/mpmt_beos.c b/server/mpm/mpmt_beos/mpmt_beos.c
+index cf0680e..4987bda 100644
+--- a/server/mpm/mpmt_beos/mpmt_beos.c
++++ b/server/mpm/mpmt_beos/mpmt_beos.c
+@@ -1275,9 +1275,12 @@ static const char *set_min_spare_threads(cmd_parms *cmd, void *dummy, char *arg)
+ 
+     min_spare_threads = atoi(arg);
+     if (min_spare_threads <= 0) {
+-       fprintf(stderr, "WARNING: detected MinSpareThreads set to non-positive.\n");
+-       fprintf(stderr, "Resetting to 1 to avoid almost certain Apache failure.\n");
+-       fprintf(stderr, "Please read the documentation.\n");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "WARNING: detected MinSpareThreads set to non-positive.");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++                    "Resetting to 1 to avoid almost certain Apache failure.");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "Please read the documentation.");
+        min_spare_threads = 1;
+     }
+        
+@@ -1304,15 +1307,19 @@ static const char *set_server_limit (cmd_parms *cmd, void *dummy, char *arg)
+ 
+     ap_daemons_limit = atoi(arg);
+     if (ap_daemons_limit > HARD_SERVER_LIMIT) {
+-       fprintf(stderr, "WARNING: MaxClients of %d exceeds compile time limit "
+-           "of %d servers,\n", ap_daemons_limit, HARD_SERVER_LIMIT);
+-       fprintf(stderr, " lowering MaxClients to %d.  To increase, please "
+-           "see the\n", HARD_SERVER_LIMIT);
+-       fprintf(stderr, " HARD_SERVER_LIMIT define in src/include/httpd.h.\n");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "WARNING: MaxClients of %d exceeds compile time limit "
++                    "of %d servers,", ap_daemons_limit, HARD_SERVER_LIMIT);
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    " lowering MaxClients to %d.  To increase, please "
++                    "see the", HARD_SERVER_LIMIT);
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    " HARD_SERVER_LIMIT define in src/include/httpd.h.");
+        ap_daemons_limit = HARD_SERVER_LIMIT;
+     } 
+     else if (ap_daemons_limit < 1) {
+-	fprintf(stderr, "WARNING: Require MaxClients > 0, setting to 1\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: Require MaxClients > 0, setting to 1");
+ 	ap_daemons_limit = 1;
+     }
+     return NULL;
+@@ -1327,15 +1334,19 @@ static const char *set_threads_per_child (cmd_parms *cmd, void *dummy, char *arg
+ 
+     ap_threads_per_child = atoi(arg);
+     if (ap_threads_per_child > HARD_THREAD_LIMIT) {
+-        fprintf(stderr, "WARNING: ThreadsPerChild of %d exceeds compile time"
+-                "limit of %d threads,\n", ap_threads_per_child,
+-                HARD_THREAD_LIMIT);
+-        fprintf(stderr, " lowering ThreadsPerChild to %d. To increase, please"
+-                "see the\n", HARD_THREAD_LIMIT);
+-        fprintf(stderr, " HARD_THREAD_LIMIT define in src/include/httpd.h.\n");
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: ThreadsPerChild of %d exceeds compile time"
++                     "limit of %d threads,\n", ap_threads_per_child,
++                     HARD_THREAD_LIMIT);
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     " lowering ThreadsPerChild to %d. To increase, please"
++                     "see the", HARD_THREAD_LIMIT);
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     " HARD_THREAD_LIMIT define in src/include/httpd.h.");
+     }
+     else if (ap_threads_per_child < 1) {
+-	fprintf(stderr, "WARNING: Require ThreadsPerChild > 0, setting to 1\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: Require ThreadsPerChild > 0, setting to 1");
+ 	ap_threads_per_child = 1;
+     }
+     return NULL;
+diff --git a/server/mpm/mpmt_beos/scoreboard.c b/server/mpm/mpmt_beos/scoreboard.c
+index ab99ff9..24dfcdd 100644
+--- a/server/mpm/mpmt_beos/scoreboard.c
++++ b/server/mpm/mpmt_beos/scoreboard.c
+@@ -18,7 +18,8 @@ void reinit_scoreboard(ap_context_t *p)
+     ap_assert(!ap_scoreboard_image);
+     ap_scoreboard_image = (scoreboard *) malloc(SCOREBOARD_SIZE);
+     if (ap_scoreboard_image == NULL) {
+-        fprintf(stderr, "Ouch! Out of memory reiniting scoreboard!\n");
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "Ouch! Out of memory reiniting scoreboard!");
+     }
+     memset(ap_scoreboard_image, 0, SCOREBOARD_SIZE);
+ }
+diff --git a/server/mpm/mpmt_pthread/mpmt_pthread.c b/server/mpm/mpmt_pthread/mpmt_pthread.c
+index 7b07ef7..a74750d 100644
+--- a/server/mpm/mpmt_pthread/mpmt_pthread.c
++++ b/server/mpm/mpmt_pthread/mpmt_pthread.c
+@@ -1587,9 +1587,12 @@ static const char *set_min_spare_threads(cmd_parms *cmd, void *dummy, char *arg)
+ 
+     min_spare_threads = atoi(arg);
+     if (min_spare_threads <= 0) {
+-       fprintf(stderr, "WARNING: detected MinSpareThreads set to non-positive.\n");
+-       fprintf(stderr, "Resetting to 1 to avoid almost certain Apache failure.\n");
+-       fprintf(stderr, "Please read the documentation.\n");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "WARNING: detected MinSpareThreads set to non-positive.");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "Resetting to 1 to avoid almost certain Apache failure.");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "Please read the documentation.");
+        min_spare_threads = 1;
+     }
+        
+@@ -1616,15 +1619,18 @@ static const char *set_server_limit (cmd_parms *cmd, void *dummy, char *arg)
+ 
+     ap_daemons_limit = atoi(arg);
+     if (ap_daemons_limit > HARD_SERVER_LIMIT) {
+-       fprintf(stderr, "WARNING: MaxClients of %d exceeds compile time limit "
+-           "of %d servers,\n", ap_daemons_limit, HARD_SERVER_LIMIT);
+-       fprintf(stderr, " lowering MaxClients to %d.  To increase, please "
+-           "see the\n", HARD_SERVER_LIMIT);
+-       fprintf(stderr, " HARD_SERVER_LIMIT define in src/include/httpd.h.\n");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "WARNING: MaxClients of %d exceeds compile time limit "
++                    "of %d servers,", ap_daemons_limit, HARD_SERVER_LIMIT);
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    " lowering MaxClients to %d.  To increase, please "
++                    "see the", HARD_SERVER_LIMIT);
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    " HARD_SERVER_LIMIT define in src/include/httpd.h.");
+        ap_daemons_limit = HARD_SERVER_LIMIT;
+     } 
+     else if (ap_daemons_limit < 1) {
+-	fprintf(stderr, "WARNING: Require MaxClients > 0, setting to 1\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, "WARNING: Require MaxClients > 0, setting to 1\n");
+ 	ap_daemons_limit = 1;
+     }
+     return NULL;
+@@ -1639,15 +1645,19 @@ static const char *set_threads_per_child (cmd_parms *cmd, void *dummy, char *arg
+ 
+     ap_threads_per_child = atoi(arg);
+     if (ap_threads_per_child > HARD_THREAD_LIMIT) {
+-        fprintf(stderr, "WARNING: ThreadsPerChild of %d exceeds compile time"
+-                "limit of %d threads,\n", ap_threads_per_child,
+-                HARD_THREAD_LIMIT);
+-        fprintf(stderr, " lowering ThreadsPerChild to %d. To increase, please"
+-                "see the\n", HARD_THREAD_LIMIT);
+-        fprintf(stderr, " HARD_THREAD_LIMIT define in src/include/httpd.h.\n");
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: ThreadsPerChild of %d exceeds compile time"
++                     "limit of %d threads,", ap_threads_per_child,
++                     HARD_THREAD_LIMIT);
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     " lowering ThreadsPerChild to %d. To increase, please"
++                     "see the", HARD_THREAD_LIMIT);
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     " HARD_THREAD_LIMIT define in src/include/httpd.h.");
+     }
+     else if (ap_threads_per_child < 1) {
+-	fprintf(stderr, "WARNING: Require ThreadsPerChild > 0, setting to 1\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: Require ThreadsPerChild > 0, setting to 1");
+ 	ap_threads_per_child = 1;
+     }
+     return NULL;
+diff --git a/server/mpm/mpmt_pthread/scoreboard.c b/server/mpm/mpmt_pthread/scoreboard.c
+index 0e208e4..0e82e18 100644
+--- a/server/mpm/mpmt_pthread/scoreboard.c
++++ b/server/mpm/mpmt_pthread/scoreboard.c
+@@ -49,7 +49,8 @@ void reinit_scoreboard(ap_context_t *p)
+     ap_assert(!ap_scoreboard_image);
+     ap_scoreboard_image = (scoreboard *) malloc(SCOREBOARD_SIZE);
+     if (ap_scoreboard_image == NULL) {
+-        fprintf(stderr, "Ouch! Out of memory reiniting scoreboard!\n");
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "Ouch! Out of memory reiniting scoreboard!");
+     }
+     memset(ap_scoreboard_image, 0, SCOREBOARD_SIZE);
+ }
+@@ -120,15 +121,16 @@ static void setup_shared_mem(ap_context_t *p)
+ 
+     m = (caddr_t) create_shared_heap("\\SHAREMEM\\SCOREBOARD", SCOREBOARD_SIZE);
+     if (m == 0) {
+-	fprintf(stderr, "%s: Could not create OS/2 Shared memory pool.\n",
+-		ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not create OS/2 Shared memory pool.",
++		     ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+ 
+     rc = _uopen((Heap_t) m);
+     if (rc != 0) {
+-	fprintf(stderr,
+-		"%s: Could not uopen() newly created OS/2 Shared memory pool.\n",
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++		"%s: Could not uopen() newly created OS/2 Shared memory pool.",
+ 		ap_server_argv0);
+     }
+     ap_scoreboard_image = (scoreboard *) m;
+@@ -142,8 +144,9 @@ API_EXPORT(void) reopen_scoreboard(ap_context_t *p)
+ 
+     m = (caddr_t) get_shared_heap("\\SHAREMEM\\SCOREBOARD");
+     if (m == 0) {
+-	fprintf(stderr, "%s: Could not find existing OS/2 Shared memory pool.\n",
+-		ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not find existing OS/2 Shared memory pool.",
++		     ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+ 
+@@ -257,14 +260,16 @@ static void setup_shared_mem(ap_context_t *p)
+ 	int fd = mkstemp(mfile);
+ 	if (fd == -1) {
+ 	    perror("open");
+-	    fprintf(stderr, "%s: Could not open %s\n", ap_server_argv0, mfile);
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "%s: Could not open %s", ap_server_argv0, mfile);
+ 	    exit(APEXIT_INIT);
+ 	}
+ 	m = mmap((caddr_t) 0, SCOREBOARD_SIZE,
+ 		PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+ 	if (m == (caddr_t) - 1) {
+ 	    perror("mmap");
+-	    fprintf(stderr, "%s: Could not mmap %s\n", ap_server_argv0, mfile);
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "%s: Could not mmap %s", ap_server_argv0, mfile);
+ 	    exit(APEXIT_INIT);
+ 	}
+ 	close(fd);
+@@ -276,7 +281,8 @@ static void setup_shared_mem(ap_context_t *p)
+ #endif
+     if (m == (caddr_t) - 1) {
+ 	perror("mmap");
+-	fprintf(stderr, "%s: Could not mmap memory\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not mmap memory", ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+ #else
+@@ -286,14 +292,16 @@ static void setup_shared_mem(ap_context_t *p)
+     fd = open("/dev/zero", O_RDWR);
+     if (fd == -1) {
+ 	perror("open");
+-	fprintf(stderr, "%s: Could not open /dev/zero\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not open /dev/zero", ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+     m = mmap((caddr_t) 0, SCOREBOARD_SIZE,
+ 	     PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+     if (m == (caddr_t) - 1) {
+ 	perror("mmap");
+-	fprintf(stderr, "%s: Could not mmap /dev/zero\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not mmap /dev/zero", ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+     close(fd);
+@@ -455,7 +463,8 @@ API_EXPORT(void) reopen_scoreboard(ap_context_t *p)
+     ap_get_os_file(&scoreboard_fd, scoreboard_file);
+     if (scoreboard_fd == -1) {
+ 	perror(ap_scoreboard_fname);
+-	fprintf(stderr, "Cannot open scoreboard file:\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "Cannot open scoreboard file:");
+ 	clean_child_exit(1);
+     }
+ }
+@@ -483,7 +492,8 @@ void reinit_scoreboard(ap_context_t *p)
+     ap_get_os_file(&scoreboard_fd, scoreboard_file);
+     if (scoreboard_fd == -1) {
+ 	perror(ap_scoreboard_fname);
+-	fprintf(stderr, "Cannot open scoreboard file:\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "Cannot open scoreboard file:");
+ 	exit(APEXIT_INIT);
+     }
+     ap_register_cleanup(p, NULL, cleanup_scoreboard_file, ap_null_cleanup);
+diff --git a/server/mpm/prefork/prefork.c b/server/mpm/prefork/prefork.c
+index cb1e829..e98a6ef 100644
+--- a/server/mpm/prefork/prefork.c
++++ b/server/mpm/prefork/prefork.c
+@@ -282,7 +282,8 @@ static void accept_mutex_on(void)
+ 	/* got lock */
+ 	break;
+     case 0:
+-	fprintf(stderr, "didn't get lock\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "didn't get lock");
+ 	clean_child_exit(APEXIT_CHILDFATAL);
+     case -1:
+ 	perror("ussetlock");
+@@ -546,7 +547,8 @@ static void accept_mutex_init(ap_context_t *p)
+     ap_get_os_file(&lock_fd, tempfile);
+     if (lock_fd == -1) {
+ 	perror("open");
+-	fprintf(stderr, "Cannot open lock file: %s\n", ap_lock_fname);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "Cannot open lock file: %s", ap_lock_fname);
+ 	exit(APEXIT_INIT);
+     }
+     unlink(ap_lock_fname);
+@@ -954,15 +956,16 @@ static void setup_shared_mem(ap_context_t *p)
+ 
+     m = (caddr_t) create_shared_heap("\\SHAREMEM\\SCOREBOARD", SCOREBOARD_SIZE);
+     if (m == 0) {
+-	fprintf(stderr, "%s: Could not create OS/2 Shared memory pool.\n",
+-		ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not create OS/2 Shared memory pool.",
++		     ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+ 
+     rc = _uopen((Heap_t) m);
+     if (rc != 0) {
+-	fprintf(stderr,
+-		"%s: Could not uopen() newly created OS/2 Shared memory pool.\n",
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++		"%s: Could not uopen() newly created OS/2 Shared memory pool.",
+ 		ap_server_argv0);
+     }
+     ap_scoreboard_image = (scoreboard *) m;
+@@ -976,8 +979,9 @@ static void reopen_scoreboard(ap_context_t *p)
+ 
+     m = (caddr_t) get_shared_heap("\\SHAREMEM\\SCOREBOARD");
+     if (m == 0) {
+-	fprintf(stderr, "%s: Could not find existing OS/2 Shared memory pool.\n",
+-		ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not find existing OS/2 Shared memory pool.",
++		     ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+ 
+@@ -1091,14 +1095,16 @@ static void setup_shared_mem(ap_context_t *p)
+ 	int fd = mkstemp(mfile);
+ 	if (fd == -1) {
+ 	    perror("open");
+-	    fprintf(stderr, "%s: Could not open %s\n", ap_server_argv0, mfile);
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "%s: Could not open %s", ap_server_argv0, mfile);
+ 	    exit(APEXIT_INIT);
+ 	}
+ 	m = mmap((caddr_t) 0, SCOREBOARD_SIZE,
+ 		PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+ 	if (m == (caddr_t) - 1) {
+ 	    perror("mmap");
+-	    fprintf(stderr, "%s: Could not mmap %s\n", ap_server_argv0, mfile);
++	    ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "%s: Could not mmap %s", ap_server_argv0, mfile);
+ 	    exit(APEXIT_INIT);
+ 	}
+ 	close(fd);
+@@ -1110,7 +1116,8 @@ static void setup_shared_mem(ap_context_t *p)
+ #endif
+     if (m == (caddr_t) - 1) {
+ 	perror("mmap");
+-	fprintf(stderr, "%s: Could not mmap memory\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not mmap memory", ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+ #else
+@@ -1120,14 +1127,16 @@ static void setup_shared_mem(ap_context_t *p)
+     fd = open("/dev/zero", O_RDWR);
+     if (fd == -1) {
+ 	perror("open");
+-	fprintf(stderr, "%s: Could not open /dev/zero\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not open /dev/zero", ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+     m = mmap((caddr_t) 0, SCOREBOARD_SIZE,
+ 	     PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+     if (m == (caddr_t) - 1) {
+ 	perror("mmap");
+-	fprintf(stderr, "%s: Could not mmap /dev/zero\n", ap_server_argv0);
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "%s: Could not mmap /dev/zero", ap_server_argv0);
+ 	exit(APEXIT_INIT);
+     }
+     close(fd);
+@@ -1250,7 +1259,8 @@ static void setup_shared_mem(ap_context_t *p)
+     ap_scoreboard_image = (scoreboard *) gsysc(SCOREBOARD_FRAMES, SCOREBOARD_NAME);
+ 
+     if (!ap_scoreboard_image) {
+-        fprintf(stderr, "httpd: Could not create scoreboard system heap storage.\n");
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "httpd: Could not create scoreboard system heap storage.");
+         exit(APEXIT_INIT);
+     }
+ 
+@@ -1317,7 +1327,8 @@ void reopen_scoreboard(ap_context_t *p)
+     scoreboard_fd = ap_popenf(p, ap_scoreboard_fname, O_CREAT | O_BINARY | O_RDWR, 0666);
+     if (scoreboard_fd == -1) {
+ 	perror(ap_scoreboard_fname);
+-	fprintf(stderr, "Cannot open scoreboard file:\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "Cannot open scoreboard file:");
+ 	clean_child_exit(1);
+     }
+ }
+@@ -1343,7 +1354,8 @@ static void reinit_scoreboard(ap_context_t *p)
+     scoreboard_fd = ap_popenf(p, ap_scoreboard_fname, O_CREAT | O_BINARY | O_RDWR, 0644);
+     if (scoreboard_fd == -1) {
+ 	perror(ap_scoreboard_fname);
+-	fprintf(stderr, "Cannot open scoreboard file:\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "Cannot open scoreboard file:");
+ 	exit(APEXIT_INIT);
+     }
+     ap_register_cleanup(p, NULL, cleanup_scoreboard_file, ap_null_cleanup);
+@@ -2868,9 +2880,12 @@ static const char *set_min_free_servers(cmd_parms *cmd, void *dummy, char *arg)
+ 
+     ap_daemons_min_free = atoi(arg);
+     if (ap_daemons_min_free <= 0) {
+-       fprintf(stderr, "WARNING: detected MinSpareServers set to non-positive.\n");
+-       fprintf(stderr, "Resetting to 1 to avoid almost certain Apache failure.\n");
+-       fprintf(stderr, "Please read the documentation.\n");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "WARNING: detected MinSpareServers set to non-positive.");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "Resetting to 1 to avoid almost certain Apache failure.");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "Please read the documentation.");
+        ap_daemons_min_free = 1;
+     }
+        
+@@ -2897,15 +2912,19 @@ static const char *set_server_limit (cmd_parms *cmd, void *dummy, char *arg)
+ 
+     ap_daemons_limit = atoi(arg);
+     if (ap_daemons_limit > HARD_SERVER_LIMIT) {
+-       fprintf(stderr, "WARNING: MaxClients of %d exceeds compile time limit "
+-           "of %d servers,\n", ap_daemons_limit, HARD_SERVER_LIMIT);
+-       fprintf(stderr, " lowering MaxClients to %d.  To increase, please "
+-           "see the\n", HARD_SERVER_LIMIT);
+-       fprintf(stderr, " HARD_SERVER_LIMIT define in src/include/httpd.h.\n");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "WARNING: MaxClients of %d exceeds compile time limit "
++                    "of %d servers,", ap_daemons_limit, HARD_SERVER_LIMIT);
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    " lowering MaxClients to %d.  To increase, please "
++                    "see the", HARD_SERVER_LIMIT);
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
++                    " HARD_SERVER_LIMIT define in src/include/httpd.h.");
+        ap_daemons_limit = HARD_SERVER_LIMIT;
+     } 
+     else if (ap_daemons_limit < 1) {
+-	fprintf(stderr, "WARNING: Require MaxClients > 0, setting to 1\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: Require MaxClients > 0, setting to 1");
+ 	ap_daemons_limit = 1;
+     }
+     return NULL;
+diff --git a/server/mpm/spmt_os2/spmt_os2.c b/server/mpm/spmt_os2/spmt_os2.c
+index 0b19ba7..75d054f 100644
+--- a/server/mpm/spmt_os2/spmt_os2.c
++++ b/server/mpm/spmt_os2/spmt_os2.c
+@@ -147,7 +147,8 @@ void reinit_scoreboard(ap_context_t *p)
+         ap_scoreboard_image = (scoreboard *) malloc(SCOREBOARD_SIZE);
+ 
+         if (ap_scoreboard_image == NULL) {
+-            fprintf(stderr, "Ouch! Out of memory reiniting scoreboard!\n");
++            ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                         "Ouch! Out of memory reiniting scoreboard!");
+         }
+     }
+ 
+@@ -1672,9 +1673,12 @@ static const char *set_min_free_servers(cmd_parms *cmd, void *dummy, char *arg)
+ 
+     ap_daemons_min_free = atoi(arg);
+     if (ap_daemons_min_free <= 0) {
+-       fprintf(stderr, "WARNING: detected MinSpareServers set to non-positive.\n");
+-       fprintf(stderr, "Resetting to 1 to avoid almost certain Apache failure.\n");
+-       fprintf(stderr, "Please read the documentation.\n");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "WARNING: detected MinSpareServers set to non-positive.");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "Resetting to 1 to avoid almost certain Apache failure.");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "Please read the documentation.");
+        ap_daemons_min_free = 1;
+     }
+        
+@@ -1701,15 +1705,19 @@ static const char *set_server_limit (cmd_parms *cmd, void *dummy, char *arg)
+ 
+     ap_daemons_limit = atoi(arg);
+     if (ap_daemons_limit > HARD_SERVER_LIMIT) {
+-       fprintf(stderr, "WARNING: MaxClients of %d exceeds compile time limit "
+-           "of %d servers,\n", ap_daemons_limit, HARD_SERVER_LIMIT);
+-       fprintf(stderr, " lowering MaxClients to %d.  To increase, please "
+-           "see the\n", HARD_SERVER_LIMIT);
+-       fprintf(stderr, " HARD_SERVER_LIMIT define in src/include/httpd.h.\n");
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    "WARNING: MaxClients of %d exceeds compile time limit "
++                    "of %d servers,", ap_daemons_limit, HARD_SERVER_LIMIT);
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    " lowering MaxClients to %d.  To increase, please "
++                    "see the", HARD_SERVER_LIMIT);
++       ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                    " HARD_SERVER_LIMIT define in src/include/httpd.h.");
+        ap_daemons_limit = HARD_SERVER_LIMIT;
+     } 
+     else if (ap_daemons_limit < 1) {
+-	fprintf(stderr, "WARNING: Require MaxClients > 0, setting to 1\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: Require MaxClients > 0, setting to 1");
+ 	ap_daemons_limit = 1;
+     }
+     return NULL;
+diff --git a/server/mpm/winnt/mpm_winnt.c b/server/mpm/winnt/mpm_winnt.c
+index deb9f7d..0747c11 100644
+--- a/server/mpm/winnt/mpm_winnt.c
++++ b/server/mpm/winnt/mpm_winnt.c
+@@ -630,7 +630,8 @@ static void add_job(int sock)
+ 
+     new_job = (joblist *) malloc(sizeof(joblist));
+     if (new_job == NULL) {
+-	fprintf(stderr, "Ouch!  Out of memory in add_job()!\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "Ouch!  Out of memory in add_job()!");
+         return;
+     }
+     new_job->next = NULL;
+@@ -1755,15 +1756,18 @@ static const char *set_threads_per_child (cmd_parms *cmd, void *dummy, char *arg
+ 
+     ap_threads_per_child = atoi(arg);
+     if (ap_threads_per_child > HARD_THREAD_LIMIT) {
+-        fprintf(stderr, "WARNING: ThreadsPerChild of %d exceeds compile time"
+-                " limit of %d threads,\n", ap_threads_per_child,
+-                HARD_THREAD_LIMIT);
+-        fprintf(stderr, " lowering ThreadsPerChild to %d. To increase, please"
+-                " see the\n", HARD_THREAD_LIMIT);
+-        fprintf(stderr, " HARD_THREAD_LIMIT define in src/include/httpd.h.\n");
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: ThreadsPerChild of %d exceeds compile time"
++                     " limit of %d threads,", ap_threads_per_child,
++                     HARD_THREAD_LIMIT);
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,                             " lowering ThreadsPerChild to %d. To increase, please"
++                     " see the", HARD_THREAD_LIMIT);
++        ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     " HARD_THREAD_LIMIT define in src/include/httpd.h.");
+     }
+     else if (ap_threads_per_child < 1) {
+-	fprintf(stderr, "WARNING: Require ThreadsPerChild > 0, setting to 1\n");
++	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, 
++                     "WARNING: Require ThreadsPerChild > 0, setting to 1");
+ 	ap_threads_per_child = 1;
+     }
+     return NULL;

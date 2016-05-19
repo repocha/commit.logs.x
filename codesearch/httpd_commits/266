@@ -1,0 +1,1263 @@
+commit 1860c918af3a18124decfb4291a539de7a31176a
+Author: Martin Kraemer <martin@apache.org>
+Date:   Fri Oct 22 16:01:27 1999 +0000
+
+    I am not claiming that the modules work now, but at least the parameter lists
+    are prepared for the updated ap_log_rerror() format. BTW: What is APLOG_NOERROR
+    for now that we have an explicit error code? This is still WIP!
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@84023 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_anon.c b/modules/aaa/mod_auth_anon.c
+index 1ff06fc..8e6abfd 100644
+--- a/modules/aaa/mod_auth_anon.c
++++ b/modules/aaa/mod_auth_anon.c
+@@ -251,7 +251,7 @@ static int anon_authenticate_basic_user(request_rec *r)
+ 	       || ((strpbrk("@", sent_pw) != NULL)
+ 		   && (strpbrk(".", sent_pw) != NULL)))) {
+ 	if (sec->auth_anon_logemail && ap_is_initial_req(r)) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_INFO, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_INFO, APR_SUCCESS, r,
+ 			"Anonymous: Passwd <%s> Accepted",
+ 			sent_pw ? sent_pw : "\'none\'");
+ 	}
+@@ -259,7 +259,7 @@ static int anon_authenticate_basic_user(request_rec *r)
+     }
+     else {
+ 	if (sec->auth_anon_authoritative) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, APR_SUCCESS, r,
+ 			"Anonymous: Authoritative, Passwd <%s> not accepted",
+ 			sent_pw ? sent_pw : "\'none\'");
+ 	    return AUTH_REQUIRED;
+diff --git a/modules/aaa/mod_auth_db.c b/modules/aaa/mod_auth_db.c
+index bc18fb8..5d9021f 100644
+--- a/modules/aaa/mod_auth_db.c
++++ b/modules/aaa/mod_auth_db.c
+@@ -166,7 +166,7 @@ static char *get_db_pw(request_rec *r, char *user, const char *auth_dbpwfile)
+ #else
+     if (!(f = dbopen(auth_dbpwfile, O_RDONLY, 0664, DB_HASH, NULL))) {
+ #endif
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+ 		    "could not open db auth file: %s", auth_dbpwfile);
+ 	return NULL;
+     }
+@@ -237,7 +237,7 @@ static int db_authenticate_basic_user(request_rec *r)
+     if (!(real_pw = get_db_pw(r, r->user, sec->auth_dbpwfile))) {
+ 	if (!(sec->auth_dbauthoritative))
+ 	    return DECLINED;
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "DB user %s not found: %s", r->user, r->filename);
+ 	ap_note_basic_auth_failure(r);
+ 	return AUTH_REQUIRED;
+@@ -249,7 +249,7 @@ static int db_authenticate_basic_user(request_rec *r)
+     }
+     invalid_pw = ap_validate_password(sent_pw, real_pw);
+     if (invalid_pw != NULL) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "DB user %s: authentication failure for \"%s\": %s",
+ 		      r->user, r->uri, invalid_pw);
+ 	ap_note_basic_auth_failure(r);
+@@ -295,7 +295,7 @@ static int db_check_auth(request_rec *r)
+ 	    if (!(groups = get_db_grp(r, user, sec->auth_dbgrpfile))) {
+ 		if (!(sec->auth_dbauthoritative))
+ 		    return DECLINED;
+-		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			    "user %s not in DB group file %s: %s",
+ 			    user, sec->auth_dbgrpfile, r->filename);
+ 		ap_note_basic_auth_failure(r);
+@@ -311,7 +311,7 @@ static int db_check_auth(request_rec *r)
+ 			return OK;
+ 		}
+ 	    }
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			"user %s not in right group: %s", user, r->filename);
+ 	    ap_note_basic_auth_failure(r);
+ 	    return AUTH_REQUIRED;
+diff --git a/modules/aaa/mod_auth_dbm.c b/modules/aaa/mod_auth_dbm.c
+index eeb3c8f..f3a7c74 100644
+--- a/modules/aaa/mod_auth_dbm.c
++++ b/modules/aaa/mod_auth_dbm.c
+@@ -159,7 +159,7 @@ static char *get_dbm_pw(request_rec *r, char *user, char *auth_dbmpwfile)
+ 
+ 
+     if (!(f = dbm_open(auth_dbmpwfile, O_RDONLY, 0664))) {
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+ 		    "could not open dbm auth file: %s", auth_dbmpwfile);
+ 	return NULL;
+     }
+@@ -224,7 +224,7 @@ static int dbm_authenticate_basic_user(request_rec *r)
+     if (!(real_pw = get_dbm_pw(r, r->user, sec->auth_dbmpwfile))) {
+ 	if (!(sec->auth_dbmauthoritative))
+ 	    return DECLINED;
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "DBM user %s not found: %s", r->user, r->filename);
+ 	ap_note_basic_auth_failure(r);
+ 	return AUTH_REQUIRED;
+@@ -236,7 +236,7 @@ static int dbm_authenticate_basic_user(request_rec *r)
+     }
+     invalid_pw = ap_validate_password(sent_pw, real_pw);
+     if (invalid_pw != NULL) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "DBM user %s: authentication failure for \"%s\": %s",
+ 		      r->user, r->uri, invalid_pw);
+ 	ap_note_basic_auth_failure(r);
+@@ -282,7 +282,7 @@ static int dbm_check_auth(request_rec *r)
+ 	    if (!(groups = get_dbm_grp(r, user, sec->auth_dbmgrpfile))) {
+ 		if (!(sec->auth_dbmauthoritative))
+ 		    return DECLINED;
+-		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			    "user %s not in DBM group file %s: %s",
+ 			    user, sec->auth_dbmgrpfile, r->filename);
+ 		ap_note_basic_auth_failure(r);
+@@ -298,7 +298,7 @@ static int dbm_check_auth(request_rec *r)
+ 			return OK;
+ 		}
+ 	    }
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			"user %s not in right group: %s",
+ 			user, r->filename);
+ 	    ap_note_basic_auth_failure(r);
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 4379522..314a064 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -690,10 +690,10 @@ static client_entry *get_client(unsigned long key, const request_rec *r)
+     mm_unlock(client_mm);
+ 
+     if (entry)
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_DEBUG, 0, r,
+ 		      "get_client(): client %lu found", key);
+     else
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_DEBUG, 0, r,
+ 		      "get_client(): client %lu not found", key);
+ 
+     return entry;
+@@ -1015,7 +1015,7 @@ static client_entry *gen_client(const request_rec *r)
+     mm_unlock(opaque_mm);
+ 
+     if (!(entry = add_client(op, &new, r->server))) {
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+ 		      "Digest: failed to allocate client entry - ignoring "
+ 		      "client");
+ 	return NULL;
+@@ -1277,7 +1277,7 @@ static const char *get_hash(request_rec *r, const char *user,
+     char *w, *x;
+ 
+     if (!(f = ap_pcfg_openfile(r->pool, auth_pwfile))) {
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+ 		      "Digest: Could not open password file: %s", auth_pwfile);
+ 	return NULL;
+     }
+@@ -1308,7 +1308,7 @@ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+ 
+ 	nc = strtol(snc, &endptr, 16);
+ 	if (endptr < (snc+strlen(snc)) && !ap_isspace(*endptr)) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: invalid nc %s received - not a number", snc);
+ 	    return !OK;
+ 	}
+@@ -1317,7 +1317,7 @@ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+ 	    return !OK;
+ 
+ 	if (nc != resp->client->nonce_count) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_DEBUG, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_DEBUG, 0, r,
+ 			  "nonce-count check failed: %lu != %lu", nc,
+ 			  resp->client->nonce_count);
+ 	    return !OK;
+@@ -1335,7 +1335,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+     char tmp, hash[NONCE_HASH_LEN+1];
+ 
+     if (strlen(resp->nonce) != NONCE_LEN) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: invalid nonce %s received - length is not %d",
+ 		      resp->nonce, NONCE_LEN);
+ 	note_digest_auth_failure(r, conf, resp, 1);
+@@ -1350,7 +1350,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+     resp->nonce_time = nonce_time.time;
+ 
+     if (strcmp(hash, resp->nonce+NONCE_TIME_LEN)) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: invalid nonce %s received - hash is not %s",
+ 		      resp->nonce, hash);
+ 	note_digest_auth_failure(r, conf, resp, 1);
+@@ -1359,7 +1359,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 
+     dt = difftime(r->request_time, nonce_time.time);
+     if (conf->nonce_lifetime > 0 && dt < 0) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: invalid nonce %s received - user attempted "
+ 		      "time travel", resp->nonce);
+ 	note_digest_auth_failure(r, conf, resp, 1);
+@@ -1368,7 +1368,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 
+     if (conf->nonce_lifetime > 0) {
+ 	if (dt > conf->nonce_lifetime) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_INFO, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_INFO, 0,r,
+ 			  "Digest: user %s: nonce expired - sending new nonce",
+ 			  r->connection->user);
+ 	    note_digest_auth_failure(r, conf, resp, 1);
+@@ -1377,7 +1377,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+     }
+     else if (conf->nonce_lifetime == 0 && resp->client) {
+ 	if (memcmp(resp->client->last_nonce, resp->nonce, NONCE_LEN)) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_INFO, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_INFO, 0, r,
+ 			  "Digest: user %s: one-time-nonce mismatch - sending "
+ 			  "new nonce", r->connection->user);
+ 	    note_digest_auth_failure(r, conf, resp, 1);
+@@ -1462,7 +1462,7 @@ static int authenticate_digest_user(request_rec *r)
+ 	return DECLINED;
+ 
+     if (!ap_auth_name(r)) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: need AuthName: %s", r->uri);
+ 	return SERVER_ERROR;
+     }
+@@ -1488,11 +1488,11 @@ static int authenticate_digest_user(request_rec *r)
+ 
+     if (resp->auth_hdr_sts != VALID) {
+ 	if (resp->auth_hdr_sts == NOT_DIGEST)
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: client used wrong authentication scheme "
+ 			  "`%s': %s", resp->scheme, r->uri);
+ 	else if (resp->auth_hdr_sts == INVALID)
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: missing user, realm, nonce, uri, or digest "
+ 			  "in authorization header: %s", r->uri);
+ 	/* else (resp->auth_hdr_sts == NO_HEADER) */
+@@ -1519,7 +1519,7 @@ static int authenticate_digest_user(request_rec *r)
+ 		&& (!d_uri.query || !r_uri->query
+ 		    || strcmp(d_uri.query, r_uri->query)))
+ 	    ) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: uri mismatch - <%s> does not match "
+ 			  "request-uri <%s>", resp->uri,
+ 			  ap_unparse_uri_components(r->pool, r_uri, 0));
+@@ -1528,7 +1528,7 @@ static int authenticate_digest_user(request_rec *r)
+     }
+ 
+     if (resp->opaque && resp->opaque_num == 0) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: received invalid opaque - got `%s'",
+ 		      resp->opaque);
+ 	note_digest_auth_failure(r, conf, resp, 0);
+@@ -1536,7 +1536,7 @@ static int authenticate_digest_user(request_rec *r)
+     }
+ 
+     if (strcmp(resp->realm, conf->realm)) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: realm mismatch - got `%s' but expected `%s'",
+ 		      resp->realm, conf->realm);
+ 	note_digest_auth_failure(r, conf, resp, 0);
+@@ -1546,7 +1546,7 @@ static int authenticate_digest_user(request_rec *r)
+     if (resp->algorithm != NULL
+ 	&& strcasecmp(resp->algorithm, "MD5")
+ 	&& strcasecmp(resp->algorithm, "MD5-sess")) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: unknown algorithm `%s' received: %s",
+ 		      resp->algorithm, r->uri);
+ 	note_digest_auth_failure(r, conf, resp, 0);
+@@ -1557,7 +1557,7 @@ static int authenticate_digest_user(request_rec *r)
+ 	return DECLINED;
+ 
+     if (!(conf->ha1 = get_hash(r, conn->user, conf->realm, conf->pwfile))) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: user `%s' in realm `%s' not found: %s",
+ 		      conn->user, conf->realm, r->uri);
+ 	note_digest_auth_failure(r, conf, resp, 0);
+@@ -1567,7 +1567,7 @@ static int authenticate_digest_user(request_rec *r)
+     if (resp->message_qop == NULL) {
+ 	/* old (rfc-2069) style digest */
+ 	if (strcmp(resp->digest, old_digest(r, resp, conf->ha1))) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: user %s: password mismatch: %s", conn->user,
+ 			  r->uri);
+ 	    note_digest_auth_failure(r, conf, resp, 0);
+@@ -1586,7 +1586,7 @@ static int authenticate_digest_user(request_rec *r)
+ 	if (!match
+ 	    && !(conf->qop_list[0] == NULL
+ 		 && !strcasecmp(resp->message_qop, "auth"))) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: invalid qop `%s' received: %s",
+ 			  resp->message_qop, r->uri);
+ 	    note_digest_auth_failure(r, conf, resp, 0);
+@@ -1594,7 +1594,7 @@ static int authenticate_digest_user(request_rec *r)
+ 	}
+ 
+ 	if (strcmp(resp->digest, new_digest(r, resp, conf))) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: user %s: password mismatch: %s", conn->user,
+ 			  r->uri);
+ 	    note_digest_auth_failure(r, conf, resp, 0);
+@@ -1625,17 +1625,18 @@ static table *groups_for_user(request_rec *r, const char *user,
+ {
+     configfile_t *f;
+     table *grps = ap_make_table(r->pool, 15);
+-    pool *sp;
++    ap_context_t *sp;
+     char l[MAX_STRING_LEN];
+     const char *group_name, *ll, *w;
+ 
+     if (!(f = ap_pcfg_openfile(r->pool, grpfile))) {
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+ 		      "Digest: Could not open group file: %s", grpfile);
+ 	return NULL;
+     }
+ 
+-    sp = ap_make_sub_pool(r->pool);
++    if (ap_create_context(&sp, r->pool) != APR_SUCCESS)
++		return NULL;
+ 
+     while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
+ 	if ((l[0] == '#') || (!l[0]))
+@@ -1718,7 +1719,7 @@ static int digest_check_auth(request_rec *r)
+ 	    }
+ 	}
+ 	else {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		"Digest: access to %s failed, reason: unknown require "
+ 		"directive \"%s\"", r->uri, reqs[x].requirement);
+ 	    return DECLINED;
+@@ -1728,7 +1729,7 @@ static int digest_check_auth(request_rec *r)
+     if (!method_restricted)
+ 	return OK;
+ 
+-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 	"Digest: access to %s failed, reason: user %s not allowed access",
+ 	r->uri, user);
+ 
+diff --git a/modules/filters/mod_include.c b/modules/filters/mod_include.c
+index 754c438..16d588e 100644
+--- a/modules/filters/mod_include.c
++++ b/modules/filters/mod_include.c
+@@ -518,7 +518,7 @@ static void parse_string(request_rec *r, const char *in, char *out,
+ 		    in = strchr(in, '}');
+ 		    if (in == NULL) {
+                         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR,
+-				    r, "Missing '}' on variable \"%s\"",
++				    0, r, "Missing '}' on variable \"%s\"",
+ 				    expansion);
+                         *next = '\0';
+                         return;
+@@ -740,7 +740,7 @@ static int handle_include(FILE *in, request_rec *r, const char *error, int noexe
+             ap_chdir_file(r->filename);
+             if (error_fmt) {
+                 ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR,
+-			    r, error_fmt, tag_val, r->filename);
++			    0, r, error_fmt, tag_val, r->filename);
+                 ap_rputs(error, r);
+             }
+ 
+@@ -755,7 +755,7 @@ static int handle_include(FILE *in, request_rec *r, const char *error, int noexe
+             return 0;
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "unknown parameter \"%s\" to tag include in %s",
+                         tag, r->filename);
+             ap_rputs(error, r);
+@@ -863,7 +863,7 @@ static int include_cmd(char *s, request_rec *r)
+ 
+     if (!ap_bspawn_child(r->pool, include_cmd_child, &arg,
+ 			 kill_after_timeout, NULL, &script_in, NULL)) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+ 		     "couldn't spawn include command");
+         return -1;
+     }
+@@ -887,7 +887,7 @@ static int handle_exec(FILE *in, request_rec *r, const char *error)
+         if (!strcmp(tag, "cmd")) {
+             parse_string(r, tag_val, parsed_string, sizeof(parsed_string), 1);
+             if (include_cmd(parsed_string, r) == -1) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "execution failure for parameter \"%s\" "
+                             "to tag exec in file %s",
+                             tag, r->filename);
+@@ -899,7 +899,7 @@ static int handle_exec(FILE *in, request_rec *r, const char *error)
+         else if (!strcmp(tag, "cgi")) {
+             parse_string(r, tag_val, parsed_string, sizeof(parsed_string), 0);
+             if (include_cgi(parsed_string, r) == -1) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "invalid CGI ref \"%s\" in %s", tag_val, file);
+                 ap_rputs(error, r);
+             }
+@@ -909,7 +909,7 @@ static int handle_exec(FILE *in, request_rec *r, const char *error)
+             return 0;
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "unknown parameter \"%s\" to tag exec in %s",
+                         tag, file);
+             ap_rputs(error, r);
+@@ -941,7 +941,7 @@ static int handle_echo(FILE *in, request_rec *r, const char *error)
+             return 0;
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "unknown parameter \"%s\" to tag echo in %s",
+                         tag, r->filename);
+             ap_rputs(error, r);
+@@ -959,7 +959,7 @@ static int handle_perl(FILE *in, request_rec *r, const char *error)
+     AV *av = newAV();
+ 
+     if (ap_allow_options(r) & OPT_INCNOEXEC) {
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "#perl SSI disallowed by IncludesNoExec in %s",
+ 		      r->filename);
+         return DECLINED;
+@@ -1027,7 +1027,7 @@ static int handle_config(FILE *in, request_rec *r, char *error, char *tf,
+             return 0;
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "unknown parameter \"%s\" to tag config in %s",
+                         tag, r->filename);
+             ap_rputs(error, r);
+@@ -1069,7 +1069,7 @@ static int find_file(request_rec *r, const char *directive, const char *tag,
+ 
+         if (error_fmt) {
+             ret = -1;
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, r, error_fmt, to_send, r->filename);
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, error_fmt, to_send, r->filename);
+             ap_rputs(error, r);
+         }
+ 
+@@ -1087,7 +1087,7 @@ static int find_file(request_rec *r, const char *directive, const char *tag,
+             return 0;
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "unable to get information about \"%s\" "
+                         "in parsed file %s",
+                         tag_val, r->filename);
+@@ -1097,7 +1097,7 @@ static int find_file(request_rec *r, const char *directive, const char *tag,
+         }
+     }
+     else {
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "unknown parameter \"%s\" to tag %s in %s",
+                     tag, directive, r->filename);
+         ap_rputs(error, r);
+@@ -1176,7 +1176,7 @@ static int re_check(request_rec *r, char *string, char *rexp)
+ 
+     compiled = ap_pregcomp(r->pool, rexp, REG_EXTENDED | REG_NOSUB);
+     if (compiled == NULL) {
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "unable to compile pattern \"%s\"", rexp);
+         return -1;
+     }
+@@ -1374,7 +1374,8 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+         return (0);
+     }
+     root = current = (struct parse_node *) NULL;
+-    expr_pool = ap_make_sub_pool(r->pool);
++    if (ap_create_context(&expr_pool, r->pool) != APR_SUCCESS)
++		return 0;
+ 
+     /* Create Parse Tree */
+     while (1) {
+@@ -1421,7 +1422,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                 current = current->right = new;
+                 break;
+             default:
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "Invalid expression \"%s\" in file %s",
+                             expr, r->filename);
+                 ap_rputs(error, r);
+@@ -1435,7 +1436,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+             ap_rputs("     Token: and/or\n", r);
+ #endif
+             if (current == (struct parse_node *) NULL) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "Invalid expression \"%s\" in file %s",
+                             expr, r->filename);
+                 ap_rputs(error, r);
+@@ -1460,7 +1461,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                 case token_lbrace:
+                     break;
+                 default:
+-                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                                 "Invalid expression \"%s\" in file %s",
+                                 expr, r->filename);
+                     ap_rputs(error, r);
+@@ -1505,7 +1506,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                 case token_lt:
+                     break;
+                 default:
+-                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                                 "Invalid expression \"%s\" in file %s",
+                                 expr, r->filename);
+                     ap_rputs(error, r);
+@@ -1537,7 +1538,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+             ap_rputs("     Token: eq/ne/ge/gt/le/lt\n", r);
+ #endif
+             if (current == (struct parse_node *) NULL) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "Invalid expression \"%s\" in file %s",
+                             expr, r->filename);
+                 ap_rputs(error, r);
+@@ -1562,7 +1563,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                 case token_le:
+                 case token_lt:
+                 default:
+-                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                                 "Invalid expression \"%s\" in file %s",
+                                 expr, r->filename);
+                     ap_rputs(error, r);
+@@ -1596,7 +1597,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                 current = current->parent;
+             }
+             if (current == (struct parse_node *) NULL) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "Unmatched ')' in \"%s\" in file %s",
+ 			    expr, r->filename);
+                 ap_rputs(error, r);
+@@ -1629,7 +1630,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                 case token_string:
+                 case token_group:
+                 default:
+-                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                                 "Invalid expression \"%s\" in file %s",
+                                 expr, r->filename);
+                     ap_rputs(error, r);
+@@ -1677,7 +1678,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+ #endif
+             if (current->left == (struct parse_node *) NULL ||
+                 current->right == (struct parse_node *) NULL) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "Invalid expression \"%s\" in file %s",
+                             expr, r->filename);
+                 ap_rputs(error, r);
+@@ -1742,7 +1743,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                 (current->right == (struct parse_node *) NULL) ||
+                 (current->left->token.type != token_string) ||
+                 (current->right->token.type != token_string)) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "Invalid expression \"%s\" in file %s",
+                             expr, r->filename);
+                 ap_rputs(error, r);
+@@ -1763,7 +1764,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                     current->right->token.value[len - 1] = '\0';
+                 }
+                 else {
+-                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                                 "Invalid rexp \"%s\" in file %s",
+                                 current->right->token.value, r->filename);
+                     ap_rputs(error, r);
+@@ -1807,7 +1808,7 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+                 (current->right == (struct parse_node *) NULL) ||
+                 (current->left->token.type != token_string) ||
+                 (current->right->token.type != token_string)) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "Invalid expression \"%s\" in file %s",
+                             expr, r->filename);
+                 ap_rputs(error, r);
+@@ -1890,21 +1891,21 @@ static int parse_expr(request_rec *r, const char *expr, const char *error)
+             break;
+ 
+         case token_lbrace:
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "Unmatched '(' in \"%s\" in file %s",
+                         expr, r->filename);
+             ap_rputs(error, r);
+             goto RETURN;
+ 
+         case token_rbrace:
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "Unmatched ')' in \"%s\" in file %s",
+                         expr, r->filename);
+             ap_rputs(error, r);
+             goto RETURN;
+ 
+         default:
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			"bad token type");
+             ap_rputs(error, r);
+             goto RETURN;
+@@ -1932,7 +1933,7 @@ static int handle_if(FILE *in, request_rec *r, const char *error,
+         }
+         else if (!strcmp(tag, "done")) {
+ 	    if (expr == NULL) {
+-		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			    "missing expr in if statement: %s",
+ 			    r->filename);
+ 		ap_rputs(error, r);
+@@ -1952,7 +1953,7 @@ static int handle_if(FILE *in, request_rec *r, const char *error,
+ #endif
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "unknown parameter \"%s\" to tag if in %s",
+                         tag, r->filename);
+             ap_rputs(error, r);
+@@ -1983,7 +1984,7 @@ static int handle_elif(FILE *in, request_rec *r, const char *error,
+                 return (0);
+             }
+ 	    if (expr == NULL) {
+-		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			    "missing expr in elif statement: %s",
+ 			    r->filename);
+ 		ap_rputs(error, r);
+@@ -2003,7 +2004,7 @@ static int handle_elif(FILE *in, request_rec *r, const char *error,
+ #endif
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "unknown parameter \"%s\" to tag if in %s",
+                         tag, r->filename);
+             ap_rputs(error, r);
+@@ -2029,7 +2030,7 @@ static int handle_else(FILE *in, request_rec *r, const char *error,
+         return 0;
+     }
+     else {
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "else directive does not take tags in %s",
+ 		    r->filename);
+         if (*printing) {
+@@ -2057,7 +2058,7 @@ static int handle_endif(FILE *in, request_rec *r, const char *error,
+         return 0;
+     }
+     else {
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "endif directive does not take tags in %s",
+ 		    r->filename);
+         ap_rputs(error, r);
+@@ -2085,7 +2086,7 @@ static int handle_set(FILE *in, request_rec *r, const char *error)
+         }
+         else if (!strcmp(tag, "value")) {
+             if (var == (char *) NULL) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                             "variable must precede value in set directive in %s",
+ 			    r->filename);
+                 ap_rputs(error, r);
+@@ -2095,7 +2096,7 @@ static int handle_set(FILE *in, request_rec *r, const char *error)
+             ap_table_setn(r->subprocess_env, var, ap_pstrdup(r->pool, parsed_string));
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "Invalid tag for set directive in %s", r->filename);
+             ap_rputs(error, r);
+             return -1;
+@@ -2121,7 +2122,7 @@ static int handle_printenv(FILE *in, request_rec *r, const char *error)
+         return 0;
+     }
+     else {
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "printenv directive does not take tags in %s",
+ 		    r->filename);
+         ap_rputs(error, r);
+@@ -2166,7 +2167,7 @@ static void send_parsed_content(FILE *f, request_rec *r)
+     while (1) {
+         if (!find_string(f, STARTING_SEQUENCE, r, printing)) {
+             if (get_directive(f, directive, sizeof(directive), r->pool)) {
+-		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			    "mod_include: error reading directive in %s",
+ 			    r->filename);
+ 		ap_rputs(error, r);
+@@ -2212,7 +2213,7 @@ static void send_parsed_content(FILE *f, request_rec *r)
+             }
+             if (!strcmp(directive, "exec")) {
+                 if (noexec) {
+-                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 				  "exec used but not allowed in %s",
+ 				  r->filename);
+                     if (printing) {
+@@ -2251,7 +2252,7 @@ static void send_parsed_content(FILE *f, request_rec *r)
+             }
+ #endif
+             else {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			      "unknown directive \"%s\" "
+ 			      "in parsed doc %s",
+ 			      directive, r->filename);
+@@ -2261,7 +2262,7 @@ static void send_parsed_content(FILE *f, request_rec *r)
+                 ret = find_string(f, ENDING_SEQUENCE, r, 0);
+             }
+             if (ret) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			      "premature EOF in parsed file %s",
+ 			      r->filename);
+                 return;
+@@ -2333,7 +2334,7 @@ static int send_parsed_file(request_rec *r)
+         return DECLINED;
+     }
+     if (r->finfo.st_mode == 0) {
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "File does not exist: %s",
+                     (r->path_info
+                      ? ap_pstrcat(r->pool, r->filename, r->path_info, NULL)
+@@ -2342,7 +2343,7 @@ static int send_parsed_file(request_rec *r)
+     }
+ 
+     if (!(f = ap_pfopen(r->pool, r->filename, "r"))) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+                     "file permissions deny server access: %s", r->filename);
+         return HTTP_FORBIDDEN;
+     }
+diff --git a/modules/generators/mod_info.c b/modules/generators/mod_info.c
+index 03a899e..9974694 100644
+--- a/modules/generators/mod_info.c
++++ b/modules/generators/mod_info.c
+@@ -171,7 +171,7 @@ static info_cfg_lines *mod_info_load_config(ap_context_t *p, const char *filenam
+ 
+     fp = ap_pcfg_openfile(p, filename);
+     if (!fp) {
+-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, r, 
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING, errno, r,
+ 		    "mod_info: couldn't open config file %s",
+ 		    filename);
+         return NULL;
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 10a2ccb..89e7bea 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -1100,7 +1100,7 @@ static int hook_uri2file(request_rec *r)
+              * we can actually use it!
+              */
+             if (!proxy_available) {
+-                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++                ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                              "attempt to make remote request from mod_rewrite "
+                              "without proxy enabled: %s", r->filename);
+                 return FORBIDDEN;
+@@ -1337,7 +1337,7 @@ static int hook_fixup(request_rec *r)
+      */
+     if (!(ap_allow_options(r) & (OPT_SYM_LINKS | OPT_SYM_OWNER))) {
+         /* FollowSymLinks is mandatory! */
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                      "Options FollowSymLinks or SymLinksIfOwnerMatch is off "
+                      "which implies that RewriteRule directive is forbidden: "
+                      "%s", r->filename);
+@@ -2618,7 +2618,7 @@ static void expand_map_lookups(request_rec *r, char *uri, int uri_len)
+                 n = strlen(cpT);
+                 if (cpO + n >= newuri + sizeof(newuri)) {
+                     ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR,
+-                                 r, "insufficient space in "
++                                 0, r, "insufficient space in "
+                                  "expand_map_lookups, aborting");
+                     return;
+                 }
+@@ -2629,7 +2629,7 @@ static void expand_map_lookups(request_rec *r, char *uri, int uri_len)
+                 n = strlen(defaultvalue);
+                 if (cpO + n >= newuri + sizeof(newuri)) {
+                     ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 
+-                                 r, "insufficient space in "
++                                 0, r, "insufficient space in "
+                                  "expand_map_lookups, aborting");
+                     return;
+                 }
+@@ -2644,7 +2644,7 @@ static void expand_map_lookups(request_rec *r, char *uri, int uri_len)
+             n = cpT-cpI;
+             if (cpO + n >= newuri + sizeof(newuri)) {
+                 ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 
+-                             r, "insufficient space in "
++                             0, r, "insufficient space in "
+                              "expand_map_lookups, aborting");
+                 return;
+             }
+@@ -2694,7 +2694,7 @@ static char *lookup_map(request_rec *r, char *name, char *key)
+         if (strcmp(s->name, name) == 0) {
+             if (s->type == MAPTYPE_TXT) {
+                 if (stat(s->checkfile, &st) == -1) {
+-                    ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                                  "mod_rewrite: can't access text RewriteMap "
+                                  "file %s", s->checkfile);
+                     rewritelog(r, 1, "can't open RewriteMap file, "
+@@ -2731,7 +2731,7 @@ static char *lookup_map(request_rec *r, char *name, char *key)
+             else if (s->type == MAPTYPE_DBM) {
+ #ifndef NO_DBM_REWRITEMAP
+                 if (stat(s->checkfile, &st) == -1) {
+-                    ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+                                  "mod_rewrite: can't access DBM RewriteMap "
+                                  "file %s", s->checkfile);
+                     rewritelog(r, 1, "can't open DBM RewriteMap file, "
+@@ -2793,7 +2793,7 @@ static char *lookup_map(request_rec *r, char *name, char *key)
+             }
+             else if (s->type == MAPTYPE_RND) {
+                 if (stat(s->checkfile, &st) == -1) {
+-                    ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++                    ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+                                  "mod_rewrite: can't access text RewriteMap "
+                                  "file %s", s->checkfile);
+                     rewritelog(r, 1, "can't open RewriteMap file, "
+@@ -3791,7 +3791,8 @@ static cache *init_cache(ap_context_t *p)
+     cache *c;
+ 
+     c = (cache *)ap_palloc(p, sizeof(cache));
+-    c->pool = ap_make_sub_pool(p);
++    if (ap_create_context(&c->pool, p) != APR_SUCCESS)
++		return NULL;
+     c->lists = ap_make_array(c->pool, 2, sizeof(cachelist));
+     return c;
+ }
+@@ -4193,7 +4194,7 @@ static void fd_lock(request_rec *r, int fd)
+ #endif
+ 
+     if (rc < 0) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+                      "mod_rewrite: failed to lock file descriptor");
+         exit(1);
+     }
+@@ -4223,7 +4224,7 @@ static void fd_unlock(request_rec *r, int fd)
+ #endif
+ 
+     if (rc < 0) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+                      "mod_rewrite: failed to unlock file descriptor");
+         exit(1);
+     }
+diff --git a/modules/metadata/mod_cern_meta.c b/modules/metadata/mod_cern_meta.c
+index 3f136f5..4ac6963 100644
+--- a/modules/metadata/mod_cern_meta.c
++++ b/modules/metadata/mod_cern_meta.c
+@@ -256,7 +256,7 @@ static int scan_meta_file(request_rec *r, FILE *f)
+ 	/* if we see a bogus header don't ignore it. Shout and scream */
+ 
+ 	if (!(l = strchr(w, ':'))) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			"malformed header in meta file: %s", r->filename);
+ 	    return SERVER_ERROR;
+ 	}
+@@ -330,7 +330,7 @@ static int add_cern_meta_data(request_rec *r)
+     }
+     else {
+ 	/* no last slash, buh?! */
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "internal error in mod_cern_meta: %s", r->filename);
+ 	/* should really barf, but hey, let's be friends... */
+ 	return DECLINED;
+@@ -359,7 +359,7 @@ static int add_cern_meta_data(request_rec *r)
+ 	if (errno == ENOENT) {
+ 	    return DECLINED;
+ 	}
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+ 	      "meta file permissions deny server access: %s", metafilename);
+ 	return FORBIDDEN;
+     };
+diff --git a/modules/metadata/mod_expires.c b/modules/metadata/mod_expires.c
+index fb364fd..77ee005 100644
+--- a/modules/metadata/mod_expires.c
++++ b/modules/metadata/mod_expires.c
+@@ -415,7 +415,7 @@ static int add_expires(request_rec *r)
+ 
+     conf = (expires_dir_config *) ap_get_module_config(r->per_dir_config, &expires_module);
+     if (conf == NULL) {
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "internal error: %s", r->filename);
+         return SERVER_ERROR;
+     };
+@@ -471,7 +471,7 @@ static int add_expires(request_rec *r)
+         /* expecting the add_* routines to be case-hardened this 
+          * is just a reminder that module is beta
+          */
+-        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++        ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "internal error: bad expires code: %s", r->filename);
+         return SERVER_ERROR;
+     };
+diff --git a/modules/metadata/mod_mime_magic.c b/modules/metadata/mod_mime_magic.c
+index be3a18a..a6a5364 100644
+--- a/modules/metadata/mod_mime_magic.c
++++ b/modules/metadata/mod_mime_magic.c
+@@ -677,7 +677,7 @@ static char *rsl_strdup(request_rec *r, int start_frag, int start_pos, int len)
+     /* clean up and return */
+     result[res_pos] = 0;
+ #if MIME_MAGIC_DEBUG
+-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 	     MODNAME ": rsl_strdup() %d chars: %s", res_pos - 1, result);
+ #endif
+     return result;
+@@ -749,7 +749,7 @@ static int magic_rsl_to_request(request_rec *r)
+ 		else {
+ 		    /* should not be possible */
+ 		    /* abandon malfunctioning module */
+-		    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++		    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 				MODNAME ": bad state %d (ws)", state);
+ 		    return DECLINED;
+ 		}
+@@ -793,7 +793,7 @@ static int magic_rsl_to_request(request_rec *r)
+ 		else {
+ 		    /* should not be possible */
+ 		    /* abandon malfunctioning module */
+-		    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++		    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 				MODNAME ": bad state %d (ns)", state);
+ 		    return DECLINED;
+ 		}
+@@ -868,7 +868,7 @@ static int magic_process(request_rec *r)
+ 
+     if ((fd = ap_popenf(r->pool, r->filename, O_RDONLY, 0)) < 0) {
+ 	/* We can't open it, but we were able to stat it. */
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+ 		    MODNAME ": can't read `%s'", r->filename);
+ 	/* let some other handler decide what the problem is */
+ 	return DECLINED;
+@@ -878,7 +878,7 @@ static int magic_process(request_rec *r)
+      * try looking at the first HOWMANY bytes
+      */
+     if ((nbytes = read(fd, (char *) buf, sizeof(buf) - 1)) == -1) {
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+ 		    MODNAME ": read failed: %s", r->filename);
+ 	return HTTP_INTERNAL_SERVER_ERROR;
+     }
+@@ -1481,7 +1481,7 @@ static int fsmagic(request_rec *r, const char *fn)
+ 	/* We used stat(), the only possible reason for this is that the
+ 	 * symlink is broken.
+ 	 */
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 		    MODNAME ": broken symlink (%s)", fn);
+ 	return HTTP_INTERNAL_SERVER_ERROR;
+ #endif
+@@ -1495,7 +1495,7 @@ static int fsmagic(request_rec *r, const char *fn)
+     case S_IFREG:
+ 	break;
+     default:
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 		    MODNAME ": invalid mode 0%o.", (unsigned int)r->finfo.st_mode);
+ 	return HTTP_INTERNAL_SERVER_ERROR;
+     }
+@@ -1562,7 +1562,7 @@ static int match(request_rec *r, unsigned char *s, int nbytes)
+     struct magic *m;
+ 
+ #if MIME_MAGIC_DEBUG
+-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		MODNAME ": match conf=%x file=%s m=%s m->next=%s last=%s",
+ 		conf,
+ 		conf->magicfile ? conf->magicfile : "NULL",
+@@ -1577,7 +1577,7 @@ static int match(request_rec *r, unsigned char *s, int nbytes)
+ 	    ap_isprint((((unsigned long) m) >> 16) & 255) &&
+ 	    ap_isprint((((unsigned long) m) >> 8) & 255) &&
+ 	    ap_isprint(((unsigned long) m) & 255)) {
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 			MODNAME ": match: POINTER CLOBBERED! "
+ 			"m=\"%c%c%c%c\"",
+ 			(((unsigned long) m) >> 24) & 255,
+@@ -1592,7 +1592,7 @@ static int match(request_rec *r, unsigned char *s, int nbytes)
+     for (m = conf->magic; m; m = m->next) {
+ #if MIME_MAGIC_DEBUG
+ 	rule_counter++;
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    MODNAME ": line=%d desc=%s", m->lineno, m->desc);
+ #endif
+ 
+@@ -1612,7 +1612,7 @@ static int match(request_rec *r, unsigned char *s, int nbytes)
+ 	    while (m_cont && (m_cont->cont_level != 0)) {
+ #if MIME_MAGIC_DEBUG
+ 		rule_counter++;
+-		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 			MODNAME ": line=%d mc=%x mc->next=%x cont=%d desc=%s",
+ 			    m_cont->lineno, m_cont,
+ 			    m_cont->next, m_cont->cont_level,
+@@ -1631,7 +1631,7 @@ static int match(request_rec *r, unsigned char *s, int nbytes)
+ 	/* if we get here, the main entry rule was a match */
+ 	/* this will be the last run through the loop */
+ #if MIME_MAGIC_DEBUG
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    MODNAME ": rule matched, line=%d type=%d %s",
+ 		    m->lineno, m->type,
+ 		    (m->type == STRING) ? m->value.s : "");
+@@ -1655,7 +1655,7 @@ static int match(request_rec *r, unsigned char *s, int nbytes)
+ 	m = m->next;
+ 	while (m && (m->cont_level != 0)) {
+ #if MIME_MAGIC_DEBUG
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 			MODNAME ": match line=%d cont=%d type=%d %s",
+ 			m->lineno, m->cont_level, m->type,
+ 			(m->type == STRING) ? m->value.s : "");
+@@ -1699,13 +1699,13 @@ static int match(request_rec *r, unsigned char *s, int nbytes)
+ 	    m = m->next;
+ 	}
+ #if MIME_MAGIC_DEBUG
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    MODNAME ": matched after %d rules", rule_counter);
+ #endif
+ 	return 1;		/* all through */
+     }
+ #if MIME_MAGIC_DEBUG
+-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		MODNAME ": failed after %d rules", rule_counter);
+ #endif
+     return 0;			/* no match at all */
+@@ -1752,7 +1752,7 @@ static void mprint(request_rec *r, union VALUETYPE *p, struct magic *m)
+ 	(void) magic_rsl_printf(r, m->desc, pp);
+ 	return;
+     default:
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 		    MODNAME ": invalid m->type (%d) in mprint().",
+ 		    m->type);
+ 	return;
+@@ -1798,7 +1798,7 @@ static int mconvert(request_rec *r, union VALUETYPE *p, struct magic *m)
+ 	    ((p->hl[3] << 24) | (p->hl[2] << 16) | (p->hl[1] << 8) | (p->hl[0]));
+ 	return 1;
+     default:
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 		    MODNAME ": invalid type %d in mconvert().", m->type);
+ 	return 0;
+     }
+@@ -1850,7 +1850,7 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+     int matched;
+ 
+     if ((m->value.s[0] == 'x') && (m->value.s[1] == '\0')) {
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 		    MODNAME ": BOINK");
+ 	return 1;
+     }
+@@ -1895,7 +1895,7 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+ 	break;
+     default:
+ 	/*  bogosity, pretend that it just wasn't a match */
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 		    MODNAME ": invalid type %d in mcheck().", m->type);
+ 	return 0;
+     }
+@@ -1905,7 +1905,7 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+     switch (m->reln) {
+     case 'x':
+ #if MIME_MAGIC_DEBUG
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    "%lu == *any* = 1", v);
+ #endif
+ 	matched = 1;
+@@ -1914,7 +1914,7 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+     case '!':
+ 	matched = v != l;
+ #if MIME_MAGIC_DEBUG
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    "%lu != %lu = %d", v, l, matched);
+ #endif
+ 	break;
+@@ -1922,7 +1922,7 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+     case '=':
+ 	matched = v == l;
+ #if MIME_MAGIC_DEBUG
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    "%lu == %lu = %d", v, l, matched);
+ #endif
+ 	break;
+@@ -1931,14 +1931,14 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+ 	if (m->flag & UNSIGNED) {
+ 	    matched = v > l;
+ #if MIME_MAGIC_DEBUG
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 			"%lu > %lu = %d", v, l, matched);
+ #endif
+ 	}
+ 	else {
+ 	    matched = (long) v > (long) l;
+ #if MIME_MAGIC_DEBUG
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 			"%ld > %ld = %d", v, l, matched);
+ #endif
+ 	}
+@@ -1948,14 +1948,14 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+ 	if (m->flag & UNSIGNED) {
+ 	    matched = v < l;
+ #if MIME_MAGIC_DEBUG
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 			"%lu < %lu = %d", v, l, matched);
+ #endif
+ 	}
+ 	else {
+ 	    matched = (long) v < (long) l;
+ #if MIME_MAGIC_DEBUG
+-	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 			"%ld < %ld = %d", v, l, matched);
+ #endif
+ 	}
+@@ -1964,7 +1964,7 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+     case '&':
+ 	matched = (v & l) == l;
+ #if MIME_MAGIC_DEBUG
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    "((%lx & %lx) == %lx) = %d", v, l, l, matched);
+ #endif
+ 	break;
+@@ -1972,7 +1972,7 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+     case '^':
+ 	matched = (v & l) != l;
+ #if MIME_MAGIC_DEBUG
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    "((%lx & %lx) != %lx) = %d", v, l, l, matched);
+ #endif
+ 	break;
+@@ -1980,7 +1980,7 @@ static int mcheck(request_rec *r, union VALUETYPE *p, struct magic *m)
+     default:
+ 	/* bogosity, pretend it didn't match */
+ 	matched = 0;
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, r,
+ 		    MODNAME ": mcheck: can't happen: invalid relation %d.",
+ 		    m->reln);
+ 	break;
+@@ -2160,7 +2160,7 @@ static int uncompress_child(void *data, child_info *pinfo)
+     child_pid = ap_spawnvp(compr[parm->method].argv[0],
+ 			new_argv);
+     if (child_pid == -1)
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, parm->r,
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, parm->r,
+ 		MODNAME ": could not execute `%s'.",
+ 		compr[parm->method].argv[0]);
+     return (child_pid);
+@@ -2181,11 +2181,12 @@ static int uncompress(request_rec *r, int method,
+      * there are cases (i.e. generating directory indicies with mod_autoindex)
+      * where we would end up with LOTS of zombies.
+      */
+-    sub_pool = ap_make_sub_pool(r->pool);
++    if (ap_create_context(&sub_pool, r->pool) != APR_SUCCESS)
++		return -1;
+ 
+     if (!ap_bspawn_child(sub_pool, uncompress_child, &parm, kill_always,
+ 			 NULL, &bout, NULL)) {
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+ 		    MODNAME ": couldn't spawn uncompress process: %s", r->uri);
+ 	return -1;
+     }
+@@ -2193,7 +2194,7 @@ static int uncompress(request_rec *r, int method,
+     *newch = (unsigned char *) ap_palloc(r->pool, n);
+     if ((n = ap_bread(bout, *newch, n)) <= 0) {
+ 	ap_destroy_pool(sub_pool);
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+ 	    MODNAME ": read failed %s", r->filename);
+ 	return -1;
+     }
+@@ -2300,7 +2301,7 @@ static int revision_suffix(request_rec *r)
+     request_rec *sub;
+ 
+ #if MIME_MAGIC_DEBUG
+-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		MODNAME ": revision_suffix checking %s", r->filename);
+ #endif /* MIME_MAGIC_DEBUG */
+ 
+@@ -2319,7 +2320,7 @@ static int revision_suffix(request_rec *r)
+     result = 0;
+     sub_filename = ap_pstrndup(r->pool, r->filename, suffix_pos);
+ #if MIME_MAGIC_DEBUG
+-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		MODNAME ": subrequest lookup for %s", sub_filename);
+ #endif /* MIME_MAGIC_DEBUG */
+     sub = ap_sub_req_lookup_file(sub_filename, r);
+@@ -2328,7 +2329,7 @@ static int revision_suffix(request_rec *r)
+     if (sub->content_type) {
+ 	r->content_type = ap_pstrdup(r->pool, sub->content_type);
+ #if MIME_MAGIC_DEBUG
+-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, r,
++	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 		    MODNAME ": subrequest %s got %s",
+ 		    sub_filename, r->content_type);
+ #endif /* MIME_MAGIC_DEBUG */

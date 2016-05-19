@@ -1,0 +1,308 @@
+commit e1fac1db26d26e57c12ffc56456e2a2017fce675
+Author: Graham Leggett <minfrin@apache.org>
+Date:   Wed Dec 14 00:31:51 2011 +0000
+
+    Further clarify the naming of the entity that originates the request by
+    calling that entity a useragent instead of a client.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1214003 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/docs/manual/developer/new_api_2_4.xml b/docs/manual/developer/new_api_2_4.xml
+index 5398483..869857a 100644
+--- a/docs/manual/developer/new_api_2_4.xml
++++ b/docs/manual/developer/new_api_2_4.xml
+@@ -466,11 +466,11 @@
+       variables, they need to be replaced with one of the following two
+       options as appropriate for the module:
+       <ul>
+-        <li>When you require the IP address of the client, which might
+-        be connected directly to the server, or might optionally be
++        <li>When you require the IP address of the user agent, which
++        might be connected directly to the server, or might optionally be
+         separated from the server by a transparent load balancer or
+-        proxy, use request_rec->client_ip and
+-        request_rec->client_addr.</li>
++        proxy, use request_rec->useragent_ip and
++        request_rec->useragent_addr.</li>
+         <li>When you require the IP address of the peer that is
+         connected directly to the server, which might be the client or
+         might be the load balancer or proxy itself, use
+diff --git a/include/httpd.h b/include/httpd.h
+index a0734dc..7121189 100644
+--- a/include/httpd.h
++++ b/include/httpd.h
+@@ -1008,8 +1008,8 @@ struct request_rec {
+     /** remote address information from conn_rec, can be overridden if
+      * necessary by a module.
+      */
+-    apr_sockaddr_t *client_addr;
+-    char *client_ip;
++    apr_sockaddr_t *useragent_addr;
++    char *useragent_ip;
+ };
+ 
+ /**
+diff --git a/modules/aaa/mod_access_compat.c b/modules/aaa/mod_access_compat.c
+index 59122a9..8d7afca 100644
+--- a/modules/aaa/mod_access_compat.c
++++ b/modules/aaa/mod_access_compat.c
+@@ -271,7 +271,7 @@ static int find_allowdeny(request_rec *r, apr_array_header_t *a, int method)
+             return 1;
+ 
+         case T_IP:
+-            if (apr_ipsubnet_test(ap[i].x.ip, r->client_addr)) {
++            if (apr_ipsubnet_test(ap[i].x.ip, r->useragent_addr)) {
+                 return 1;
+             }
+             break;
+diff --git a/modules/aaa/mod_authz_host.c b/modules/aaa/mod_authz_host.c
+index e3108e8..9087676 100644
+--- a/modules/aaa/mod_authz_host.c
++++ b/modules/aaa/mod_authz_host.c
+@@ -153,7 +153,7 @@ static authz_status ip_check_authorization(request_rec *r,
+     apr_ipsubnet_t **ip = (apr_ipsubnet_t **)parsed_require_line;
+ 
+     while (*ip) {
+-        if (apr_ipsubnet_test(*ip, r->client_addr))
++        if (apr_ipsubnet_test(*ip, r->useragent_addr))
+             return AUTHZ_GRANTED;
+         ip++;
+     }
+@@ -201,10 +201,10 @@ static authz_status local_check_authorization(request_rec *r,
+                                               const void *parsed_require_line)
+ {
+      if (   apr_sockaddr_equal(r->connection->local_addr,
+-                               r->client_addr)
+-         || apr_ipsubnet_test(localhost_v4, r->client_addr)
++                               r->useragent_addr)
++         || apr_ipsubnet_test(localhost_v4, r->useragent_addr)
+ #if APR_HAVE_IPV6
+-         || apr_ipsubnet_test(localhost_v6, r->client_addr)
++         || apr_ipsubnet_test(localhost_v6, r->useragent_addr)
+ #endif
+         )
+      {
+diff --git a/modules/arch/netware/mod_nw_ssl.c b/modules/arch/netware/mod_nw_ssl.c
+index 22418d3..84aa6fb 100644
+--- a/modules/arch/netware/mod_nw_ssl.c
++++ b/modules/arch/netware/mod_nw_ssl.c
+@@ -1001,7 +1001,7 @@ char *ssl_var_lookup(apr_pool_t *p, server_rec *s, conn_rec *c, request_rec *r,
+             else if (strcEQ(var, "REQUEST_FILENAME"))
+                 result = r->filename;
+             else if (strcEQ(var, "REMOTE_ADDR"))
+-                result = r->client_ip;
++                result = r->useragent_ip;
+             else if (strcEQ(var, "REMOTE_HOST"))
+                 result = ap_get_remote_host(r->connection, r->per_dir_config,
+                                             REMOTE_NAME, NULL);
+diff --git a/modules/filters/mod_ext_filter.c b/modules/filters/mod_ext_filter.c
+index d223e94..3412c21 100644
+--- a/modules/filters/mod_ext_filter.c
++++ b/modules/filters/mod_ext_filter.c
+@@ -406,7 +406,7 @@ static void child_errfn(apr_pool_t *pool, apr_status_t err, const char *descript
+     apr_file_printf(stderr_log,
+                     "[%s] [client %s] mod_ext_filter (%d)%s: %s\n",
+                     time_str,
+-                    r->client_ip,
++                    r->useragent_ip,
+                     err,
+                     apr_strerror(err, errbuf, sizeof(errbuf)),
+                     description);
+diff --git a/modules/http/http_request.c b/modules/http/http_request.c
+index 2788ec9..ce16de9 100644
+--- a/modules/http/http_request.c
++++ b/modules/http/http_request.c
+@@ -439,8 +439,8 @@ static request_rec *internal_internal_redirect(const char *new_uri,
+     new->prev = r;
+     r->next   = new;
+ 
+-    new->client_addr = r->client_addr;
+-    new->client_ip = r->client_ip;
++    new->useragent_addr = r->useragent_addr;
++    new->useragent_ip = r->useragent_ip;
+ 
+     /* Must have prev and next pointers set before calling create_request
+      * hook.
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 2b3cd53..0f9e76d 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -314,7 +314,7 @@ static const char *log_remote_address(request_rec *r, char *a)
+         return r->connection->peer_ip;
+     }
+     else {
+-        return r->client_ip;
++        return r->useragent_ip;
+     }
+ }
+ 
+@@ -763,7 +763,7 @@ static const char *log_server_port(request_rec *r, char *a)
+         port = r->server->port ? r->server->port : ap_default_port(r);
+     }
+     else if (!strcasecmp(a, "remote")) {
+-        port = r->client_addr->port;
++        port = r->useragent_addr->port;
+     }
+     else if (!strcasecmp(a, "local")) {
+         port = r->connection->local_addr->port;
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 970faff..17f52cb 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -1861,7 +1861,7 @@ static char *lookup_variable(char *var, rewrite_ctx *ctx)
+             else if (!strcmp(var, "IPV6")) {
+                 int flag = FALSE;
+ #if APR_HAVE_IPV6
+-                apr_sockaddr_t *addr = r->client_addr;
++                apr_sockaddr_t *addr = r->useragent_addr;
+                 flag = (addr->family == AF_INET6 &&
+                         !IN6_IS_ADDR_V4MAPPED((struct in6_addr *)addr->ipaddr_ptr));
+                 rewritelog((r, 1, ctx->perdir, "IPV6='%s'", flag ? "on" : "off"));
+@@ -1967,7 +1967,7 @@ static char *lookup_variable(char *var, rewrite_ctx *ctx)
+ 
+             case 'D':
+                 if (*var == 'R' && !strcmp(var, "REMOTE_ADDR")) {
+-                    result = r->client_ip;
++                    result = r->useragent_ip;
+                 }
+                 else if (!strcmp(var, "SERVER_ADDR")) {
+                     result = r->connection->local_ip;
+@@ -2006,7 +2006,7 @@ static char *lookup_variable(char *var, rewrite_ctx *ctx)
+                                                 REMOTE_NAME, NULL);
+                 }
+                 else if (!strcmp(var, "REMOTE_PORT")) {
+-                    return apr_itoa(r->pool, r->client_addr->port);
++                    return apr_itoa(r->pool, r->useragent_addr->port);
+                 }
+                 break;
+ 
+diff --git a/modules/metadata/mod_remoteip.c b/modules/metadata/mod_remoteip.c
+index aa9ae4e..1cb6715 100644
+--- a/modules/metadata/mod_remoteip.c
++++ b/modules/metadata/mod_remoteip.c
+@@ -51,8 +51,8 @@ typedef struct {
+ } remoteip_config_t;
+ 
+ typedef struct {
+-    apr_sockaddr_t *client_addr;
+-    char *client_ip;
++    apr_sockaddr_t *useragent_addr;
++    char *useragent_ip;
+     /** The list of proxy ip's ignored as remote ip's */
+     const char *proxy_ips;
+     /** The remaining list of untrusted proxied remote ip's */
+@@ -367,8 +367,8 @@ static int remoteip_modify_request(request_rec *r)
+             }
+         }
+ 
+-        req->client_addr = temp_sa;
+-        apr_sockaddr_ip_get(&req->client_ip, req->client_addr);
++        req->useragent_addr = temp_sa;
++        apr_sockaddr_ip_get(&req->useragent_ip, req->useragent_addr);
+     }
+ 
+     /* Nothing happened? */
+@@ -394,14 +394,14 @@ static int remoteip_modify_request(request_rec *r)
+         }
+     }
+ 
+-    r->client_addr = req->client_addr;
+-    r->client_ip = req->client_ip;
++    r->useragent_addr = req->useragent_addr;
++    r->useragent_ip = req->useragent_ip;
+ 
+     ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                   req->proxy_ips
+                       ? "Using %s as client's IP by proxies %s"
+                       : "Using %s as client's IP by internal proxies",
+-                  req->client_ip, req->proxy_ips);
++                  req->useragent_ip, req->proxy_ips);
+     return OK;
+ }
+ 
+diff --git a/modules/metadata/mod_setenvif.c b/modules/metadata/mod_setenvif.c
+index dbbf34d..80825cc 100644
+--- a/modules/metadata/mod_setenvif.c
++++ b/modules/metadata/mod_setenvif.c
+@@ -527,7 +527,7 @@ static int match_headers(request_rec *r)
+                 last_name = b->name;
+                 switch (b->special_type) {
+                 case SPECIAL_REMOTE_ADDR:
+-                    val = r->client_ip;
++                    val = r->useragent_ip;
+                     break;
+                 case SPECIAL_SERVER_ADDR:
+                     val = r->connection->local_ip;
+diff --git a/modules/proxy/ajp_header.c b/modules/proxy/ajp_header.c
+index 4c7aad0..e7e1696 100644
+--- a/modules/proxy/ajp_header.c
++++ b/modules/proxy/ajp_header.c
+@@ -247,7 +247,7 @@ static apr_status_t ajp_marshal_into_msgb(ajp_msg_t *msg,
+         ajp_msg_append_uint8(msg, (apr_byte_t) method)           ||
+         ajp_msg_append_string(msg, r->protocol)                  ||
+         ajp_msg_append_string(msg, uri->path)                    ||
+-        ajp_msg_append_string(msg, r->client_ip)                 ||
++        ajp_msg_append_string(msg, r->useragent_ip)              ||
+         ajp_msg_append_string(msg, remote_host)                  ||
+         ajp_msg_append_string(msg, ap_get_server_name(r))        ||
+         ajp_msg_append_uint16(msg, (apr_uint16_t)r->connection->local_addr->port) ||
+@@ -413,7 +413,7 @@ static apr_status_t ajp_marshal_into_msgb(ajp_msg_t *msg,
+      */
+     {
+         const char *key = SC_A_REQ_REMOTE_PORT;
+-        char *val = apr_itoa(r->pool, r->client_addr->port);
++        char *val = apr_itoa(r->pool, r->useragent_addr->port);
+         if (ajp_msg_append_uint8(msg, SC_A_REQ_ATTRIBUTE) ||
+             ajp_msg_append_string(msg, key)   ||
+             ajp_msg_append_string(msg, val)) {
+diff --git a/modules/proxy/mod_proxy_http.c b/modules/proxy/mod_proxy_http.c
+index f339ec1..7822366 100644
+--- a/modules/proxy/mod_proxy_http.c
++++ b/modules/proxy/mod_proxy_http.c
+@@ -908,7 +908,7 @@ int ap_proxy_http_request(apr_pool_t *p, request_rec *r,
+             * determine, where the original request came from.
+             */
+            apr_table_mergen(r->headers_in, "X-Forwarded-For",
+-                            r->client_ip);
++                            r->useragent_ip);
+ 
+            /* Add X-Forwarded-Host: so that upstream knows what the
+             * original request hostname was.
+@@ -1295,8 +1295,8 @@ static request_rec *make_fake_req(conn_rec *c, request_rec *r)
+     rp->input_filters   = c->input_filters;
+     rp->proto_output_filters  = c->output_filters;
+     rp->proto_input_filters   = c->input_filters;
+-    rp->client_ip = c->peer_ip;
+-    rp->client_addr = c->peer_addr;
++    rp->useragent_ip = c->peer_ip;
++    rp->useragent_addr = c->peer_addr;
+ 
+     rp->request_config  = ap_create_request_config(pool);
+     proxy_run_create_req(r, rp);
+diff --git a/modules/ssl/ssl_engine_kernel.c b/modules/ssl/ssl_engine_kernel.c
+index 3165da9..a470393 100644
+--- a/modules/ssl/ssl_engine_kernel.c
++++ b/modules/ssl/ssl_engine_kernel.c
+@@ -918,7 +918,7 @@ int ssl_hook_Access(request_rec *r)
+             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, APLOGNO(02266)
+                           "Access to %s denied for %s "
+                           "(requirement expression not fulfilled)",
+-                          r->filename, r->client_ip);
++                          r->filename, r->useragent_ip);
+ 
+             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, APLOGNO(02228)
+                           "Failed expression: %s", req->cpExpr);
+diff --git a/modules/ssl/ssl_engine_vars.c b/modules/ssl/ssl_engine_vars.c
+index 0d0be67..3815cd4 100644
+--- a/modules/ssl/ssl_engine_vars.c
++++ b/modules/ssl/ssl_engine_vars.c
+@@ -188,7 +188,7 @@ char *ssl_var_lookup(apr_pool_t *p, server_rec *s, conn_rec *c, request_rec *r,
+             else if (strcEQ(var, "REQUEST_FILENAME"))
+                 result = r->filename;
+             else if (strcEQ(var, "REMOTE_ADDR"))
+-                result = r->client_ip;
++                result = r->useragent_ip;
+             else if (strcEQ(var, "REMOTE_HOST"))
+                 result = ap_get_remote_host(r->connection, r->per_dir_config,
+                                             REMOTE_NAME, NULL);

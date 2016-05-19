@@ -1,0 +1,1062 @@
+commit 39d20ff3b3d442e50058cc74f62964f39331f51f
+Author: Rainer Jung <rjung@apache.org>
+Date:   Tue Jan 19 12:02:41 2016 +0000
+
+    Added many log numbers to log statements that
+    had none.
+    
+    Those were not detected by the coccinelle script.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1725485 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 5dfebb5..78a9468 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -1842,8 +1842,8 @@ static int authnz_ldap_post_config(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *
+     {
+         if (!util_ldap_ssl_supported(s))
+         {
+-            ap_log_error(APLOG_MARK, APLOG_CRIT, 0, s,
+-                     "LDAP: SSL connections (ldaps://) not supported by utilLDAP");
++            ap_log_error(APLOG_MARK, APLOG_CRIT, 0, s, APLOGNO(03159)
++                         "LDAP: SSL connections (ldaps://) not supported by utilLDAP");
+             return(!OK);
+         }
+     }
+diff --git a/modules/arch/unix/mod_privileges.c b/modules/arch/unix/mod_privileges.c
+index a68b3bf..fede3d8 100644
+--- a/modules/arch/unix/mod_privileges.c
++++ b/modules/arch/unix/mod_privileges.c
+@@ -34,8 +34,8 @@
+     apr_strerror(errno, msgbuf, sizeof(msgbuf)); \
+     return apr_pstrdup(cmd->pool, msgbuf); \
+ }
+-#define CR_CHECK(x) if (x == -1) \
+-    ap_log_error(APLOG_MARK, APLOG_CRIT, errno, 0, \
++#define CR_CHECK(x, y) if (x == -1) \
++    ap_log_error(APLOG_MARK, APLOG_CRIT, errno, 0, y \
+                  "Failed to initialise privileges")
+ 
+ module AP_MODULE_DECLARE_DATA privileges_module;
+@@ -87,17 +87,17 @@ static void *privileges_create_cfg(apr_pool_t *pool, server_rec *s)
+     /* By default, run in secure vhost mode.
+      * That means dropping basic privileges we don't usually need.
+      */
+-    CR_CHECK(priv_delset(cfg->priv, PRIV_FILE_LINK_ANY));
+-    CR_CHECK(priv_delset(cfg->priv, PRIV_PROC_INFO));
+-    CR_CHECK(priv_delset(cfg->priv, PRIV_PROC_SESSION));
++    CR_CHECK(priv_delset(cfg->priv, PRIV_FILE_LINK_ANY), APLOGNO(03160));
++    CR_CHECK(priv_delset(cfg->priv, PRIV_PROC_INFO), APLOGNO(03161));
++    CR_CHECK(priv_delset(cfg->priv, PRIV_PROC_SESSION), APLOGNO(03162));
+ 
+ /* Hmmm, should CGI default to secure too ? */
+ /*
+-    CR_CHECK(priv_delset(cfg->child_priv, PRIV_FILE_LINK_ANY));
+-    CR_CHECK(priv_delset(cfg->child_priv, PRIV_PROC_INFO));
+-    CR_CHECK(priv_delset(cfg->child_priv, PRIV_PROC_SESSION));
+-    CR_CHECK(priv_delset(cfg->child_priv, PRIV_PROC_FORK));
+-    CR_CHECK(priv_delset(cfg->child_priv, PRIV_PROC_EXEC));
++    CR_CHECK(priv_delset(cfg->child_priv, PRIV_FILE_LINK_ANY), APLOGNO(03163));
++    CR_CHECK(priv_delset(cfg->child_priv, PRIV_PROC_INFO), APLOGNO(03164));
++    CR_CHECK(priv_delset(cfg->child_priv, PRIV_PROC_SESSION), APLOGNO(03165));
++    CR_CHECK(priv_delset(cfg->child_priv, PRIV_PROC_FORK), APLOGNO(03166));
++    CR_CHECK(priv_delset(cfg->child_priv, PRIV_PROC_EXEC), APLOGNO(03167));
+ */
+ 
+     /* we´ll use 0 for unset */
+@@ -362,16 +362,16 @@ static int privileges_postconf(apr_pool_t *pconf, apr_pool_t *plog,
+     if (dtrace_enabled) {
+         for (sp = s; sp != NULL; sp = sp->next) {
+             cfg = ap_get_module_config(sp->module_config, &privileges_module);
+-            CR_CHECK(priv_addset(cfg->priv, PRIV_DTRACE_KERNEL));
+-            CR_CHECK(priv_addset(cfg->priv, PRIV_DTRACE_PROC));
+-            CR_CHECK(priv_addset(cfg->priv, PRIV_DTRACE_USER));
+-            CR_CHECK(priv_addset(cfg->child_priv, PRIV_DTRACE_KERNEL));
+-            CR_CHECK(priv_addset(cfg->child_priv, PRIV_DTRACE_PROC));
+-            CR_CHECK(priv_addset(cfg->child_priv, PRIV_DTRACE_USER));
++            CR_CHECK(priv_addset(cfg->priv, PRIV_DTRACE_KERNEL), APLOGNO(03168));
++            CR_CHECK(priv_addset(cfg->priv, PRIV_DTRACE_PROC), APLOGNO(03169));
++            CR_CHECK(priv_addset(cfg->priv, PRIV_DTRACE_USER), APLOGNO(03170));
++            CR_CHECK(priv_addset(cfg->child_priv, PRIV_DTRACE_KERNEL), APLOGNO(03171));
++            CR_CHECK(priv_addset(cfg->child_priv, PRIV_DTRACE_PROC), APLOGNO(03172));
++            CR_CHECK(priv_addset(cfg->child_priv, PRIV_DTRACE_USER), APLOGNO(03173));
+         }
+-        CR_CHECK(priv_addset(priv_default, PRIV_DTRACE_KERNEL));
+-        CR_CHECK(priv_addset(priv_default, PRIV_DTRACE_PROC));
+-        CR_CHECK(priv_addset(priv_default, PRIV_DTRACE_USER));
++        CR_CHECK(priv_addset(priv_default, PRIV_DTRACE_KERNEL), APLOGNO(03174));
++        CR_CHECK(priv_addset(priv_default, PRIV_DTRACE_PROC), APLOGNO(03175));
++        CR_CHECK(priv_addset(priv_default, PRIV_DTRACE_USER), APLOGNO(03176));
+     }
+ 
+     /* set up priv_setid for per-request use */
+diff --git a/modules/arch/win32/mod_isapi.c b/modules/arch/win32/mod_isapi.c
+index 275d086..bd7cae7 100644
+--- a/modules/arch/win32/mod_isapi.c
++++ b/modules/arch/win32/mod_isapi.c
+@@ -933,8 +933,8 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+             rv = ap_pass_brigade(cid->r->output_filters, bb);
+             cid->response_sent = 1;
+             if (rv != APR_SUCCESS)
+-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r,
+-                              "ServerSupport function "
++                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r, APLOGNO(03177)
++                              "ServerSupportFunction "
+                               "HSE_REQ_SEND_RESPONSE_HEADER "
+                               "ap_pass_brigade failed: %s", r->filename);
+             return (rv == APR_SUCCESS);
+@@ -1135,8 +1135,8 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+         rv = ap_pass_brigade(r->output_filters, bb);
+         cid->response_sent = 1;
+         if (rv != APR_SUCCESS)
+-            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r,
+-                          "ServerSupport function "
++            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r, APLOGNO(03178)
++                          "ServerSupportFunction "
+                           "HSE_REQ_TRANSMIT_FILE "
+                           "ap_pass_brigade failed: %s", r->filename);
+ 
+@@ -1348,8 +1348,8 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+             rv = ap_pass_brigade(cid->r->output_filters, bb);
+             cid->response_sent = 1;
+             if (rv != APR_SUCCESS)
+-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r,
+-                              "ServerSupport function "
++                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r, APLOGNO(03179)
++                              "ServerSupportFunction "
+                               "HSE_REQ_SEND_RESPONSE_HEADER_EX "
+                               "ap_pass_brigade failed: %s", r->filename);
+             return (rv == APR_SUCCESS);
+diff --git a/modules/arch/win32/mod_win32.c b/modules/arch/win32/mod_win32.c
+index d9ef73c..bddc60d 100644
+--- a/modules/arch/win32/mod_win32.c
++++ b/modules/arch/win32/mod_win32.c
+@@ -423,8 +423,8 @@ static apr_status_t ap_cgi_build_command(const char **cmd, const char ***argv,
+         }
+         else {
+             ap_log_error(APLOG_MARK, APLOG_INFO, 0, r->server,
+-                 strict ? "No ExecCGI verb found for files of type '%s'."
+-                        : "No ExecCGI or Open verb found for files of type '%s'.",
++                 strict ? APLOGNO(03180) "No ExecCGI verb found for files of type '%s'."
++                        : APLOGNO(03181) "No ExecCGI or Open verb found for files of type '%s'.",
+                  ext);
+         }
+     }
+diff --git a/modules/cluster/mod_heartmonitor.c b/modules/cluster/mod_heartmonitor.c
+index 784e5dd..1389e27 100644
+--- a/modules/cluster/mod_heartmonitor.c
++++ b/modules/cluster/mod_heartmonitor.c
+@@ -155,7 +155,7 @@ static void qs_to_table(const char *input, apr_table_t *parms,
+         ap_unescape_url(value);
+         apr_table_set(parms, key, value);
+         /*
+-           ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
++           ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(03182)
+            "Found query arg: %s = %s", key, value);
+          */
+         key = apr_strtok(NULL, "&", &strtok_state);
+diff --git a/modules/dav/main/mod_dav.c b/modules/dav/main/mod_dav.c
+index 5787355..75b0881 100644
+--- a/modules/dav/main/mod_dav.c
++++ b/modules/dav/main/mod_dav.c
+@@ -558,6 +558,7 @@ static void dav_log_err(request_rec *r, dav_error *err, int level)
+         if (errscan->desc == NULL)
+             continue;
+ 
++        /* Intentional no APLOGNO */
+         ap_log_rerror(APLOG_MARK, level, errscan->aprerr, r, "%s  [%d, #%d]",
+                       errscan->desc, errscan->status, errscan->error_id);
+     }
+diff --git a/modules/debugging/mod_firehose.c b/modules/debugging/mod_firehose.c
+index d7e4ed9..1dfdd03 100644
+--- a/modules/debugging/mod_firehose.c
++++ b/modules/debugging/mod_firehose.c
+@@ -143,20 +143,12 @@ static apr_status_t pumpit_cleanup(void *dummy)
+             /* ignore the error */
+         }
+         else if (ctx->r) {
+-            ap_log_rerror(
+-                    APLOG_MARK,
+-                    APLOG_WARNING,
+-                    rv,
+-                    ctx->r,
++            ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, ctx->r, APLOGNO(03183)
+                     "mod_firehose: could not write %" APR_UINT64_T_FMT " bytes to '%s' for '%c' connection '%s' and count '%0" APR_UINT64_T_HEX_FMT "', bytes dropped (further errors will be suppressed)",
+                     (apr_uint64_t)(hdr_len), ctx->conn->filename, ctx->conn->direction, ctx->uuid, ctx->count);
+         }
+         else {
+-            ap_log_cerror(
+-                    APLOG_MARK,
+-                    APLOG_WARNING,
+-                    rv,
+-                    ctx->c,
++            ap_log_cerror(APLOG_MARK, APLOG_WARNING, rv, ctx->c, APLOGNO(03184)
+                     "mod_firehose: could not write %" APR_UINT64_T_FMT " bytes to '%s' for '%c' connection '%s' and count '%0" APR_UINT64_T_HEX_FMT "', bytes dropped (further errors will be suppressed)",
+                     (apr_uint64_t)(hdr_len), ctx->conn->filename, ctx->conn->direction, ctx->uuid, ctx->count);
+         }
+@@ -225,20 +217,12 @@ static apr_status_t pumpit(ap_filter_t *f, apr_bucket *b, firehose_ctx_t *ctx)
+                         /* ignore the error */
+                     }
+                     else if (ctx->r) {
+-                        ap_log_rerror(
+-                                APLOG_MARK,
+-                                APLOG_WARNING,
+-                                rv,
+-                                ctx->r,
++                        ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, ctx->r, APLOGNO(03185)
+                                 "mod_firehose: could not write %" APR_UINT64_T_FMT " bytes to '%s' for '%c' connection '%s' and count '%0" APR_UINT64_T_HEX_FMT "', bytes dropped (further errors will be suppressed)",
+                                 (apr_uint64_t)(vec[0].iov_len + vec[1].iov_len + vec[2].iov_len), ctx->conn->filename, ctx->conn->direction, ctx->uuid, ctx->count);
+                     }
+                     else {
+-                        ap_log_cerror(
+-                                APLOG_MARK,
+-                                APLOG_WARNING,
+-                                rv,
+-                                ctx->c,
++                        ap_log_cerror(APLOG_MARK, APLOG_WARNING, rv, ctx->c, APLOGNO(03186)
+                                 "mod_firehose: could not write %" APR_UINT64_T_FMT " bytes to '%s' for '%c' connection '%s' and count '%0" APR_UINT64_T_HEX_FMT "', bytes dropped (further errors will be suppressed)",
+                                 (apr_uint64_t)(vec[0].iov_len + vec[1].iov_len + vec[2].iov_len), ctx->conn->filename, ctx->conn->direction, ctx->uuid, ctx->count);
+                     }
+@@ -483,9 +467,7 @@ static int firehose_open_logs(apr_pool_t *p, apr_pool_t *plog,
+             if (APR_SUCCESS != (rv = apr_file_open(&conn->file, conn->filename,
+                     APR_FOPEN_WRITE | APR_FOPEN_CREATE | APR_FOPEN_APPEND
+                             | conn->nonblock, APR_OS_DEFAULT, plog))) {
+-                ap_log_error(APLOG_MARK,
+-                        APLOG_WARNING,
+-                        rv, s, APLOGNO(02990)
++                ap_log_error(APLOG_MARK, APLOG_WARNING, rv, s, APLOGNO(02990)
+                         "mod_firehose: could not open '%s' for write, disabling firehose %s%s %s filter",
+                         conn->filename, conn->proxy == FIREHOSE_PROXY ? "proxy " : "",
+                         conn->request == FIREHOSE_REQUEST ? " request" : "connection",
+diff --git a/modules/examples/mod_example_ipc.c b/modules/examples/mod_example_ipc.c
+index 9685f8f..6f48a84 100644
+--- a/modules/examples/mod_example_ipc.c
++++ b/modules/examples/mod_example_ipc.c
+@@ -284,7 +284,7 @@ static int exipc_handler(request_rec *r)
+          * and returned BUSY. So, bump the time and try again
+          */
+         timecamped += CAMPOUT;
+-        ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server,
++        ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server, APLOGNO(03187)
+                      "Child %ld camping out on mutex for %" APR_INT64_T_FMT
+                      " microseconds",
+                      (long int) getpid(), timecamped);
+diff --git a/modules/filters/mod_include.c b/modules/filters/mod_include.c
+index 9c84806..2e24b0d 100644
+--- a/modules/filters/mod_include.c
++++ b/modules/filters/mod_include.c
+@@ -1168,7 +1168,7 @@ static int parse_expr(include_ctx_t *ctx, const char *expr, int *was_error)
+     parse_node_t *new, *root = NULL, *current = NULL;
+     request_rec *r = ctx->r;
+     request_rec *rr = NULL;
+-    const char *error = "Invalid expression \"%s\" in file %s";
++    const char *error = APLOGNO(03188) "Invalid expression \"%s\" in file %s";
+     const char *parse = expr;
+     unsigned regex = 0;
+ 
+@@ -1209,6 +1209,8 @@ static int parse_expr(include_ctx_t *ctx, const char *expr, int *was_error)
+                 continue;
+ 
+             default:
++                /* Intentional no APLOGNO */
++                /* error text provides APLOGNO */
+                 ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, error, expr,
+                               r->filename);
+                 *was_error = 1;
+@@ -1334,7 +1336,7 @@ static int parse_expr(include_ctx_t *ctx, const char *expr, int *was_error)
+                 continue;
+             }
+ 
+-            error = "Unmatched ')' in \"%s\" in file %s";
++            error = APLOGNO(03189) "Unmatched ')' in \"%s\" in file %s";
+             break;
+ 
+         case TOKEN_NOT:
+@@ -1359,6 +1361,8 @@ static int parse_expr(include_ctx_t *ctx, const char *expr, int *was_error)
+             break;
+         }
+ 
++        /* Intentional no APLOGNO */
++        /* error text provides APLOGNO */
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, error, expr, r->filename);
+         *was_error = 1;
+         return 0;
+@@ -1555,18 +1559,20 @@ static int parse_expr(include_ctx_t *ctx, const char *expr, int *was_error)
+ 
+         case TOKEN_RE:
+             if (!error) {
+-                error = "No operator before regex in expr \"%s\" in file %s";
++                error = APLOGNO(03190) "No operator before regex in expr \"%s\" in file %s";
+             }
+         case TOKEN_LBRACE:
+             if (!error) {
+-                error = "Unmatched '(' in \"%s\" in file %s";
++                error = APLOGNO(03191) "Unmatched '(' in \"%s\" in file %s";
+             }
+         default:
+             if (!error) {
+-                error = "internal parser error in \"%s\" in file %s";
++                error = APLOGNO(03192) "internal parser error in \"%s\" in file %s";
+             }
+ 
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, error, expr,r->filename);
++            /* Intentional no APLOGNO */
++            /* error text provides APLOGNO */
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, error, expr, r->filename);
+             *was_error = 1;
+             return 0;
+         }
+@@ -1720,6 +1726,8 @@ static int find_file(request_rec *r, const char *directive, const char *tag,
+ 
+         if (error_fmt) {
+             ret = -1;
++            /* Intentional no APLOGNO */
++            /* error_fmt provides APLOGNO */
+             ap_log_rerror(APLOG_MARK, APLOG_ERR,
+                           rv, r, error_fmt, to_send, r->filename);
+         }
+@@ -1864,6 +1872,8 @@ static apr_status_t handle_include(include_ctx_t *ctx, ap_filter_t *f,
+         }
+ 
+         if (error_fmt) {
++            /* Intentional no APLOGNO */
++            /* error text is also sent to client */
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, error_fmt, tag_val,
+                     r->filename, status ? status : rr ? rr->status : 0);
+             if (last_error) {
+diff --git a/modules/filters/mod_ratelimit.c b/modules/filters/mod_ratelimit.c
+index 7b26eda..a2e9bd0 100644
+--- a/modules/filters/mod_ratelimit.c
++++ b/modules/filters/mod_ratelimit.c
+@@ -48,7 +48,7 @@ static void brigade_dump(request_rec *r, apr_bucket_brigade *bb)
+ 
+     for (e = APR_BRIGADE_FIRST(bb);
+          e != APR_BRIGADE_SENTINEL(bb); e = APR_BUCKET_NEXT(e), i++) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(03193)
+                       "brigade: [%d] %s", i, e->type->name);
+ 
+     }
+diff --git a/modules/generators/mod_cgi.c b/modules/generators/mod_cgi.c
+index 7c70119..28d93c5 100644
+--- a/modules/generators/mod_cgi.c
++++ b/modules/generators/mod_cgi.c
+@@ -169,6 +169,8 @@ static int log_scripterror(request_rec *r, cgi_server_conf * conf, int ret,
+     char time_str[APR_CTIME_LEN];
+     int log_flags = rv ? APLOG_ERR : APLOG_ERR;
+ 
++    /* Intentional no APLOGNO */
++    /* Callee provides APLOGNO in error text */
+     ap_log_rerror(APLOG_MARK, log_flags, rv, r,
+                   "%s%s: %s", logno ? logno : "", error, r->filename);
+ 
+@@ -458,6 +460,7 @@ static apr_status_t run_cgi_child(apr_file_t **script_out,
+ 
+         if (rc != APR_SUCCESS) {
+             /* Bad things happened. Everyone should have cleaned up. */
++            /* Intentional no APLOGNO */
+             ap_log_rerror(APLOG_MARK, APLOG_ERR|APLOG_TOCLIENT, rc, r,
+                           "couldn't create child process: %d: %s", rc,
+                           apr_filepath_name_get(r->filename));
+@@ -797,7 +800,7 @@ static int cgi_handler(request_rec *r)
+ /*
+     if (!ap_suexec_enabled) {
+         if (!ap_can_exec(&r->finfo))
+-            return log_scripterror(r, conf, HTTP_FORBIDDEN, 0,
++            return log_scripterror(r, conf, HTTP_FORBIDDEN, 0, APLOGNO(03194)
+                                    "file permissions deny server execution");
+     }
+ 
+@@ -1166,8 +1169,8 @@ static apr_status_t handle_exec(include_ctx_t *ctx, ap_filter_t *f,
+         ap_log_rerror(APLOG_MARK,
+                       (ctx->flags & SSI_FLAG_PRINTING)
+                           ? APLOG_ERR : APLOG_WARNING,
+-                      0, r, "missing argument for exec element in %s",
+-                      r->filename);
++                      0, r, APLOGNO(03195)
++                      "missing argument for exec element in %s", r->filename);
+     }
+ 
+     if (!(ctx->flags & SSI_FLAG_PRINTING)) {
+diff --git a/modules/generators/mod_cgid.c b/modules/generators/mod_cgid.c
+index 020093c..4b2585e 100644
+--- a/modules/generators/mod_cgid.c
++++ b/modules/generators/mod_cgid.c
+@@ -1072,6 +1072,8 @@ static int log_scripterror(request_rec *r, cgid_server_conf * conf, int ret,
+     char time_str[APR_CTIME_LEN];
+     int log_flags = rv ? APLOG_ERR : APLOG_ERR;
+ 
++    /* Intentional no APLOGNO */
++    /* Callee provides APLOGNO in error text */
+     ap_log_rerror(APLOG_MARK, log_flags, rv, r,
+                 "%s: %s", error, r->filename);
+ 
+@@ -1865,8 +1867,8 @@ static apr_status_t handle_exec(include_ctx_t *ctx, ap_filter_t *f,
+         ap_log_rerror(APLOG_MARK,
+                       (ctx->flags & SSI_FLAG_PRINTING)
+                           ? APLOG_ERR : APLOG_WARNING,
+-                      0, r, "missing argument for exec element in %s",
+-                      r->filename);
++                      0, r, APLOGNO(03196)
++                      "missing argument for exec element in %s", r->filename);
+     }
+ 
+     if (!(ctx->flags & SSI_FLAG_PRINTING)) {
+diff --git a/modules/http2/h2_from_h1.c b/modules/http2/h2_from_h1.c
+index e9b2fe3..59ee655 100644
+--- a/modules/http2/h2_from_h1.c
++++ b/modules/http2/h2_from_h1.c
+@@ -77,7 +77,7 @@ static apr_status_t make_h2_headers(h2_from_h1 *from_h1, request_rec *r)
+     from_h1->content_length = from_h1->response->content_length;
+     from_h1->chunked = r->chunked;
+     
+-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, r->connection,
++    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, r->connection, APLOGNO(03197)
+                   "h2_from_h1(%d): converted headers, content-length: %d"
+                   ", chunked=%d",
+                   from_h1->stream_id, (int)from_h1->content_length, 
+diff --git a/modules/http2/h2_mplx.c b/modules/http2/h2_mplx.c
+index a9f305b..2120185 100644
+--- a/modules/http2/h2_mplx.c
++++ b/modules/http2/h2_mplx.c
+@@ -300,7 +300,7 @@ apr_status_t h2_mplx_release_and_join(h2_mplx *m, apr_thread_cond_t *wait)
+                      * If we exit now, all will be deallocated and the worker, once 
+                      * it does return, will walk all over freed memory...
+                      */
+-                    ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, m->c,
++                    ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, m->c, APLOGNO(03198)
+                                   "h2_mplx(%ld): release, waiting for %d seconds now for "
+                                   "all h2_workers to return, have still %d requests outstanding", 
+                                   m->id, i*wait_secs, (int)h2_io_set_size(m->stream_ios));
+diff --git a/modules/http2/h2_push.c b/modules/http2/h2_push.c
+index 89dd2dc..d69c1e7 100644
+--- a/modules/http2/h2_push.c
++++ b/modules/http2/h2_push.c
+@@ -624,6 +624,7 @@ static void h2_push_diary_append(h2_push_diary *diary, h2_push_diary_entry *e)
+         ne = move_to_last(diary, 0);
+         *ne = *e;
+     }
++    /* Intentional no APLOGNO */
+     ap_log_perror(APLOG_MARK, GCSLOG_LEVEL, 0, diary->entries->pool,
+                   "push_diary_append: %"APR_UINT64_T_HEX_FMT, ne->hash);
+ }
+@@ -644,11 +645,13 @@ apr_array_header_t *h2_push_diary_update(h2_session *session, apr_array_header_t
+             session->push_diary->dcalc(session->push_diary, &e.hash, push);
+             idx = h2_push_diary_find(session->push_diary, e.hash);
+             if (idx >= 0) {
++                /* Intentional no APLOGNO */
+                 ap_log_cerror(APLOG_MARK, GCSLOG_LEVEL, 0, session->c,
+                               "push_diary_update: already there PUSH %s", push->req->path);
+                 move_to_last(session->push_diary, idx);
+             }
+             else {
++                /* Intentional no APLOGNO */
+                 ap_log_cerror(APLOG_MARK, GCSLOG_LEVEL, 0, session->c,
+                               "push_diary_update: adding PUSH %s", push->req->path);
+                 if (!npushes) {
+@@ -788,6 +791,7 @@ static apr_status_t gset_encode_next(gset_encoder *encoder, apr_uint64_t pval)
+     delta = pval - encoder->last;
+     encoder->last = pval;
+     flex_bits = (delta >> encoder->fixed_bits);
++    /* Intentional no APLOGNO */
+     ap_log_perror(APLOG_MARK, GCSLOG_LEVEL, 0, encoder->pool,
+                   "h2_push_diary_enc: val=%"APR_UINT64_T_HEX_FMT", delta=%"
+                   APR_UINT64_T_HEX_FMT" flex_bits=%" APR_UINT64_T_FMT
+@@ -866,6 +870,7 @@ apr_status_t h2_push_diary_digest_get(h2_push_diary *diary, apr_pool_t *pool,
+     encoder.bit = 8;
+     encoder.last = 0;
+     
++    /* Intentional no APLOGNO */
+     ap_log_perror(APLOG_MARK, GCSLOG_LEVEL, 0, pool,
+                   "h2_push_diary_digest_get: %d entries, N=%d, log2n=%d, "
+                   "mask_bits=%d, enc.mask_bits=%d, delta_bits=%d, enc.log2p=%d, authority=%s", 
+@@ -888,6 +893,7 @@ apr_status_t h2_push_diary_digest_get(h2_push_diary *diary, apr_pool_t *pool,
+                 gset_encode_next(&encoder, hashes[i]);
+             }
+         }
++        /* Intentional no APLOGNO */
+         ap_log_perror(APLOG_MARK, GCSLOG_LEVEL, 0, pool,
+                       "h2_push_diary_digest_get: golomb compressed hashes, %d bytes",
+                       (int)encoder.offset + 1);
+@@ -952,6 +958,7 @@ static apr_status_t gset_decode_next(gset_decoder *decoder, apr_uint64_t *phash)
+     *phash = delta + decoder->last_val;
+     decoder->last_val = *phash;
+     
++    /* Intentional no APLOGNO */
+     ap_log_perror(APLOG_MARK, GCSLOG_LEVEL, 0, decoder->pool,
+                   "h2_push_diary_digest_dec: val=%"APR_UINT64_T_HEX_FMT", delta=%"
+                   APR_UINT64_T_HEX_FMT", flex=%d, fixed=%"APR_UINT64_T_HEX_FMT, 
+@@ -1026,6 +1033,7 @@ apr_status_t h2_push_diary_digest_set(h2_push_diary *diary, const char *authorit
+         diary->N = diary->NMax;
+     }
+     
++    /* Intentional no APLOGNO */
+     ap_log_perror(APLOG_MARK, GCSLOG_LEVEL, 0, pool,
+                   "h2_push_diary_digest_set: N=%d, log2n=%d, "
+                   "diary->mask_bits=%d, dec.log2p=%d", 
+@@ -1040,6 +1048,7 @@ apr_status_t h2_push_diary_digest_set(h2_push_diary *diary, const char *authorit
+         h2_push_diary_append(diary, &e);
+     }
+     
++    /* Intentional no APLOGNO */
+     ap_log_perror(APLOG_MARK, GCSLOG_LEVEL, 0, pool,
+                   "h2_push_diary_digest_set: diary now with %d entries, mask_bits=%d", 
+                   (int)diary->entries->nelts, diary->mask_bits);
+@@ -1051,6 +1060,7 @@ apr_status_t h2_push_diary_digest64_set(h2_push_diary *diary, const char *author
+ {
+     const char *data;
+     apr_size_t len = h2_util_base64url_decode(&data, data64url, pool);
++    /* Intentional no APLOGNO */
+     ap_log_perror(APLOG_MARK, GCSLOG_LEVEL, 0, pool,
+                   "h2_push_diary_digest64_set: digest=%s, dlen=%d", 
+                   data64url, (int)len);
+diff --git a/modules/http2/h2_session.c b/modules/http2/h2_session.c
+index 1b527f4..b0100fa 100644
+--- a/modules/http2/h2_session.c
++++ b/modules/http2/h2_session.c
+@@ -732,7 +732,7 @@ static apr_status_t session_pool_cleanup(void *data)
+          * connection when sending the next request, this has the effect
+          * that at least this one request will fail.
+          */
+-        ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, session->c,
++        ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, session->c, APLOGNO(03199)
+                       "session(%ld): connection disappeared without proper "
+                       "goodbye, clients will be confused, should not happen", 
+                       session->id);
+@@ -895,7 +895,7 @@ static h2_session *h2_session_create_int(conn_rec *c,
+         session->push_diary = h2_push_diary_create(session->pool, n);
+         
+         if (APLOGcdebug(c)) {
+-            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
++            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, APLOGNO(03200)
+                           "session(%ld) created, timeout=%d, keepalive_timeout=%d, "
+                           "max_streams=%d, stream_mem=%d, push_diary(type=%d,N=%d)",
+                           session->id, session->timeout_secs, session->keepalive_secs,
+@@ -1000,7 +1000,7 @@ static apr_status_t h2_session_start(h2_session *session, int *rv)
+         ++slen;
+     }
+     
+-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, status, session->c,
++    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, status, session->c, APLOGNO(03201)
+                   "h2_session(%ld): start, INITIAL_WINDOW_SIZE=%ld, "
+                   "MAX_CONCURRENT_STREAMS=%d", 
+                   session->id, (long)win_size, (int)session->max_stream_count);
+@@ -1402,7 +1402,7 @@ apr_status_t h2_session_set_prio(h2_session *session, h2_stream *stream,
+                 id_grandpa = nghttp2_stream_get_stream_id(s_grandpa);
+                 rv = nghttp2_session_change_stream_priority(session->ngh2, id_parent, &ps);
+                 if (rv < 0) {
+-                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, session->c,
++                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, session->c, APLOGNO(03202)
+                                   "h2_stream(%ld-%d): PUSH BEFORE, weight=%d, "
+                                   "depends=%d, returned=%d",
+                                   session->id, id_parent, ps.weight, ps.stream_id, rv);
+@@ -1424,7 +1424,7 @@ apr_status_t h2_session_set_prio(h2_session *session, h2_stream *stream,
+ 
+ 
+         rv = nghttp2_session_change_stream_priority(session->ngh2, stream->id, &ps);
+-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, session->c,
++        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, session->c, APLOGNO(03203)
+                       "h2_stream(%ld-%d): PUSH %s, weight=%d, "
+                       "depends=%d, returned=%d",
+                       session->id, stream->id, ptype, 
+diff --git a/modules/http2/h2_task_output.c b/modules/http2/h2_task_output.c
+index 1d097ab..2bbac1c 100644
+--- a/modules/http2/h2_task_output.c
++++ b/modules/http2/h2_task_output.c
+@@ -69,7 +69,7 @@ static apr_status_t open_if_needed(h2_task_output *output, ap_filter_t *f,
+                 /* This happens currently when ap_die(status, r) is invoked
+                  * by a read request filter.
+                  */
+-                ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, f->c,
++                ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, f->c, APLOGNO(03204)
+                               "h2_task_output(%s): write without response "
+                               "for %s %s %s",
+                               output->task->id, output->task->request->method, 
+diff --git a/modules/http2/h2_util.c b/modules/http2/h2_util.c
+index 47e7084..8db68a2 100644
+--- a/modules/http2/h2_util.c
++++ b/modules/http2/h2_util.c
+@@ -341,7 +341,7 @@ apr_status_t h2_util_move(apr_bucket_brigade *to, apr_bucket_brigade *from,
+                 APR_BUCKET_REMOVE(b);
+                 APR_BRIGADE_INSERT_TAIL(to, b);
+ #if LOG_BUCKETS
+-                ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p,
++                ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p, APLOGNO(03205)
+                               "h2_util_move: %s, passed bucket(same bucket_alloc) "
+                               "%ld-%ld, type=%s",
+                               msg, (long)b->start, (long)b->length, 
+@@ -379,7 +379,7 @@ apr_status_t h2_util_move(apr_bucket_brigade *to, apr_bucket_brigade *from,
+                     apr_file_t *fd = f->fd;
+                     int setaside = (f->readpool != to->p);
+ #if LOG_BUCKETS
+-                    ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p,
++                    ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p, APLOGNO(03206)
+                                   "h2_util_move: %s, moving FILE bucket %ld-%ld "
+                                   "from=%lx(p=%lx) to=%lx(p=%lx), setaside=%d",
+                                   msg, (long)b->start, (long)b->length, 
+@@ -406,7 +406,7 @@ apr_status_t h2_util_move(apr_bucket_brigade *to, apr_bucket_brigade *from,
+                     if (status == APR_SUCCESS && len > 0) {
+                         status = apr_brigade_write(to, NULL, NULL, data, len);
+ #if LOG_BUCKETS
+-                        ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p,
++                        ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p, APLOGNO(03207)
+                                       "h2_util_move: %s, copied bucket %ld-%ld "
+                                       "from=%lx(p=%lx) to=%lx(p=%lx)",
+                                       msg, (long)b->start, (long)b->length, 
+@@ -422,7 +422,7 @@ apr_status_t h2_util_move(apr_bucket_brigade *to, apr_bucket_brigade *from,
+                 APR_BUCKET_REMOVE(b);
+                 APR_BRIGADE_INSERT_TAIL(to, b);
+ #if LOG_BUCKETS
+-                ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p,
++                ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p, APLOGNO(03208)
+                               "h2_util_move: %s, passed setaside bucket %ld-%ld "
+                               "from=%lx(p=%lx) to=%lx(p=%lx)",
+                               msg, (long)b->start, (long)b->length, 
+@@ -485,7 +485,7 @@ apr_status_t h2_util_copy(apr_bucket_brigade *to, apr_bucket_brigade *from,
+                     if (status == APR_SUCCESS && len > 0) {
+                         status = apr_brigade_write(to, NULL, NULL, data, len);
+ #if LOG_BUCKETS                        
+-                        ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p,
++                        ap_log_perror(APLOG_MARK, LOG_LEVEL, 0, to->p, APLOGNO(03209)
+                                       "h2_util_copy: %s, copied bucket %ld-%ld "
+                                       "from=%lx(p=%lx) to=%lx(p=%lx)",
+                                       msg, (long)b->start, (long)b->length, 
+@@ -737,6 +737,7 @@ void h2_util_bb_log(conn_rec *c, int stream_id, int level,
+         }
+         line = *buffer? buffer : "(empty)";
+     }
++    /* Intentional no APLOGNO */
+     ap_log_cerror(APLOG_MARK, level, 0, c, "bb_dump(%ld-%d)-%s: %s", 
+                   c->id, stream_id, tag, line);
+ 
+diff --git a/modules/lua/lua_request.c b/modules/lua/lua_request.c
+index bf66fc4..2364791 100644
+--- a/modules/lua/lua_request.c
++++ b/modules/lua/lua_request.c
+@@ -2315,12 +2315,12 @@ static int lua_websocket_read(lua_State *L)
+                         return 0;
+                     }
+                 }
+-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
+-                        "Websocket: Reading %" APR_SIZE_T_FMT " (%s) bytes, masking is %s. %s", 
+-                        plen,
+-                        (payload >= 126) ? "extra payload" : "no extra payload", 
+-                        mask ? "on" : "off", 
+-                        fin ? "This is a final frame" : "more to follow");
++                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(03210)
++                              "Websocket: Reading %" APR_SIZE_T_FMT " (%s) bytes, masking is %s. %s", 
++                              plen,
++                              (payload >= 126) ? "extra payload" : "no extra payload", 
++                              mask ? "on" : "off", 
++                              fin ? "This is a final frame" : "more to follow");
+                 if (mask) {
+                     len = 4;
+                     if (plaintext) {
+diff --git a/modules/lua/lua_vmprep.c b/modules/lua/lua_vmprep.c
+index 311fab8..925f2b3 100644
+--- a/modules/lua/lua_vmprep.c
++++ b/modules/lua/lua_vmprep.c
+@@ -69,59 +69,65 @@ static void pstack_dump(lua_State *L, apr_pool_t *r, int level,
+     int i;
+     int top = lua_gettop(L);
+ 
+-    ap_log_perror(APLOG_MARK, level, 0, r, "Lua Stack Dump: [%s]", msg);
++    ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03211)
++                  "Lua Stack Dump: [%s]", msg);
+ 
+     for (i = 1; i <= top; i++) {
+         int t = lua_type(L, i);
+         switch (t) {
+         case LUA_TSTRING:{
+-                ap_log_perror(APLOG_MARK, level, 0, r,
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03212)
+                               "%d:  '%s'", i, lua_tostring(L, i));
+                 break;
+             }
+         case LUA_TUSERDATA:{
+-                ap_log_perror(APLOG_MARK, level, 0, r, "%d:  userdata", i);
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03213)
++                              "%d:  userdata", i);
+                 break;
+             }
+         case LUA_TLIGHTUSERDATA:{
+-                ap_log_perror(APLOG_MARK, level, 0, r, "%d:  lightuserdata",
+-                              i);
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03214)
++                              "%d:  lightuserdata", i);
+                 break;
+             }
+         case LUA_TNIL:{
+-                ap_log_perror(APLOG_MARK, level, 0, r, "%d:  NIL", i);
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03215)
++                              "%d:  NIL", i);
+                 break;
+             }
+         case LUA_TNONE:{
+-                ap_log_perror(APLOG_MARK, level, 0, r, "%d:  None", i);
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03216)
++                              "%d:  None", i);
+                 break;
+             }
+         case LUA_TBOOLEAN:{
+-                ap_log_perror(APLOG_MARK, level, 0, r,
+-                              "%d:  %s", i, lua_toboolean(L,
+-                                                          i) ? "true" :
+-                              "false");
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03217)
++                              "%d:  %s",
++                              i, lua_toboolean(L, i) ? "true" : "false");
+                 break;
+             }
+         case LUA_TNUMBER:{
+-                ap_log_perror(APLOG_MARK, level, 0, r,
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03218)
+                               "%d:  %g", i, lua_tonumber(L, i));
+                 break;
+             }
+         case LUA_TTABLE:{
+-                ap_log_perror(APLOG_MARK, level, 0, r, "%d:  <table>", i);
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03219)
++                              "%d:  <table>", i);
+                 break;
+             }
+         case LUA_TTHREAD:{
+-                ap_log_perror(APLOG_MARK, level, 0, r, "%d:  <thread>", i);
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03220)
++                              "%d:  <thread>", i);
+                 break;
+             }
+         case LUA_TFUNCTION:{
+-                ap_log_perror(APLOG_MARK, level, 0, r, "%d:  <function>", i);
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03221)
++                              "%d:  <function>", i);
+                 break;
+             }
+         default:{
+-                ap_log_perror(APLOG_MARK, level, 0, r,
++                ap_log_perror(APLOG_MARK, level, 0, r, APLOGNO(03222)
+                               "%d:  unknown: [%s]", i, lua_typename(L, i));
+                 break;
+             }
+diff --git a/modules/lua/mod_lua.c b/modules/lua/mod_lua.c
+index 6eede23..dcb38e3 100644
+--- a/modules/lua/mod_lua.c
++++ b/modules/lua/mod_lua.c
+@@ -1256,7 +1256,8 @@ static int lua_auth_checker_harness_last(request_rec *r)
+ }
+ static void lua_insert_filter_harness(request_rec *r)
+ {
+-    /* ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "LuaHookInsertFilter not yet implemented"); */
++    /* ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, APLOGNO(03223)
++     *               "LuaHookInsertFilter not yet implemented"); */
+ }
+ 
+ static int lua_log_transaction_harness(request_rec *r)
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 83b0104..95f1d70 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -481,6 +481,7 @@ static void do_rewritelog(request_rec *r, int level, char *perdir,
+ 
+     AP_REWRITE_LOG((uintptr_t)r, level, r->main ? 0 : 1, (char *)ap_get_server_name(r), logline);
+ 
++    /* Intentional no APLOGNO */
+     ap_log_rerror(APLOG_MARK, APLOG_DEBUG + level, 0, r, "%s", logline);
+ 
+     return;
+diff --git a/modules/mappers/mod_speling.c b/modules/mappers/mod_speling.c
+index 4d8a942..ea2bdbc 100644
+--- a/modules/mappers/mod_speling.c
++++ b/modules/mappers/mod_speling.c
+@@ -390,8 +390,8 @@ static int check_speling(request_rec *r)
+ 
+             ap_log_rerror(APLOG_MARK, APLOG_INFO, APR_SUCCESS,
+                           r,
+-                          ref ? "Fixed spelling: %s to %s from %s"
+-                              : "Fixed spelling: %s to %s%s",
++                          ref ? APLOGNO(03224) "Fixed spelling: %s to %s from %s"
++                              : APLOGNO(03225) "Fixed spelling: %s to %s%s",
+                           r->uri, nuri,
+                           (ref ? ref : ""));
+ 
+@@ -499,8 +499,8 @@ static int check_speling(request_rec *r)
+             apr_pool_destroy(sub_pool);
+ 
+             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+-                         ref ? "Spelling fix: %s: %d candidates from %s"
+-                             : "Spelling fix: %s: %d candidates%s",
++                         ref ? APLOGNO(03226) "Spelling fix: %s: %d candidates from %s"
++                             : APLOGNO(03227) "Spelling fix: %s: %d candidates%s",
+                          r->uri, candidates->nelts,
+                          (ref ? ref : ""));
+ 
+diff --git a/modules/proxy/ajp_header.c b/modules/proxy/ajp_header.c
+index dff0656..145bdcf 100644
+--- a/modules/proxy/ajp_header.c
++++ b/modules/proxy/ajp_header.c
+@@ -297,7 +297,7 @@ static apr_status_t ajp_marshal_into_msgb(ajp_msg_t *msg,
+     if (s->secret) {
+         if (ajp_msg_append_uint8(msg, SC_A_SECRET) ||
+             ajp_msg_append_string(msg, s->secret)) {
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(03228)
+                    "Error ajp_marshal_into_msgb - "
+                    "Error appending secret");
+             return APR_EGENERAL;
+diff --git a/modules/proxy/ajp_msg.c b/modules/proxy/ajp_msg.c
+index 06bee9b..3367b5d 100644
+--- a/modules/proxy/ajp_msg.c
++++ b/modules/proxy/ajp_msg.c
+@@ -130,9 +130,11 @@ apr_status_t ajp_msg_log(request_rec *r, ajp_msg_t *msg, char *err)
+         if (rc == APR_SUCCESS) {
+             while ((next = ap_strchr(buf, '\n'))) {
+                 *next = '\0';
++                /* Intentional no APLOGNO */
+                 ap_log_rerror(APLOG_MARK, level, 0, r, "%s", buf);
+                 buf = next + 1;
+             }
++            /* Intentional no APLOGNO */
+             ap_log_rerror(APLOG_MARK, level, 0, r, "%s", buf);
+         }
+     }
+@@ -241,7 +243,7 @@ apr_status_t ajp_msg_end(ajp_msg_t *msg)
+ 
+ static APR_INLINE int ajp_log_overflow(ajp_msg_t *msg, const char *context)
+ {
+-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
++    ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL, APLOGNO(03229)
+                  "%s(): BufferOverflowException %" APR_SIZE_T_FMT
+                  " %" APR_SIZE_T_FMT,
+                  context, msg->pos, msg->len);
+diff --git a/modules/proxy/balancers/mod_lbmethod_heartbeat.c b/modules/proxy/balancers/mod_lbmethod_heartbeat.c
+index 863fc02..8b52eca 100644
+--- a/modules/proxy/balancers/mod_lbmethod_heartbeat.c
++++ b/modules/proxy/balancers/mod_lbmethod_heartbeat.c
+@@ -82,7 +82,7 @@ argstr_to_table(apr_pool_t *p, char *str, apr_table_t *parms)
+         ap_unescape_url(value);
+         apr_table_set(parms, key, value);
+         /*
+-         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
++         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(03230)
+          "Found query arg: %s = %s", key, value);
+          */
+         key = apr_strtok(NULL, "&", &strtok_state);
+diff --git a/modules/proxy/mod_proxy.c b/modules/proxy/mod_proxy.c
+index 4247aba..f84715f 100644
+--- a/modules/proxy/mod_proxy.c
++++ b/modules/proxy/mod_proxy.c
+@@ -1090,7 +1090,7 @@ static int proxy_handler(request_rec *r)
+     }
+ #if DEBUGGING
+     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                (direct_connect) ? "NoProxy for %s" : "UseProxy for %s",
++                (direct_connect) ? APLOGNO(03231) "NoProxy for %s" : APLOGNO(03232) "UseProxy for %s",
+                 r->uri);
+ #endif
+ 
+diff --git a/modules/proxy/mod_proxy_ftp.c b/modules/proxy/mod_proxy_ftp.c
+index 7e0341a..52345f5 100644
+--- a/modules/proxy/mod_proxy_ftp.c
++++ b/modules/proxy/mod_proxy_ftp.c
+@@ -391,7 +391,7 @@ static int ftp_getrc_msg(conn_rec *ftp_ctrl, apr_bucket_brigade *bb, char *msgbu
+         return -1;
+     }
+ /*
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, NULL,
++    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, NULL, APLOGNO(03233)
+                  "<%s", response);
+ */
+     if (!apr_isdigit(response[0]) || !apr_isdigit(response[1]) ||
+diff --git a/modules/proxy/proxy_util.c b/modules/proxy/proxy_util.c
+index badc6fa..b268afb 100644
+--- a/modules/proxy/proxy_util.c
++++ b/modules/proxy/proxy_util.c
+@@ -654,7 +654,7 @@ PROXY_DECLARE(int) ap_proxy_is_domainname(struct dirconn_entry *This, apr_pool_t
+ 
+ #if 0
+     if (addr[i] == ':') {
+-    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, NULL,
++    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, NULL, APLOGNO(03234)
+                      "@@@@ handle optional port in proxy_is_domainname()");
+     /* @@@@ handle optional port */
+     }
+diff --git a/modules/ssl/mod_ssl_ct.c b/modules/ssl/mod_ssl_ct.c
+index c65d04c..d08e77a 100644
+--- a/modules/ssl/mod_ssl_ct.c
++++ b/modules/ssl/mod_ssl_ct.c
+@@ -820,7 +820,7 @@ static void * APR_THREAD_FUNC run_service_thread(apr_thread_t *me, void *data)
+     apr_status_t rv;
+     int count = 0;
+ 
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
++    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(03241)
+                  SERVICE_THREAD_NAME " started");
+ 
+     while (1) {
+@@ -835,7 +835,7 @@ static void * APR_THREAD_FUNC run_service_thread(apr_thread_t *me, void *data)
+             count = 0;
+             if (sconf->db_log_config) {
+                 /* Reload log config DB */
+-                ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
++                ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(03242)
+                              SERVICE_THREAD_NAME " - reloading config");
+                 ap_assert(apr_thread_rwlock_wrlock(log_config_rwlock) == 0);
+                 active_log_config = NULL;
+@@ -861,7 +861,7 @@ static void * APR_THREAD_FUNC run_service_thread(apr_thread_t *me, void *data)
+         }
+     }
+ 
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
++    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s, APLOGNO(03243)
+                  SERVICE_THREAD_NAME " exiting");
+ 
+     return NULL;
+@@ -1044,7 +1044,7 @@ static int sct_daemon(server_rec *s_main)
+         apr_sleep(apr_time_from_sec(30)); /* SIGHUP at restart/stop will break out */
+     }
+ 
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s_main,
++    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s_main, APLOGNO(03244)
+                  DAEMON_NAME " - exiting");
+ 
+     return 0;
+@@ -1086,7 +1086,7 @@ static void *sct_daemon_thread(apr_thread_t *me, void *data)
+     apr_status_t rv;
+     int count = 0;
+ 
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
++    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(03245)
+                  DAEMON_THREAD_NAME " started");
+ 
+     /* ptemp - temporary pool for refresh cycles */
+@@ -1106,7 +1106,7 @@ static void *sct_daemon_thread(apr_thread_t *me, void *data)
+         }
+     }
+ 
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
++    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(03246)
+                  DAEMON_THREAD_NAME " - exiting");
+ 
+     return NULL;
+@@ -2147,7 +2147,7 @@ static int ssl_ct_proxy_post_handshake(conn_rec *c, SSL *ssl)
+ 
+     ssl_ct_ssl_proxy_verify(s, c, chain);
+ 
+-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
++    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, APLOGNO(03247)
+                   "finally at the point where we can see where SCTs came from"
+                   " %pp/%pp/%pp (c %pp)",
+                   conncfg->cert_sct_list, conncfg->serverhello_sct_list,
+diff --git a/modules/ssl/ssl_engine_io.c b/modules/ssl/ssl_engine_io.c
+index 595e14e..c86bdb0 100644
+--- a/modules/ssl/ssl_engine_io.c
++++ b/modules/ssl/ssl_engine_io.c
+@@ -1065,6 +1065,8 @@ static void ssl_filter_io_shutdown(ssl_filter_ctx_t *filter_ctx,
+ 
+     /* and finally log the fact that we've closed the connection */
+     if (APLOG_CS_IS_LEVEL(c, mySrvFromConn(c), loglevel)) {
++        /* Intentional no APLOGNO */
++        /* logno provides APLOGNO */
+         ap_log_cserror(APLOG_MARK, loglevel, 0, c, mySrvFromConn(c),
+                        "%sConnection closed to child %ld with %s shutdown "
+                        "(server %s)",
+diff --git a/modules/ssl/ssl_engine_ocsp.c b/modules/ssl/ssl_engine_ocsp.c
+index eaa1828..553004f 100644
+--- a/modules/ssl/ssl_engine_ocsp.c
++++ b/modules/ssl/ssl_engine_ocsp.c
+@@ -233,7 +233,7 @@ static int verify_ocsp_status(X509 *cert, X509_STORE_CTX *ctx, conn_rec *c,
+                 status == V_OCSP_CERTSTATUS_GOOD ? "good" :
+                 (status == V_OCSP_CERTSTATUS_REVOKED ? "revoked" : "unknown");
+ 
+-            ssl_log_cxerror(SSLLOG_MARK, level, 0, c, cert,
++            ssl_log_cxerror(SSLLOG_MARK, level, 0, c, cert, APLOGNO(03239)
+                             "OCSP validation completed, "
+                             "certificate status: %s (%d, %d)",
+                             result, status, reason);
+diff --git a/modules/ssl/ssl_util_stapling.c b/modules/ssl/ssl_util_stapling.c
+index 779c3e3..413e40f 100644
+--- a/modules/ssl/ssl_util_stapling.c
++++ b/modules/ssl/ssl_util_stapling.c
+@@ -776,20 +776,20 @@ static int stapling_cb(SSL *ssl, void *arg)
+         rv = get_and_check_cached_response(s, mctx, &rsp, &ok, cinf,
+                                            conn->pool);
+         if (rv != 0) {
+-            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
++            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(03236)
+                          "stapling_cb: error checking for cached response "
+                          "after obtaining refresh mutex");
+             stapling_refresh_mutex_off(s);
+             return rv;
+         }
+         else if (rsp) {
+-            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
++            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(03237)
+                          "stapling_cb: don't need to refresh cached response "
+                          "after obtaining refresh mutex");
+             stapling_refresh_mutex_off(s);
+         }
+         else {
+-            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
++            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, APLOGNO(03238)
+                          "stapling_cb: still must refresh cached response "
+                          "after obtaining refresh mutex");
+             rv = stapling_renew_response(s, mctx, ssl, cinf, &rsp, &ok,
+diff --git a/server/util_script.c b/server/util_script.c
+index 651b119..37508f8 100644
+--- a/server/util_script.c
++++ b/server/util_script.c
+@@ -473,12 +473,14 @@ AP_DECLARE(int) ap_scan_script_header_err_core_ex(request_rec *r, char *buffer,
+             const char *msg = "Premature end of script headers";
+             if (first_header)
+                 msg = "End of script output before headers";
++            /* Intentional no APLOGNO */
+             ap_log_rerror(SCRIPT_LOG_MARK, APLOG_ERR|APLOG_TOCLIENT, 0, r,
+                           "%s: %s", msg,
+                           apr_filepath_name_get(r->filename));
+             return HTTP_INTERNAL_SERVER_ERROR;
+         }
+         else if (rv == -1) {
++            /* Intentional no APLOGNO */
+             ap_log_rerror(SCRIPT_LOG_MARK, APLOG_ERR|APLOG_TOCLIENT, 0, r,
+                           "Script timed out before returning headers: %s",
+                           apr_filepath_name_get(r->filename));
+@@ -586,6 +588,7 @@ AP_DECLARE(int) ap_scan_script_header_err_core_ex(request_rec *r, char *buffer,
+                 }
+             }
+ 
++            /* Intentional no APLOGNO */
+             ap_log_rerror(SCRIPT_LOG_MARK, APLOG_ERR|APLOG_TOCLIENT, 0, r,
+                           "malformed header from script '%s': Bad header: %.30s",
+                           apr_filepath_name_get(r->filename), w);
+@@ -618,6 +621,7 @@ AP_DECLARE(int) ap_scan_script_header_err_core_ex(request_rec *r, char *buffer,
+         else if (!ap_casecmpstr(w, "Status")) {
+             r->status = cgi_status = atoi(l);
+             if (!ap_is_HTTP_VALID_RESPONSE(cgi_status))
++                /* Intentional no APLOGNO */
+                 ap_log_rerror(SCRIPT_LOG_MARK, APLOG_ERR|APLOG_TOCLIENT, 0, r,
+                               "Invalid status line from script '%s': %.30s",
+                               apr_filepath_name_get(r->filename), l);
+diff --git a/server/vhost.c b/server/vhost.c
+index eab2e19..12bdd55 100644
+--- a/server/vhost.c
++++ b/server/vhost.c
+@@ -298,7 +298,7 @@ static void dump_iphash_statistics(server_rec *main_s)
+     }
+     qsort(count, IPHASH_TABLE_SIZE, sizeof(count[0]), iphash_compare);
+     p = buf + apr_snprintf(buf, sizeof(buf),
+-                           "iphash: total hashed = %u, avg chain = %u, "
++                           APLOGNO(03235) "iphash: total hashed = %u, avg chain = %u, "
+                            "chain lengths (count x len):",
+                            total, total / IPHASH_TABLE_SIZE);
+     total = 1;
+@@ -314,6 +314,8 @@ static void dump_iphash_statistics(server_rec *main_s)
+     }
+     p += apr_snprintf(p, sizeof(buf) - (p - buf), " %ux%u",
+                       total, count[IPHASH_TABLE_SIZE - 1]);
++    /* Intentional no APLOGNO */
++    /* buf provides APLOGNO */
+     ap_log_error(APLOG_MARK, APLOG_DEBUG, main_s, buf);
+ }
+ #endif

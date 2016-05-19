@@ -1,0 +1,1469 @@
+commit 7b8021d695cc085b17b9f3228f64228052a2979c
+Author: Greg Stein <gstein@apache.org>
+Date:   Sat Jun 24 17:34:11 2000 +0000
+
+    blast the old names for the status codes
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@85686 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/http_config.h b/include/http_config.h
+index ee9fe1d..5f964c2 100644
+--- a/include/http_config.h
++++ b/include/http_config.h
+@@ -318,8 +318,9 @@ typedef struct module_struct {
+      * check_user_id --- get and validate user id from the HTTP request
+      * auth_checker --- see if the user (from check_user_id) is OK *here*.
+      *                  If all of *these* decline, the request is rejected
+-     *                  (as a SERVER_ERROR, since the module which was
+-     *                  supposed to handle this was configured wrong).
++     *                  (as a HTTP_INTERNAL_SERVER_ERROR, since the module
++     *                  which was suppsoed to handle this was configured
++     *                  wrong).
+      * type_checker --- Determine MIME type of the requested entity;
+      *                  sets content_type, _encoding and _language fields.
+      */
+diff --git a/include/http_core.h b/include/http_core.h
+index e79e0e5..22ac545 100644
+--- a/include/http_core.h
++++ b/include/http_core.h
+@@ -137,7 +137,7 @@ API_EXPORT(unsigned) ap_get_server_port(const request_rec *r);
+ API_EXPORT(unsigned long) ap_get_limit_req_body(const request_rec *r);
+ API_EXPORT(void) ap_custom_response(request_rec *r, int status, char *string);
+ API_EXPORT(int) ap_exists_config_define(const char *name);
+-API_EXPORT_NONSTD(int) ap_core_translate(request_rec *r);
++API_EXPORT(int) ap_core_translate(request_rec *r);
+ 
+ /* Authentication stuff.  This is one of the places where compatibility
+  * with the old config files *really* hurts; they don't discriminate at
+diff --git a/include/http_protocol.h b/include/http_protocol.h
+index ea1b59a..43a0a6a 100644
+--- a/include/http_protocol.h
++++ b/include/http_protocol.h
+@@ -113,7 +113,7 @@ API_EXPORT(void) ap_send_error_response(request_rec *r, int recursive_error);
+ /* Set last modified header line from the lastmod date of the associated file.
+  * Also, set content length.
+  *
+- * May return an error status, typically USE_LOCAL_COPY (that when the
++ * May return an error status, typically HTTP_NOT_MODIFIED (that when the
+  * permit_cache argument is set to one).
+  */
+ 
+@@ -186,10 +186,10 @@ API_EXPORT(int) ap_each_byterange(request_rec *r, ap_off_t *offset,
+  *
+  * get_basic_auth_pw returns 0 (OK) if it set the 'pw' argument (and assured
+  * a correct value in r->connection->user); otherwise it returns an error
+- * code, either SERVER_ERROR if things are really confused, AUTH_REQUIRED
+- * if no authentication at all seemed to be in use, or DECLINED if there
+- * was authentication but it wasn't Basic (in which case, the caller should
+- * presumably decline as well).
++ * code, either HTTP_INTERNAL_SERVER_ERROR if things are really confused,
++ * HTTP_UNAUTHORIZED if no authentication at all seemed to be in use, or
++ * DECLINED if there was authentication but it wasn't Basic (in which case,
++ * the caller should presumably decline as well).
+  *
+  * note_basic_auth_failure arranges for the right stuff to be scribbled on
+  * the HTTP return so that the client knows how to authenticate itself the
+diff --git a/include/httpd.h b/include/httpd.h
+index 0752cfd..fd7aa83 100644
+--- a/include/httpd.h
++++ b/include/httpd.h
+@@ -446,25 +446,6 @@ API_EXPORT(const char *) ap_get_server_built(void);
+ #define HTTP_INSUFFICIENT_STORAGE          507
+ #define HTTP_NOT_EXTENDED                  510
+ 
+-#define DOCUMENT_FOLLOWS    HTTP_OK
+-#define PARTIAL_CONTENT     HTTP_PARTIAL_CONTENT
+-#define MULTIPLE_CHOICES    HTTP_MULTIPLE_CHOICES
+-#define MOVED               HTTP_MOVED_PERMANENTLY
+-#define REDIRECT            HTTP_MOVED_TEMPORARILY
+-#define USE_LOCAL_COPY      HTTP_NOT_MODIFIED
+-#define BAD_REQUEST         HTTP_BAD_REQUEST
+-#define AUTH_REQUIRED       HTTP_UNAUTHORIZED
+-#define FORBIDDEN           HTTP_FORBIDDEN
+-#define NOT_FOUND           HTTP_NOT_FOUND
+-#define METHOD_NOT_ALLOWED  HTTP_METHOD_NOT_ALLOWED
+-#define NOT_ACCEPTABLE      HTTP_NOT_ACCEPTABLE
+-#define LENGTH_REQUIRED     HTTP_LENGTH_REQUIRED
+-#define PRECONDITION_FAILED HTTP_PRECONDITION_FAILED
+-#define SERVER_ERROR        HTTP_INTERNAL_SERVER_ERROR
+-#define NOT_IMPLEMENTED     HTTP_NOT_IMPLEMENTED
+-#define BAD_GATEWAY         HTTP_BAD_GATEWAY
+-#define VARIANT_ALSO_VARIES HTTP_VARIANT_ALSO_VARIES
+-
+ #define ap_is_HTTP_INFO(x)         (((x) >= 100)&&((x) < 200))
+ #define ap_is_HTTP_SUCCESS(x)      (((x) >= 200)&&((x) < 300))
+ #define ap_is_HTTP_REDIRECT(x)     (((x) >= 300)&&((x) < 400))
+@@ -649,7 +630,7 @@ struct request_rec {
+ 	handler like this the handler should set r->allowed to the list
+ 	of methods that it is willing to handle.  This bitvector is used
+ 	to construct the "Allow:" header required for OPTIONS requests,
+-	and METHOD_NOT_ALLOWED and NOT_IMPLEMENTED status codes.
++	and HTTP_METHOD_NOT_ALLOWED and HTTP_NOT_IMPLEMENTED status codes.
+ 
+ 	Since the default_handler deals with OPTIONS, all modules can
+ 	usually decline to deal with OPTIONS.  TRACE is always allowed,
+@@ -657,7 +638,7 @@ struct request_rec {
+ 
+ 	Since the default_handler will always handle a GET, a
+ 	module which does *not* implement GET should probably return
+-	METHOD_NOT_ALLOWED.  Unfortunately this means that a Script GET
++	HTTP_METHOD_NOT_ALLOWED.  Unfortunately this means that a Script GET
+ 	handler can't be installed by mod_actions.
+     */
+     int allowed;		/* Allowed methods - for 405, OPTIONS, etc */
+diff --git a/modules/aaa/mod_access.c b/modules/aaa/mod_access.c
+index dcd83e4..978bbff 100644
+--- a/modules/aaa/mod_access.c
++++ b/modules/aaa/mod_access.c
+@@ -370,15 +370,15 @@ static int check_dir_access(request_rec *r)
+     int ret = OK;
+ 
+     if (a->order[method] == ALLOW_THEN_DENY) {
+-	ret = FORBIDDEN;
++	ret = HTTP_FORBIDDEN;
+ 	if (find_allowdeny(r, a->allows, method))
+ 	    ret = OK;
+ 	if (find_allowdeny(r, a->denys, method))
+-	    ret = FORBIDDEN;
++	    ret = HTTP_FORBIDDEN;
+     }
+     else if (a->order[method] == DENY_THEN_ALLOW) {
+ 	if (find_allowdeny(r, a->denys, method))
+-	    ret = FORBIDDEN;
++	    ret = HTTP_FORBIDDEN;
+ 	if (find_allowdeny(r, a->allows, method))
+ 	    ret = OK;
+     }
+@@ -387,10 +387,10 @@ static int check_dir_access(request_rec *r)
+ 	    && !find_allowdeny(r, a->denys, method))
+ 	    ret = OK;
+ 	else
+-	    ret = FORBIDDEN;
++	    ret = HTTP_FORBIDDEN;
+     }
+ 
+-    if (ret == FORBIDDEN
++    if (ret == HTTP_FORBIDDEN
+ 	&& (ap_satisfies(r) != SATISFY_ANY || !ap_some_auth_required(r))) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		  "client denied by server configuration: %s",
+diff --git a/modules/aaa/mod_auth.c b/modules/aaa/mod_auth.c
+index 7e64506..8b5a875 100644
+--- a/modules/aaa/mod_auth.c
++++ b/modules/aaa/mod_auth.c
+@@ -188,9 +188,9 @@ static ap_table_t *groups_for_user(ap_pool_t *p, char *user, char *grpfile)
+ }
+ 
+ /* These functions return 0 if client is OK, and proper error status
+- * if not... either AUTH_REQUIRED, if we made a check, and it failed, or
+- * SERVER_ERROR, if things are so totally confused that we couldn't
+- * figure out how to tell if the client is authorized or not.
++ * if not... either HTTP_UNAUTHORIZED, if we made a check, and it failed, or
++ * HTTP_INTERNAL_SERVER_ERROR, if things are so totally confused that we
++ * couldn't figure out how to tell if the client is authorized or not.
+  *
+  * If they return DECLINED, and all other modules also decline, that's
+  * treated by the server core as a configuration error, logged and
+@@ -222,7 +222,7 @@ static int authenticate_basic_user(request_rec *r)
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "user %s not found: %s", r->user, r->uri);
+ 	ap_note_basic_auth_failure(r);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+     invalid_pw = ap_validate_password(sent_pw, real_pw);
+     if (invalid_pw != APR_SUCCESS) {
+@@ -231,7 +231,7 @@ static int authenticate_basic_user(request_rec *r)
+                       "Password Mismatch",
+ 		      r->user, r->uri);
+ 	ap_note_basic_auth_failure(r);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+     return OK;
+ }
+@@ -314,7 +314,7 @@ static int check_user_access(request_rec *r)
+ 	r->uri, user);
+ 	
+     ap_note_basic_auth_failure(r);
+-    return AUTH_REQUIRED;
++    return HTTP_UNAUTHORIZED;
+ }
+ 
+ static void register_hooks(void)
+diff --git a/modules/aaa/mod_auth_anon.c b/modules/aaa/mod_auth_anon.c
+index 3a786d0..a0397ad 100644
+--- a/modules/aaa/mod_auth_anon.c
++++ b/modules/aaa/mod_auth_anon.c
+@@ -263,7 +263,7 @@ static int anon_authenticate_basic_user(request_rec *r)
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, APR_SUCCESS, r,
+ 			"Anonymous: Authoritative, Passwd <%s> not accepted",
+ 			sent_pw ? sent_pw : "\'none\'");
+-	    return AUTH_REQUIRED;
++	    return HTTP_UNAUTHORIZED;
+ 	}
+ 	/* Drop out the bottom to return DECLINED */
+     }
+diff --git a/modules/aaa/mod_auth_db.c b/modules/aaa/mod_auth_db.c
+index c0fb311..d8ff16a 100644
+--- a/modules/aaa/mod_auth_db.c
++++ b/modules/aaa/mod_auth_db.c
+@@ -309,7 +309,7 @@ static int db_authenticate_basic_user(request_rec *r)
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "DB user %s not found: %s", r->user, r->filename);
+ 	ap_note_basic_auth_failure(r);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+     /* Password is up to first : if exists */
+     colon_pw = strchr(real_pw, ':');
+@@ -325,7 +325,7 @@ static int db_authenticate_basic_user(request_rec *r)
+                       "Password Mismatch",
+ 		      r->user, r->uri);
+ 	ap_note_basic_auth_failure(r);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+     return OK;
+ }
+@@ -371,7 +371,7 @@ static int db_check_auth(request_rec *r)
+ 			      "user %s not in DB group file %s: %s",
+ 			      user, sec->auth_dbgrpfile, r->filename);
+ 		ap_note_basic_auth_failure(r);
+-		return AUTH_REQUIRED;
++		return HTTP_UNAUTHORIZED;
+ 	    }
+ 	    orig_groups = groups;
+ 	    while (t[0]) {
+@@ -386,7 +386,7 @@ static int db_check_auth(request_rec *r)
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "user %s not in right group: %s", user, r->filename);
+ 	    ap_note_basic_auth_failure(r);
+-	    return AUTH_REQUIRED;
++	    return HTTP_UNAUTHORIZED;
+ 	}
+     }
+ 
+diff --git a/modules/aaa/mod_auth_dbm.c b/modules/aaa/mod_auth_dbm.c
+index 20317f9..215bde7 100644
+--- a/modules/aaa/mod_auth_dbm.c
++++ b/modules/aaa/mod_auth_dbm.c
+@@ -230,7 +230,7 @@ static int dbm_authenticate_basic_user(request_rec *r)
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "DBM user %s not found: %s", r->user, r->filename);
+ 	ap_note_basic_auth_failure(r);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+     /* Password is up to first : if exists */
+     colon_pw = strchr(real_pw, ':');
+@@ -244,7 +244,7 @@ static int dbm_authenticate_basic_user(request_rec *r)
+                       "Password Mismatch",
+ 		      r->user, r->uri);
+ 	ap_note_basic_auth_failure(r);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+     return OK;
+ }
+@@ -290,7 +290,7 @@ static int dbm_check_auth(request_rec *r)
+ 			    "user %s not in DBM group file %s: %s",
+ 			    user, sec->auth_dbmgrpfile, r->filename);
+ 		ap_note_basic_auth_failure(r);
+-		return AUTH_REQUIRED;
++		return HTTP_UNAUTHORIZED;
+ 	    }
+ 	    orig_groups = groups;
+ 	    while (t[0]) {
+@@ -306,7 +306,7 @@ static int dbm_check_auth(request_rec *r)
+ 			"user %s not in right group: %s",
+ 			user, r->filename);
+ 	    ap_note_basic_auth_failure(r);
+-	    return AUTH_REQUIRED;
++	    return HTTP_UNAUTHORIZED;
+ 	}
+     }
+ 
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index bd32184..00c7fc1 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -1401,7 +1401,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 		      "Digest: invalid nonce %s received - length is not %d",
+ 		      resp->nonce, NONCE_LEN);
+ 	note_digest_auth_failure(r, conf, resp, 1);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     tmp = resp->nonce[NONCE_TIME_LEN];
+@@ -1416,7 +1416,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 		      "Digest: invalid nonce %s received - hash is not %s",
+ 		      resp->nonce, hash);
+ 	note_digest_auth_failure(r, conf, resp, 1);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     dt = r->request_time - nonce_time.time;
+@@ -1425,7 +1425,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 		      "Digest: invalid nonce %s received - user attempted "
+ 		      "time travel", resp->nonce);
+ 	note_digest_auth_failure(r, conf, resp, 1);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     if (conf->nonce_lifetime > 0) {
+@@ -1435,7 +1435,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 			  r->user, ((double)dt)/AP_USEC_PER_SEC, 
+ 			  ((double)(conf->nonce_lifetime))/AP_USEC_PER_SEC);
+ 	    note_digest_auth_failure(r, conf, resp, 1);
+-	    return AUTH_REQUIRED;
++	    return HTTP_UNAUTHORIZED;
+ 	}
+     }
+     else if (conf->nonce_lifetime == 0 && resp->client) {
+@@ -1444,7 +1444,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 			  "Digest: user %s: one-time-nonce mismatch - sending "
+ 			  "new nonce", r->user);
+ 	    note_digest_auth_failure(r, conf, resp, 1);
+-	    return AUTH_REQUIRED;
++	    return HTTP_UNAUTHORIZED;
+ 	}
+     }
+     /* else (lifetime < 0) => never expires */
+@@ -1533,9 +1533,9 @@ static void copy_uri_components(uri_components *dst, uri_components *src,
+ }
+ 
+ /* These functions return 0 if client is OK, and proper error status
+- * if not... either AUTH_REQUIRED, if we made a check, and it failed, or
+- * SERVER_ERROR, if things are so totally confused that we couldn't
+- * figure out how to tell if the client is authorized or not.
++ * if not... either HTTP_UNAUTHORIZED, if we made a check, and it failed, or
++ * HTTP_INTERNAL_SERVER_ERROR, if things are so totally confused that we
++ * couldn't figure out how to tell if the client is authorized or not.
+  *
+  * If they return DECLINED, and all other modules also decline, that's
+  * treated by the server core as a configuration error, logged and
+@@ -1562,7 +1562,7 @@ static int authenticate_digest_user(request_rec *r)
+     if (!ap_auth_name(r)) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: need AuthName: %s", r->uri);
+-	return SERVER_ERROR;
++	return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+ 
+@@ -1596,7 +1596,7 @@ static int authenticate_digest_user(request_rec *r)
+ 			  r->uri);
+ 	/* else (resp->auth_hdr_sts == NO_HEADER) */
+ 	note_digest_auth_failure(r, conf, resp, 0);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     r->user         = (char *) resp->username;
+@@ -1615,7 +1615,7 @@ static int authenticate_digest_user(request_rec *r)
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: invalid uri <%s> in Authorization header",
+ 			  resp->uri);
+-	    return BAD_REQUEST;
++	    return HTTP_BAD_REQUEST;
+ 	}
+ 
+ 	if (d_uri.hostname)
+@@ -1630,7 +1630,7 @@ static int authenticate_digest_user(request_rec *r)
+ 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			      "Digest: uri mismatch - <%s> does not match "
+ 			      "request-uri <%s>", resp->uri, r_uri.hostinfo);
+-		return BAD_REQUEST;
++		return HTTP_BAD_REQUEST;
+ 	    }
+ 	}
+ 	else if (
+@@ -1658,7 +1658,7 @@ static int authenticate_digest_user(request_rec *r)
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: uri mismatch - <%s> does not match "
+ 			  "request-uri <%s>", resp->uri, resp->raw_request_uri);
+-	    return BAD_REQUEST;
++	    return HTTP_BAD_REQUEST;
+ 	}
+     }
+ 
+@@ -1667,7 +1667,7 @@ static int authenticate_digest_user(request_rec *r)
+ 		      "Digest: received invalid opaque - got `%s'",
+ 		      resp->opaque);
+ 	note_digest_auth_failure(r, conf, resp, 0);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     if (strcmp(resp->realm, conf->realm)) {
+@@ -1675,7 +1675,7 @@ static int authenticate_digest_user(request_rec *r)
+ 		      "Digest: realm mismatch - got `%s' but expected `%s'",
+ 		      resp->realm, conf->realm);
+ 	note_digest_auth_failure(r, conf, resp, 0);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     if (resp->algorithm != NULL
+@@ -1685,7 +1685,7 @@ static int authenticate_digest_user(request_rec *r)
+ 		      "Digest: unknown algorithm `%s' received: %s",
+ 		      resp->algorithm, r->uri);
+ 	note_digest_auth_failure(r, conf, resp, 0);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     if (!conf->pwfile)
+@@ -1696,7 +1696,7 @@ static int authenticate_digest_user(request_rec *r)
+ 		      "Digest: user `%s' in realm `%s' not found: %s",
+ 		      r->user, conf->realm, r->uri);
+ 	note_digest_auth_failure(r, conf, resp, 0);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     
+@@ -1707,7 +1707,7 @@ static int authenticate_digest_user(request_rec *r)
+ 			  "Digest: user %s: password mismatch: %s", r->user,
+ 			  r->uri);
+ 	    note_digest_auth_failure(r, conf, resp, 0);
+-	    return AUTH_REQUIRED;
++	    return HTTP_UNAUTHORIZED;
+ 	}
+     }
+     else {
+@@ -1727,26 +1727,26 @@ static int authenticate_digest_user(request_rec *r)
+ 			  "Digest: invalid qop `%s' received: %s",
+ 			  resp->message_qop, r->uri);
+ 	    note_digest_auth_failure(r, conf, resp, 0);
+-	    return AUTH_REQUIRED;
++	    return HTTP_UNAUTHORIZED;
+ 	}
+ 
+ 	exp_digest = new_digest(r, resp, conf);
+ 	if (!exp_digest) {
+ 	    /* we failed to allocate a client struct */
+-	    return SERVER_ERROR;
++	    return HTTP_INTERNAL_SERVER_ERROR;
+ 	}
+ 	if (strcmp(resp->digest, exp_digest)) {
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: user %s: password mismatch: %s", r->user,
+ 			  r->uri);
+ 	    note_digest_auth_failure(r, conf, resp, 0);
+-	    return AUTH_REQUIRED;
++	    return HTTP_UNAUTHORIZED;
+ 	}
+     }
+ 
+     if (check_nc(r, resp, conf) != OK) {
+ 	note_digest_auth_failure(r, conf, resp, 0);
+-	return AUTH_REQUIRED;
++	return HTTP_UNAUTHORIZED;
+     }
+ 
+     /* Note: this check is done last so that a "stale=true" can be
+@@ -1880,7 +1880,7 @@ static int digest_check_auth(request_rec *r)
+ 	(digest_header_rec *) ap_get_module_config(r->request_config,
+ 						   &auth_digest_module),
+ 	0);
+-    return AUTH_REQUIRED;
++    return HTTP_UNAUTHORIZED;
+ }
+ 
+ 
+diff --git a/modules/arch/win32/mod_isapi.c b/modules/arch/win32/mod_isapi.c
+index 923d694..847e147 100644
+--- a/modules/arch/win32/mod_isapi.c
++++ b/modules/arch/win32/mod_isapi.c
+@@ -145,13 +145,13 @@ int isapi_handler (request_rec *r)
+     /* Use similar restrictions as CGIs */
+ 
+     if (!(ap_allow_options(r) & OPT_EXECCGI))
+-        return FORBIDDEN;
++        return HTTP_FORBIDDEN;
+ 
+     if (r->finfo.protection == 0)
+-            return NOT_FOUND;
++            return HTTP_NOT_FOUND;
+ 
+     if (r->finfo.filetype == APR_DIR)
+-            return FORBIDDEN;
++            return HTTP_FORBIDDEN;
+ 
+     /* Load the module */
+ 
+@@ -160,7 +160,7 @@ int isapi_handler (request_rec *r)
+             rv = GetLastError();
+         ap_log_rerror(APLOG_MARK, APLOG_ALERT, rv, r,
+                               "Could not load DLL: %s", r->filename);
+-            return SERVER_ERROR;
++            return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     if (!(isapi_version =
+@@ -170,7 +170,7 @@ int isapi_handler (request_rec *r)
+                               "Could not load DLL %s symbol GetExtensionVersion()",
+                       r->filename);
+             FreeLibrary(isapi_handle);
+-            return SERVER_ERROR;
++            return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     if (!(isapi_entry =
+@@ -180,7 +180,7 @@ int isapi_handler (request_rec *r)
+                               "Could not load DLL %s symbol HttpExtensionProc()",
+                       r->filename);
+             FreeLibrary(isapi_handle);
+-            return SERVER_ERROR;
++            return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     /* TerminateExtension() is an optional interface */
+@@ -190,10 +190,11 @@ int isapi_handler (request_rec *r)
+     /* Run GetExtensionVersion() */
+ 
+     if (!(*isapi_version)(pVer)) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ALERT, SERVER_ERROR, r,
++        /* ### euh... we're passing the wrong type of error code here */
++        ap_log_rerror(APLOG_MARK, APLOG_ALERT, HTTP_INTERNAL_SERVER_ERROR, r,
+                     "ISAPI %s GetExtensionVersion() call failed", r->filename);
+             FreeLibrary(isapi_handle);
+-            return SERVER_ERROR;
++            return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     /* Set up variables */
+@@ -248,7 +249,7 @@ int isapi_handler (request_rec *r)
+             if ((read = ap_get_client_block(r, ecb->lpbData, to_read)) < 0) {
+                 if (isapi_term) (*isapi_term)(HSE_TERM_MUST_UNLOAD);
+                 FreeLibrary(isapi_handle);
+-                return SERVER_ERROR;
++                return HTTP_INTERNAL_SERVER_ERROR;
+             }
+ 
+             /* Although its not to spec, IIS seems to null-terminate
+@@ -301,13 +302,13 @@ int isapi_handler (request_rec *r)
+             return OK;
+ 
+     case HSE_STATUS_PENDING:    /* We don't support this */
+-        rv = APR_ENOTIMPL;
+-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, SERVER_ERROR, r,
+-                    "ISAPI asynchronous I/O not supported: %s", r->filename);
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING, APR_ENOTIMPL, r,
++                      "ISAPI asynchronous I/O not supported: %s", r->filename);
++        /* fallthrough */
+     case HSE_STATUS_ERROR:
+     default:
+ 
+-        return SERVER_ERROR;
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+ }
+@@ -403,7 +404,8 @@ BOOL WINAPI ServerSupportFunction (HCONN hConn, DWORD dwHSERequest,
+          * is done.
+          */
+         ap_table_set (r->headers_out, "Location", lpvBuffer);
+-        cid->status = cid->r->status = cid->ecb->dwHttpStatusCode = REDIRECT;
++        cid->status = cid->r->status = cid->ecb->dwHttpStatusCode =
++            HTTP_MOVED_TEMPORARILY;
+         return TRUE;
+ 
+     case HSE_REQ_SEND_URL:
+@@ -478,8 +480,11 @@ BOOL WINAPI ServerSupportFunction (HCONN hConn, DWORD dwHSERequest,
+ 
+                 if (!(value = strchr(data, ':'))) {
+                         SetLastError(TODO_ERROR);
+-                        ap_log_rerror(APLOG_MARK, APLOG_ERR, SERVER_ERROR, r,
+-                                          "ISA sent invalid headers", r->filename);
++                        /* ### euh... we're passing the wrong type of error
++                           ### code here */
++                        ap_log_rerror(APLOG_MARK, APLOG_ERR,
++                                      HTTP_INTERNAL_SERVER_ERROR, r,
++                                      "ISA sent invalid headers", r->filename);
+                         return FALSE;
+                 }
+ 
+@@ -561,8 +566,11 @@ BOOL WINAPI ServerSupportFunction (HCONN hConn, DWORD dwHSERequest,
+     /* We don't support all this async I/O, Microsoft-specific stuff */
+     case HSE_REQ_IO_COMPLETION:
+     case HSE_REQ_TRANSMIT_FILE:
+-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, SERVER_ERROR, r,
+-                        "ISAPI asynchronous I/O not supported: %s", r->filename);
++        /* ### euh... we're passing the wrong type of error code here */
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING,
++                      HTTP_INTERNAL_SERVER_ERROR, r,
++                      "ISAPI asynchronous I/O not supported: %s",
++                      r->filename);
+     default:
+             SetLastError(ERROR_INVALID_PARAMETER);
+             return FALSE;
+diff --git a/modules/cache/mod_file_cache.c b/modules/cache/mod_file_cache.c
+index 1f7f4cc..76f4203 100644
+--- a/modules/cache/mod_file_cache.c
++++ b/modules/cache/mod_file_cache.c
+@@ -323,7 +323,7 @@ int core_translate_copy(request_rec *r)
+     if ((r->uri[0] != '/') && strcmp(r->uri, "*")) {
+         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                       "Invalid URI in request %s", r->the_request);
+-        return BAD_REQUEST;
++        return HTTP_BAD_REQUEST;
+     }
+     
+     if (r->server->path 
+diff --git a/modules/generators/mod_asis.c b/modules/generators/mod_asis.c
+index 4466e9c..7e06698 100644
+--- a/modules/generators/mod_asis.c
++++ b/modules/generators/mod_asis.c
+@@ -79,14 +79,14 @@ static int asis_handler(request_rec *r)
+     if (r->finfo.protection == 0) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "File does not exist: %s", r->filename);
+-	return NOT_FOUND;
++	return HTTP_NOT_FOUND;
+     }
+ 
+     if ((status = ap_open(&f, r->filename, APR_READ, 
+                 APR_OS_DEFAULT, r->pool)) != APR_SUCCESS) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+ 		    "file permissions deny server access: %s", r->filename);
+-	return FORBIDDEN;
++	return HTTP_FORBIDDEN;
+     }
+ 
+     ap_scan_script_header_err(r, f, NULL);
+diff --git a/modules/generators/mod_cgi.c b/modules/generators/mod_cgi.c
+index 4a6279c..7805764 100644
+--- a/modules/generators/mod_cgi.c
++++ b/modules/generators/mod_cgi.c
+@@ -512,10 +512,10 @@ static int cgi_handler(request_rec *r)
+     nph = !(strncmp(argv0, "nph-", 4));
+ 
+     if (!(ap_allow_options(r) & OPT_EXECCGI) && !is_scriptaliased(r))
+-        return log_scripterror(r, conf, FORBIDDEN, APLOG_NOERRNO,
++        return log_scripterror(r, conf, HTTP_FORBIDDEN, APLOG_NOERRNO,
+                                "Options ExecCGI is off in this directory");
+     if (nph && is_included)
+-        return log_scripterror(r, conf, FORBIDDEN, APLOG_NOERRNO,
++        return log_scripterror(r, conf, HTTP_FORBIDDEN, APLOG_NOERRNO,
+                                "attempt to include NPH CGI script");
+ 
+ #if defined(OS2) || defined(WIN32)
+@@ -527,7 +527,7 @@ static int cgi_handler(request_rec *r)
+         newfile = ap_pstrcat(r->pool, r->filename, ".EXE", NULL);
+         if ((ap_stat(&finfo, newfile, r->pool) != APR_SUCCESS) || 
+             (finfo.filetype != APR_REG)) {
+-            return log_scripterror(r, conf, NOT_FOUND, 0,
++            return log_scripterror(r, conf, HTTP_NOT_FOUND, 0,
+                                    "script not found or unable to stat");
+         } else {
+             r->filename = newfile;
+@@ -535,17 +535,17 @@ static int cgi_handler(request_rec *r)
+     }
+ #else
+     if (r->finfo.protection == 0)
+-	return log_scripterror(r, conf, NOT_FOUND, APLOG_NOERRNO,
++	return log_scripterror(r, conf, HTTP_NOT_FOUND, APLOG_NOERRNO,
+ 			       "script not found or unable to stat");
+ #endif
+     if (r->finfo.filetype == APR_DIR)
+-	return log_scripterror(r, conf, FORBIDDEN, APLOG_NOERRNO,
++	return log_scripterror(r, conf, HTTP_FORBIDDEN, APLOG_NOERRNO,
+ 			       "attempt to invoke directory as script");
+ 
+ /*
+     if (!ap_suexec_enabled) {
+ 	if (!ap_can_exec(&r->finfo))
+-	    return log_scripterror(r, conf, FORBIDDEN, APLOG_NOERRNO,
++	    return log_scripterror(r, conf, HTTP_FORBIDDEN, APLOG_NOERRNO,
+ 				   "file permissions deny server execution");
+     }
+ 
+@@ -651,7 +651,7 @@ static int cgi_handler(request_rec *r)
+ 	    /* XX Note that if a script wants to produce its own Redirect
+ 	     * body, it now has to explicitly *say* "Status: 302"
+ 	     */
+-	    return REDIRECT;
++	    return HTTP_MOVED_TEMPORARILY;
+ 	}
+ 
+ 	ap_send_http_header(r);
+diff --git a/modules/generators/mod_cgid.c b/modules/generators/mod_cgid.c
+index 7f373b7..732fec5 100644
+--- a/modules/generators/mod_cgid.c
++++ b/modules/generators/mod_cgid.c
+@@ -841,10 +841,10 @@ static int cgid_handler(request_rec *r)
+         argv0 = r->filename; 
+ 
+     if (!(ap_allow_options(r) & OPT_EXECCGI) && !is_scriptaliased(r)) 
+-        return log_scripterror(r, conf, FORBIDDEN, APLOG_NOERRNO, 
++        return log_scripterror(r, conf, HTTP_FORBIDDEN, APLOG_NOERRNO, 
+                                "Options ExecCGI is off in this directory"); 
+     if (nph && is_included) 
+-        return log_scripterror(r, conf, FORBIDDEN, APLOG_NOERRNO, 
++        return log_scripterror(r, conf, HTTP_FORBIDDEN, APLOG_NOERRNO, 
+                                "attempt to include NPH CGI script"); 
+ 
+ #if defined(OS2) || defined(WIN32) 
+@@ -856,7 +856,7 @@ static int cgid_handler(request_rec *r)
+         newfile = ap_pstrcat(r->pool, r->filename, ".EXE", NULL); 
+ 
+         if ((stat(newfile, &statbuf) != 0) || (!S_ISREG(statbuf.st_mode))) { 
+-            return log_scripterror(r, conf, NOT_FOUND, 0, 
++            return log_scripterror(r, conf, HTTP_NOT_FOUND, 0, 
+                                    "script not found or unable to stat"); 
+         } else { 
+             r->filename = newfile; 
+@@ -864,16 +864,16 @@ static int cgid_handler(request_rec *r)
+     } 
+ #else 
+     if (r->finfo.protection == 0) 
+-        return log_scripterror(r, conf, NOT_FOUND, APLOG_NOERRNO, 
++        return log_scripterror(r, conf, HTTP_NOT_FOUND, APLOG_NOERRNO, 
+                                "script not found or unable to stat"); 
+ #endif 
+     if (r->finfo.filetype == APR_DIR) 
+-        return log_scripterror(r, conf, FORBIDDEN, APLOG_NOERRNO, 
++        return log_scripterror(r, conf, HTTP_FORBIDDEN, APLOG_NOERRNO, 
+                                "attempt to invoke directory as script"); 
+ /*
+     if (!ap_suexec_enabled) { 
+         if (!ap_can_exec(&r->finfo)) 
+-            return log_scripterror(r, conf, FORBIDDEN, APLOG_NOERRNO, 
++            return log_scripterror(r, conf, HTTP_FORBIDDEN, APLOG_NOERRNO, 
+                                    "file permissions deny server execution"); 
+     } 
+ */
+@@ -882,7 +882,7 @@ static int cgid_handler(request_rec *r)
+     env = ap_create_environment(r->pool, r->subprocess_env); 
+ 
+     if ((sd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+-            return log_scripterror(r, conf, NOT_FOUND, 0, 
++            return log_scripterror(r, conf, HTTP_NOT_FOUND, 0, 
+                                    "unable to create socket to cgi daemon");
+     } 
+     memset(&unix_addr, 0, sizeof(unix_addr));
+@@ -890,7 +890,7 @@ static int cgid_handler(request_rec *r)
+     strcpy(unix_addr.sun_path, conf->sockname);
+ 
+     if (connect(sd, (struct sockaddr *)&unix_addr, sizeof(unix_addr)) < 0) {
+-            return log_scripterror(r, conf, NOT_FOUND, 0, 
++            return log_scripterror(r, conf, HTTP_NOT_FOUND, 0, 
+                                    "unable to connect to cgi daemon");
+     } 
+ 
+@@ -987,7 +987,7 @@ static int cgid_handler(request_rec *r)
+             /* XX Note that if a script wants to produce its own Redirect 
+              * body, it now has to explicitly *say* "Status: 302" 
+              */ 
+-            return REDIRECT; 
++            return HTTP_MOVED_TEMPORARILY; 
+         } 
+ 
+         ap_send_http_header(r); 
+diff --git a/modules/http/http_core.c b/modules/http/http_core.c
+index d5fe587..f337efc 100644
+--- a/modules/http/http_core.c
++++ b/modules/http/http_core.c
+@@ -2609,7 +2609,7 @@ AP_INIT_TAKE12("RLimitNPROC", no_set_limit, NULL,
+  * Core handlers for various phases of server operation...
+  */
+ 
+-API_EXPORT_NONSTD(int) ap_core_translate(request_rec *r)
++API_EXPORT(int) ap_core_translate(request_rec *r)
+ {
+     void *sconf = r->server->module_config;
+     core_server_config *conf = ap_get_module_config(sconf, &core_module);
+@@ -2620,7 +2620,7 @@ API_EXPORT_NONSTD(int) ap_core_translate(request_rec *r)
+     if ((r->uri[0] != '/') && strcmp(r->uri, "*")) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		     "Invalid URI in request %s", r->the_request);
+-	return BAD_REQUEST;
++	return HTTP_BAD_REQUEST;
+     }
+     
+     if (r->server->path 
+@@ -2684,13 +2684,13 @@ static int default_handler(request_rec *r)
+     if (r->method_number == M_INVALID) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "Invalid method in request %s", r->the_request);
+-	return NOT_IMPLEMENTED;
++	return HTTP_NOT_IMPLEMENTED;
+     }
+     if (r->method_number == M_OPTIONS) {
+         return ap_send_http_options(r);
+     }
+     if (r->method_number == M_PUT) {
+-        return METHOD_NOT_ALLOWED;
++        return HTTP_METHOD_NOT_ALLOWED;
+     }
+     if (r->finfo.protection == 0 || (r->path_info && *r->path_info)) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_ERR|APLOG_NOERRNO, 0, r,
+@@ -2700,13 +2700,13 @@ static int default_handler(request_rec *r)
+ 	return HTTP_NOT_FOUND;
+     }
+     if (r->method_number != M_GET) {
+-        return METHOD_NOT_ALLOWED;
++        return HTTP_METHOD_NOT_ALLOWED;
+     }
+ 	
+     if ((status = ap_open(&fd, r->filename, APR_READ | APR_BINARY, 0, r->pool)) != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+ 		     "file permissions deny server access: %s", r->filename);
+-        return FORBIDDEN;
++        return HTTP_FORBIDDEN;
+     }
+     ap_update_mtime(r, r->finfo.mtime);
+     ap_set_last_modified(r);
+diff --git a/modules/http/http_protocol.c b/modules/http/http_protocol.c
+index 57d6f86..c232323 100644
+--- a/modules/http/http_protocol.c
++++ b/modules/http/http_protocol.c
+@@ -171,15 +171,18 @@ static int checked_bputs(const char *str, request_rec *r)
+  *    - return type
+  */
+ static const char *make_content_type(request_rec *r, const char *type) {
+-    char *needcset[] = {
++    static const char *needcset[] = {
+ 	"text/plain",
+ 	"text/html",
+ 	NULL };
+-    char **pcset;
++    const char **pcset;
+     core_dir_config *conf = (core_dir_config *)ap_get_module_config(
+ 	r->per_dir_config, &core_module);
+-    if (!type) type = ap_default_type(r);
+-    if (conf->add_default_charset != ADD_DEFAULT_CHARSET_ON) return type;
++
++    if (!type)
++        type = ap_default_type(r);
++    if (conf->add_default_charset != ADD_DEFAULT_CHARSET_ON)
++        return type;
+ 
+     if (ap_strcasestr(type, "charset=") != NULL) {
+ 	/* already has parameter, do nothing */
+@@ -303,7 +306,7 @@ API_EXPORT(int) ap_set_byterange(request_rec *r)
+ 	    ap_psprintf(r->pool, "%ld", tlength));
+     }
+ 
+-    r->status = PARTIAL_CONTENT;
++    r->status = HTTP_PARTIAL_CONTENT;
+     r->range = range + 6;
+ 
+     return 1;
+@@ -1250,7 +1253,7 @@ void ap_set_sub_req_protocol(request_rec *rnew, const request_rec *r)
+     rnew->the_request     = r->the_request;  /* Keep original request-line */
+ 
+     rnew->assbackwards    = 1;   /* Don't send headers from this. */
+-    rnew->no_local_copy   = 1;   /* Don't try to send USE_LOCAL_COPY for a
++    rnew->no_local_copy   = 1;   /* Don't try to send HTTP_NOT_MODIFIED for a
+                                   * fragment. */
+     rnew->method          = "GET";
+     rnew->method_number   = M_GET;
+@@ -1320,12 +1323,12 @@ API_EXPORT(int) ap_get_basic_auth_pw(request_rec *r, const char **pw)
+     if (!ap_auth_name(r)) {
+         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR,
+ 		    0, r, "need AuthName: %s", r->uri);
+-        return SERVER_ERROR;
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     if (!auth_line) {
+         ap_note_basic_auth_failure(r);
+-        return AUTH_REQUIRED;
++        return HTTP_UNAUTHORIZED;
+     }
+ 
+     if (strcasecmp(ap_getword(r->pool, &auth_line, ' '), "Basic")) {
+@@ -1333,7 +1336,7 @@ API_EXPORT(int) ap_get_basic_auth_pw(request_rec *r, const char **pw)
+         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "client used wrong authentication scheme: %s", r->uri);
+         ap_note_basic_auth_failure(r);
+-        return AUTH_REQUIRED;
++        return HTTP_UNAUTHORIZED;
+     }
+ 
+     /* APACHE_XLATE Issue's here ?!? Compare with 32/9 instead
+@@ -2626,8 +2629,10 @@ API_EXPORT(void) ap_send_error_response(request_rec *r, int recursive_error)
+         r->clength = 0;
+         r->content_type = "text/html; charset=iso-8859-1";
+ 
+-        if ((status == METHOD_NOT_ALLOWED) || (status == NOT_IMPLEMENTED))
++        if ((status == HTTP_METHOD_NOT_ALLOWED)
++            || (status == HTTP_NOT_IMPLEMENTED)) {
+             ap_table_setn(r->headers_out, "Allow", make_allow(r));
++        }
+ 
+         ap_send_http_header(r);
+ 
+@@ -2720,7 +2725,7 @@ API_EXPORT(void) ap_send_error_response(request_rec *r, int recursive_error)
+ 		      "configure your client to use that proxy.<P>\n", NULL);
+ 	    break;
+ 	case HTTP_PROXY_AUTHENTICATION_REQUIRED:
+-	case AUTH_REQUIRED:
++	case HTTP_UNAUTHORIZED:
+ 	    ap_rputs("This server could not verify that you\n"
+ 	             "are authorized to access the document\n"
+ 	             "requested.  Either you supplied the wrong\n"
+@@ -2728,7 +2733,7 @@ API_EXPORT(void) ap_send_error_response(request_rec *r, int recursive_error)
+ 	             "browser doesn't understand how to supply\n"
+ 	             "the credentials required.<P>\n", r);
+ 	    break;
+-	case BAD_REQUEST:
++	case HTTP_BAD_REQUEST:
+ 	    ap_rputs("Your browser sent a request that "
+ 	             "this server could not understand.<P>\n", r);
+ 	    if ((error_notes = ap_table_get(r->notes, "error-notes")) != NULL) {
+@@ -2740,39 +2745,39 @@ API_EXPORT(void) ap_send_error_response(request_rec *r, int recursive_error)
+ 		      ap_escape_html(r->pool, r->uri),
+ 		      "\non this server.<P>\n", NULL);
+ 	    break;
+-	case NOT_FOUND:
++	case HTTP_NOT_FOUND:
+ 	    ap_rvputs(r, "The requested URL ",
+ 		      ap_escape_html(r->pool, r->uri),
+ 		      " was not found on this server.<P>\n", NULL);
+ 	    break;
+-	case METHOD_NOT_ALLOWED:
++	case HTTP_METHOD_NOT_ALLOWED:
+ 	    ap_rvputs(r, "The requested method ", r->method,
+ 		      " is not allowed "
+ 		      "for the URL ", ap_escape_html(r->pool, r->uri),
+ 		      ".<P>\n", NULL);
+ 	    break;
+-	case NOT_ACCEPTABLE:
++	case HTTP_NOT_ACCEPTABLE:
+ 	    ap_rvputs(r,
+ 		      "An appropriate representation of the "
+ 		      "requested resource ",
+ 		      ap_escape_html(r->pool, r->uri),
+ 		      " could not be found on this server.<P>\n", NULL);
+ 	    /* fall through */
+-	case MULTIPLE_CHOICES:
++	case HTTP_MULTIPLE_CHOICES:
+ 	    {
+ 		const char *list;
+ 		if ((list = ap_table_get(r->notes, "variant-list")))
+ 		    ap_rputs(list, r);
+ 	    }
+ 	    break;
+-	case LENGTH_REQUIRED:
++	case HTTP_LENGTH_REQUIRED:
+ 	    ap_rvputs(r, "A request of the requested method ", r->method,
+ 		      " requires a valid Content-length.<P>\n", NULL);
+ 	    if ((error_notes = ap_table_get(r->notes, "error-notes")) != NULL) {
+ 		ap_rvputs(r, error_notes, "<P>\n", NULL);
+ 	    }
+ 	    break;
+-	case PRECONDITION_FAILED:
++	case HTTP_PRECONDITION_FAILED:
+ 	    ap_rvputs(r, "The precondition on the request for the URL ",
+ 		      ap_escape_html(r->pool, r->uri),
+ 		      " evaluated to false.<P>\n", NULL);
+@@ -2785,14 +2790,14 @@ API_EXPORT(void) ap_send_error_response(request_rec *r, int recursive_error)
+ 		ap_rvputs(r, error_notes, "<P>\n", NULL);
+ 	    }
+ 	    break;
+-	case BAD_GATEWAY:
++	case HTTP_BAD_GATEWAY:
+ 	    ap_rputs("The proxy server received an invalid" CRLF
+ 	             "response from an upstream server.<P>" CRLF, r);
+ 	    if ((error_notes = ap_table_get(r->notes, "error-notes")) != NULL) {
+ 		ap_rvputs(r, error_notes, "<P>\n", NULL);
+ 	    }
+ 	    break;
+-	case VARIANT_ALSO_VARIES:
++	case HTTP_VARIANT_ALSO_VARIES:
+ 	    ap_rvputs(r, "A variant for the requested resource\n<PRE>\n",
+ 		      ap_escape_html(r->pool, r->uri),
+ 		      "\n</PRE>\nis itself a negotiable resource. "
+diff --git a/modules/http/http_request.c b/modules/http/http_request.c
+index 8cdd788..af9aafa 100644
+--- a/modules/http/http_request.c
++++ b/modules/http/http_request.c
+@@ -1021,7 +1021,7 @@ API_EXPORT(void) ap_die(int type, request_rec *r)
+      * about proxy authentication.  They treat it like normal auth, and then
+      * we tweak the status.
+      */
+-    if (r->status == AUTH_REQUIRED && r->proxyreq) {
++    if (r->status == HTTP_UNAUTHORIZED && r->proxyreq) {
+         r->status = HTTP_PROXY_AUTHENTICATION_REQUIRED;
+     }
+ 
+@@ -1050,12 +1050,12 @@ API_EXPORT(void) ap_die(int type, request_rec *r)
+              * But note that the client will ultimately see the wrong
+              * status...
+              */
+-            r->status = REDIRECT;
++            r->status = HTTP_MOVED_TEMPORARILY;
+             ap_table_setn(r->headers_out, "Location", custom_response);
+         }
+         else if (custom_response[0] == '/') {
+             const char *error_notes;
+-            r->no_local_copy = 1;       /* Do NOT send USE_LOCAL_COPY for
++            r->no_local_copy = 1;       /* Do NOT send HTTP_NOT_MODIFIED for
+                                          * error documents! */
+             /*
+              * This redirect needs to be a GET no matter what the original
+@@ -1081,7 +1081,7 @@ API_EXPORT(void) ap_die(int type, request_rec *r)
+              * Dumb user has given us a bad url to redirect to --- fake up
+              * dying with a recursive server error...
+              */
+-            recursive_error = SERVER_ERROR;
++            recursive_error = HTTP_INTERNAL_SERVER_ERROR;
+             ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                         "Invalid error redirection directive: %s",
+                         custom_response);
+@@ -1095,7 +1095,7 @@ static void decl_die(int status, char *phase, request_rec *r)
+     if (status == DECLINED) {
+         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_CRIT, 0, r,
+                     "configuration error:  couldn't %s: %s", phase, r->uri);
+-        ap_die(SERVER_ERROR, r);
++        ap_die(HTTP_INTERNAL_SERVER_ERROR, r);
+     }
+     else
+         ap_die(status, r);
+diff --git a/modules/mappers/mod_actions.c b/modules/mappers/mod_actions.c
+index 4bf7d76..23c007c 100644
+--- a/modules/mappers/mod_actions.c
++++ b/modules/mappers/mod_actions.c
+@@ -195,7 +195,7 @@ static int action_handler(request_rec *r)
+ 	if (r->finfo.protection == 0) {
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			"File does not exist: %s", r->filename);
+-	    return NOT_FOUND;
++	    return HTTP_NOT_FOUND;
+ 	}
+     }
+ 
+diff --git a/modules/mappers/mod_imap.c b/modules/mappers/mod_imap.c
+index f32ccbb..9c795b2 100644
+--- a/modules/mappers/mod_imap.c
++++ b/modules/mappers/mod_imap.c
+@@ -497,16 +497,19 @@ static char *imap_url(request_rec *r, const char *base, const char *value)
+ static int imap_reply(request_rec *r, char *redirect)
+ {
+     if (!strcasecmp(redirect, "error")) {
+-        return SERVER_ERROR;    /* they actually requested an error! */
++        /* they actually requested an error! */
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+     if (!strcasecmp(redirect, "nocontent")) {
+-        return HTTP_NO_CONTENT; /* tell the client to keep the page it has */
++        /* tell the client to keep the page it has */
++        return HTTP_NO_CONTENT;
+     }
+     if (redirect && *redirect) {
++        /* must be a URL, so redirect to it */
+         ap_table_setn(r->headers_out, "Location", redirect);
+-        return REDIRECT;        /* must be a URL, so redirect to it */
++        return HTTP_MOVED_TEMPORARILY;
+     }
+-    return SERVER_ERROR;
++    return HTTP_INTERNAL_SERVER_ERROR;
+ }
+ 
+ static void menu_header(request_rec *r, char *menu)
+@@ -635,7 +638,7 @@ static int imap_handler(request_rec *r)
+     status = ap_pcfg_openfile(&imap, r->pool, r->filename);
+ 
+     if (status != APR_SUCCESS) {
+-        return NOT_FOUND;
++        return HTTP_NOT_FOUND;
+     }
+ 
+     base = imap_url(r, NULL, imap_base);         /* set base according
+diff --git a/modules/mappers/mod_negotiation.c b/modules/mappers/mod_negotiation.c
+index a5605dc..083aab1 100644
+--- a/modules/mappers/mod_negotiation.c
++++ b/modules/mappers/mod_negotiation.c
+@@ -811,7 +811,7 @@ static int read_type_map(negotiation_state *neg, request_rec *rr)
+             const char *body;
+ 
+             if (body1 == NULL) {
+-                return SERVER_ERROR;
++                return HTTP_INTERNAL_SERVER_ERROR;
+             }
+ 
+             strip_paren_comments(body1);
+@@ -2297,7 +2297,7 @@ static void store_variant_list(request_rec *r, negotiation_state *neg)
+ 
+ /* Called if we got a "Choice" response from the variant selection algorithm.
+  * It checks the result of the chosen variant to see if it
+- * is itself negotiated (if so, return error VARIANT_ALSO_VARIES).
++ * is itself negotiated (if so, return error HTTP_VARIANT_ALSO_VARIES).
+  * Otherwise, add the appropriate headers to the current response.
+  */
+ 
+@@ -2343,12 +2343,12 @@ static int setup_choice_response(request_rec *r, negotiation_state *neg,
+      * lead to cases in which a change in the set of variants or the
+      * negotiation algorithm of the nontransparent resource is never
+      * propagated up to a HTTP/1.1 cache which interprets Vary.  To be
+-     * completely on the safe side we should return VARIANT_ALSO_VARIES
++     * completely on the safe side we should return HTTP_VARIANT_ALSO_VARIES
+      * for this type of recursive negotiation too.
+      */
+     if (neg->is_transparent &&
+         ap_table_get(sub_req->err_headers_out, "TCN")) {
+-        return VARIANT_ALSO_VARIES;
++        return HTTP_VARIANT_ALSO_VARIES;
+     }
+ 
+     /* This catches the error that a transparent type map recursively
+@@ -2375,7 +2375,7 @@ static int setup_choice_response(request_rec *r, negotiation_state *neg,
+      * variant list validators.
+      */
+     if (sub_req->handler && strcmp(sub_req->handler, "type-map") == 0) {
+-        return VARIANT_ALSO_VARIES;
++        return HTTP_VARIANT_ALSO_VARIES;
+     }
+ 
+     /* This adds an appropriate Variant-Vary header if the subrequest
+@@ -2470,7 +2470,7 @@ static int do_negotiation(request_rec *r, negotiation_state *neg,
+      */
+ 
+     if (alg_result == alg_list) {
+-        /* send a list response or NOT_ACCEPTABLE error response  */
++        /* send a list response or HTTP_NOT_ACCEPTABLE error response  */
+ 
+         neg->send_alternates = 1; /* always include Alternates header */
+         set_neg_headers(r, neg, alg_result); 
+@@ -2490,13 +2490,13 @@ static int do_negotiation(request_rec *r, negotiation_state *neg,
+              * responses (they certainly won't if they conform to the
+              * HTTP/1.0 specification).
+              */
+-            return MULTIPLE_CHOICES;
++            return HTTP_MULTIPLE_CHOICES;
+         }
+         
+         if (!*bestp) {
+             ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                           "no acceptable variant: %s", r->filename);
+-            return NOT_ACCEPTABLE;
++            return HTTP_NOT_ACCEPTABLE;
+         }
+     }
+ 
+@@ -2632,7 +2632,7 @@ static int handle_multi(request_rec *r)
+     /* BLECH --- don't multi-resolve non-ordinary files */
+ 
+     if (sub_req->finfo.filetype != APR_REG) {
+-        res = NOT_FOUND;
++        res = HTTP_NOT_FOUND;
+         goto return_from_multi;
+     }
+ 
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 22c4192..f66dfb4 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -155,7 +155,7 @@
+ **         all hooks are run, independend of result
+ **
+ **  o  at the last stage, the core module always
+-**       - says "BAD_REQUEST" if r->filename does not begin with "/"
++**       - says "HTTP_BAD_REQUEST" if r->filename does not begin with "/"
+ **       - prefix URL with document_root or replaced server_root
+ **         with document_root and sets r->filename
+ **       - always return a "OK" independed if the file really exists
+@@ -1142,7 +1142,7 @@ static int hook_uri2file(request_rec *r)
+                 ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                              "attempt to make remote request from mod_rewrite "
+                              "without proxy enabled: %s", r->filename);
+-                return FORBIDDEN;
++                return HTTP_FORBIDDEN;
+             }
+ 
+             /* make sure the QUERY_STRING and
+@@ -1210,7 +1210,7 @@ static int hook_uri2file(request_rec *r)
+                 r->status = HTTP_OK; /* make Apache kernel happy */
+             }
+             else {
+-                n = REDIRECT;
++                n = HTTP_MOVED_TEMPORARILY;
+             }
+ 
+             /* now do the redirection */
+@@ -1221,7 +1221,7 @@ static int hook_uri2file(request_rec *r)
+         else if (strlen(r->filename) > 10 &&
+                  strncmp(r->filename, "forbidden:", 10) == 0) {
+             /* This URLs is forced to be forbidden for the requester */
+-            return FORBIDDEN;
++            return HTTP_FORBIDDEN;
+         }
+         else if (strlen(r->filename) > 5 &&
+                  strncmp(r->filename, "gone:", 5) == 0) {
+@@ -1252,7 +1252,7 @@ static int hook_uri2file(request_rec *r)
+ 
+             /* the filename has to start with a slash! */
+             if (r->filename[0] != '/') {
+-                return BAD_REQUEST;
++                return HTTP_BAD_REQUEST;
+             }
+ 
+             /* if there is no valid prefix, we have
+@@ -1386,7 +1386,7 @@ static int hook_fixup(request_rec *r)
+                      "Options FollowSymLinks or SymLinksIfOwnerMatch is off "
+                      "which implies that RewriteRule directive is forbidden: "
+                      "%s", r->filename);
+-        return FORBIDDEN;
++        return HTTP_FORBIDDEN;
+     }
+     else {
+         /* FollowSymLinks is given, but the user can
+@@ -1503,7 +1503,7 @@ static int hook_fixup(request_rec *r)
+                 r->status = HTTP_OK; /* make Apache kernel happy */
+             }
+             else {
+-                n = REDIRECT;
++                n = HTTP_MOVED_TEMPORARILY;
+             }
+ 
+             /* now do the redirection */
+@@ -1515,7 +1515,7 @@ static int hook_fixup(request_rec *r)
+         else if (strlen(r->filename) > 10 &&
+                  strncmp(r->filename, "forbidden:", 10) == 0) {
+             /* This URL is forced to be forbidden for the requester */
+-            return FORBIDDEN;
++            return HTTP_FORBIDDEN;
+         }
+         else if (strlen(r->filename) > 5 &&
+                  strncmp(r->filename, "gone:", 5) == 0) {
+@@ -1536,7 +1536,7 @@ static int hook_fixup(request_rec *r)
+ 
+             /* the filename has to start with a slash! */
+             if (r->filename[0] != '/') {
+-                return BAD_REQUEST;
++                return HTTP_BAD_REQUEST;
+             }
+ 
+             /* Check for deadlooping:
+diff --git a/modules/mappers/mod_userdir.c b/modules/mappers/mod_userdir.c
+index 7e83bb1..7e6018c 100644
+--- a/modules/mappers/mod_userdir.c
++++ b/modules/mappers/mod_userdir.c
+@@ -289,7 +289,7 @@ static int translate_userdir(request_rec *r)
+ 		{
+                     redirect = ap_pstrcat(r->pool, x, w, userdir, dname, NULL);
+                     ap_table_setn(r->headers_out, "Location", redirect);
+-                    return REDIRECT;
++                    return HTTP_MOVED_TEMPORARILY;
+                 }
+                 else
+                     filename = ap_pstrcat(r->pool, x, w, userdir, NULL);
+@@ -300,7 +300,7 @@ static int translate_userdir(request_rec *r)
+         else if (ap_strchr_c(userdir, ':')) {
+             redirect = ap_pstrcat(r->pool, userdir, "/", w, dname, NULL);
+             ap_table_setn(r->headers_out, "Location", redirect);
+-            return REDIRECT;
++            return HTTP_MOVED_TEMPORARILY;
+         }
+         else {
+ #ifdef WIN32
+diff --git a/modules/metadata/mod_cern_meta.c b/modules/metadata/mod_cern_meta.c
+index ae42c09..346cbf0 100644
+--- a/modules/metadata/mod_cern_meta.c
++++ b/modules/metadata/mod_cern_meta.c
+@@ -261,7 +261,7 @@ static int scan_meta_file(request_rec *r, ap_file_t *f)
+ 	if (!(l = strchr(w, ':'))) {
+  	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			"malformed header in meta file: %s", r->filename);
+-	    return SERVER_ERROR;
++	    return HTTP_INTERNAL_SERVER_ERROR;
+ 	}
+ 
+ 	*l++ = '\0';
+@@ -365,7 +365,7 @@ static int add_cern_meta_data(request_rec *r)
+ 	}
+ 	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+ 	      "meta file permissions deny server access: %s", metafilename);
+-	return FORBIDDEN;
++	return HTTP_FORBIDDEN;
+     };
+ 
+     /* read the headers in */
+diff --git a/modules/metadata/mod_expires.c b/modules/metadata/mod_expires.c
+index dff1dbe..bf52f13 100644
+--- a/modules/metadata/mod_expires.c
++++ b/modules/metadata/mod_expires.c
+@@ -422,7 +422,7 @@ static int add_expires(request_rec *r)
+     if (conf == NULL) {
+         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "internal error: %s", r->filename);
+-        return SERVER_ERROR;
++        return HTTP_INTERNAL_SERVER_ERROR;
+     };
+ 
+     if (conf->active != ACTIVE_ON)
+@@ -479,7 +479,7 @@ static int add_expires(request_rec *r)
+          */
+         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+                     "internal error: bad expires code: %s", r->filename);
+-        return SERVER_ERROR;
++        return HTTP_INTERNAL_SERVER_ERROR;
+     };
+ 
+     expires = base + additional;
+diff --git a/os/win32/mod_isapi.c b/os/win32/mod_isapi.c
+index 923d694..847e147 100644
+--- a/os/win32/mod_isapi.c
++++ b/os/win32/mod_isapi.c
+@@ -145,13 +145,13 @@ int isapi_handler (request_rec *r)
+     /* Use similar restrictions as CGIs */
+ 
+     if (!(ap_allow_options(r) & OPT_EXECCGI))
+-        return FORBIDDEN;
++        return HTTP_FORBIDDEN;
+ 
+     if (r->finfo.protection == 0)
+-            return NOT_FOUND;
++            return HTTP_NOT_FOUND;
+ 
+     if (r->finfo.filetype == APR_DIR)
+-            return FORBIDDEN;
++            return HTTP_FORBIDDEN;
+ 
+     /* Load the module */
+ 
+@@ -160,7 +160,7 @@ int isapi_handler (request_rec *r)
+             rv = GetLastError();
+         ap_log_rerror(APLOG_MARK, APLOG_ALERT, rv, r,
+                               "Could not load DLL: %s", r->filename);
+-            return SERVER_ERROR;
++            return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     if (!(isapi_version =
+@@ -170,7 +170,7 @@ int isapi_handler (request_rec *r)
+                               "Could not load DLL %s symbol GetExtensionVersion()",
+                       r->filename);
+             FreeLibrary(isapi_handle);
+-            return SERVER_ERROR;
++            return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     if (!(isapi_entry =
+@@ -180,7 +180,7 @@ int isapi_handler (request_rec *r)
+                               "Could not load DLL %s symbol HttpExtensionProc()",
+                       r->filename);
+             FreeLibrary(isapi_handle);
+-            return SERVER_ERROR;
++            return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     /* TerminateExtension() is an optional interface */
+@@ -190,10 +190,11 @@ int isapi_handler (request_rec *r)
+     /* Run GetExtensionVersion() */
+ 
+     if (!(*isapi_version)(pVer)) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ALERT, SERVER_ERROR, r,
++        /* ### euh... we're passing the wrong type of error code here */
++        ap_log_rerror(APLOG_MARK, APLOG_ALERT, HTTP_INTERNAL_SERVER_ERROR, r,
+                     "ISAPI %s GetExtensionVersion() call failed", r->filename);
+             FreeLibrary(isapi_handle);
+-            return SERVER_ERROR;
++            return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     /* Set up variables */
+@@ -248,7 +249,7 @@ int isapi_handler (request_rec *r)
+             if ((read = ap_get_client_block(r, ecb->lpbData, to_read)) < 0) {
+                 if (isapi_term) (*isapi_term)(HSE_TERM_MUST_UNLOAD);
+                 FreeLibrary(isapi_handle);
+-                return SERVER_ERROR;
++                return HTTP_INTERNAL_SERVER_ERROR;
+             }
+ 
+             /* Although its not to spec, IIS seems to null-terminate
+@@ -301,13 +302,13 @@ int isapi_handler (request_rec *r)
+             return OK;
+ 
+     case HSE_STATUS_PENDING:    /* We don't support this */
+-        rv = APR_ENOTIMPL;
+-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, SERVER_ERROR, r,
+-                    "ISAPI asynchronous I/O not supported: %s", r->filename);
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING, APR_ENOTIMPL, r,
++                      "ISAPI asynchronous I/O not supported: %s", r->filename);
++        /* fallthrough */
+     case HSE_STATUS_ERROR:
+     default:
+ 
+-        return SERVER_ERROR;
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+ }
+@@ -403,7 +404,8 @@ BOOL WINAPI ServerSupportFunction (HCONN hConn, DWORD dwHSERequest,
+          * is done.
+          */
+         ap_table_set (r->headers_out, "Location", lpvBuffer);
+-        cid->status = cid->r->status = cid->ecb->dwHttpStatusCode = REDIRECT;
++        cid->status = cid->r->status = cid->ecb->dwHttpStatusCode =
++            HTTP_MOVED_TEMPORARILY;
+         return TRUE;
+ 
+     case HSE_REQ_SEND_URL:
+@@ -478,8 +480,11 @@ BOOL WINAPI ServerSupportFunction (HCONN hConn, DWORD dwHSERequest,
+ 
+                 if (!(value = strchr(data, ':'))) {
+                         SetLastError(TODO_ERROR);
+-                        ap_log_rerror(APLOG_MARK, APLOG_ERR, SERVER_ERROR, r,
+-                                          "ISA sent invalid headers", r->filename);
++                        /* ### euh... we're passing the wrong type of error
++                           ### code here */
++                        ap_log_rerror(APLOG_MARK, APLOG_ERR,
++                                      HTTP_INTERNAL_SERVER_ERROR, r,
++                                      "ISA sent invalid headers", r->filename);
+                         return FALSE;
+                 }
+ 
+@@ -561,8 +566,11 @@ BOOL WINAPI ServerSupportFunction (HCONN hConn, DWORD dwHSERequest,
+     /* We don't support all this async I/O, Microsoft-specific stuff */
+     case HSE_REQ_IO_COMPLETION:
+     case HSE_REQ_TRANSMIT_FILE:
+-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, SERVER_ERROR, r,
+-                        "ISAPI asynchronous I/O not supported: %s", r->filename);
++        /* ### euh... we're passing the wrong type of error code here */
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING,
++                      HTTP_INTERNAL_SERVER_ERROR, r,
++                      "ISAPI asynchronous I/O not supported: %s",
++                      r->filename);
+     default:
+             SetLastError(ERROR_INVALID_PARAMETER);
+             return FALSE;
+diff --git a/server/util.c b/server/util.c
+index 2bcbbf3..e30ee3d 100644
+--- a/server/util.c
++++ b/server/util.c
+@@ -1485,11 +1485,11 @@ static char x2c(const char *what)
+  * Unescapes a URL.
+  * Returns 0 on success, non-zero on error
+  * Failure is due to
+- *   bad % escape       returns BAD_REQUEST
++ *   bad % escape       returns HTTP_BAD_REQUEST
+  *
+  *   decoding %00 -> \0
+  *   decoding %2f -> /   (a special character)
+- *                      returns NOT_FOUND
++ *                      returns HTTP_NOT_FOUND
+  */
+ API_EXPORT(int) ap_unescape_url(char *url)
+ {
+@@ -1522,9 +1522,9 @@ API_EXPORT(int) ap_unescape_url(char *url)
+     }
+     *x = '\0';
+     if (badesc)
+-	return BAD_REQUEST;
++	return HTTP_BAD_REQUEST;
+     else if (badpath)
+-	return NOT_FOUND;
++	return HTTP_NOT_FOUND;
+     else
+ 	return OK;
+ }

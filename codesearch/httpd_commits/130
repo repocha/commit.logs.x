@@ -1,0 +1,26 @@
+commit a8e475258627d21b1dbeb4fb58708ec47823d2ec
+Author: Daniel Earl Poirier <poirier@apache.org>
+Date:   Fri Aug 28 14:39:34 2009 +0000
+
+    Don't let the server start if user has asked for qop=auth-int
+    with mod_auth_digest.  The server can't provide it because it's
+    not implemented yet.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@808901 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index b3a1251..df9235b 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -548,9 +548,7 @@ static const char *set_qop(cmd_parms *cmd, void *config, const char *op)
+     }
+ 
+     if (!strcasecmp(op, "auth-int")) {
+-        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, cmd->server,
+-                     "Digest: WARNING: qop `auth-int' currently only works "
+-                     "correctly for responses with no entity");
++        return "AuthDigestQop auth-int is not implemented";
+     }
+     else if (strcasecmp(op, "auth")) {
+         return apr_pstrcat(cmd->pool, "Unrecognized qop: ", op, NULL);

@@ -1,0 +1,69 @@
+commit 84ff67324df85fb8da57321a8bd548a129cb037c
+Author: Chris Darroch <chrisd@apache.org>
+Date:   Tue Mar 25 18:21:32 2008 +0000
+
+    Return AUTHZ_GRANTED not AUTHZ_DENIED when redirecting after
+    successful login/logout.  Use redirection URL from first row returned
+    by DB query, in the same manner as that used by mod_authn_dbd when
+    querying for a single record.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@640932 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 2a4a23b..4fb869b 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,11 @@
+ Changes with Apache 2.3.0
+ [ When backported to 2.2.x, remove entry from this file ]
+ 
++  *) mod_authz_dbd: When redirecting after successful login/logout per
++     AuthzDBDRedirectQuery, do not report authorization failure, and use
++     first row returned by database query instead of last row.
++     [Chris Darroch]
++
+   *) mod_rewrite: Initialize hash needed by ap_register_rewrite_mapfunc early
+      enough. PR 44641 [Daniel Lescohier <daniel.lescohier cnet.com>]
+ 
+diff --git a/modules/aaa/mod_authz_dbd.c b/modules/aaa/mod_authz_dbd.c
+index 0999178..d01d83b 100644
+--- a/modules/aaa/mod_authz_dbd.c
++++ b/modules/aaa/mod_authz_dbd.c
+@@ -164,15 +164,16 @@ static int authz_dbd_login(request_rec *r, authz_dbd_cfg *cfg,
+             for (rv = apr_dbd_get_row(dbd->driver, r->pool, res, &row, -1);
+                  rv != -1;
+                  rv = apr_dbd_get_row(dbd->driver, r->pool, res, &row, -1)) {
+-                if (rv == 0) {
+-                    newuri = apr_dbd_get_entry(dbd->driver, row, 0);
+-                }
+-                else {
++                if (rv != 0) {
+                     message = apr_dbd_error(dbd->driver, dbd->handle, rv);
+                     ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                           "authz_dbd in get_row; action=%s user=%s [%s]",
+                           action, r->user, message?message:noerror);
+                 }
++                else if (newuri == NULL) {
++                    newuri = apr_dbd_get_entry(dbd->driver, row, 0);
++                }
++                /* we can't break out here or row won't get cleaned up */
+             }
+         }
+         else {
+@@ -185,13 +186,9 @@ static int authz_dbd_login(request_rec *r, authz_dbd_cfg *cfg,
+     if (newuri != NULL) {
+         r->status = HTTP_MOVED_TEMPORARILY;
+         apr_table_set(r->err_headers_out, "Location", newuri);
+-        rv = HTTP_MOVED_TEMPORARILY;
+     }
+-    else {
+-        rv = OK;
+-    }
+-    authz_dbd_run_client_login(r, rv, action);
+-    return rv;
++    authz_dbd_run_client_login(r, OK, action);
++    return OK;
+ }
+ 
+ static int authz_dbd_group_query(request_rec *r, authz_dbd_cfg *cfg,

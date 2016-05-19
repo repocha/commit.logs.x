@@ -1,0 +1,35 @@
+commit 6e1269dc3223326d36e10d9fa1e909411e342cff
+Author: Jan Kaluža <jkaluza@apache.org>
+Date:   Wed Jun 10 10:43:54 2015 +0000
+
+    * mod_auth_digest: Use anonymous shm by default, fall back on name-based.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1684636 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 316da19..e9bf364 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -249,9 +249,18 @@ static int initialize_tables(server_rec *s, apr_pool_t *ctx)
+     client_shm_filename = ap_runtime_dir_relative(ctx, "authdigest_shm");
+     client_shm_filename = ap_append_pid(ctx, client_shm_filename, ".");
+ 
+-    /* Now create that segment */
+-    sts = apr_shm_create(&client_shm, shmem_size,
+-                        client_shm_filename, ctx);
++    /* Use anonymous shm by default, fall back on name-based. */
++    sts = apr_shm_create(&client_shm, shmem_size, NULL, ctx);
++    if (APR_STATUS_IS_ENOTIMPL(sts)) {
++        /* For a name-based segment, remove it first in case of a
++         * previous unclean shutdown. */
++        apr_shm_remove(client_shm_filename, ctx);
++
++        /* Now create that segment */
++        sts = apr_shm_create(&client_shm, shmem_size,
++                            client_shm_filename, ctx);
++    }
++
+     if (APR_SUCCESS != sts) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, sts, s, APLOGNO(01762)
+                      "Failed to create shared memory segment on file %s",

@@ -1,0 +1,150 @@
+commit 861793946233a4bada0ad832819ae4f24bf26f94
+Author: Graham Leggett <minfrin@apache.org>
+Date:   Mon Dec 30 11:57:15 2013 +0000
+
+    mod_authz_user: Support the expression parser within the require directives.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1554195 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index dde3b17..e8e2569 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,16 +1,19 @@
+                                                          -*- coding: utf-8 -*-
+ Changes with Apache 2.5.0
+ 
+-  *) mod_authnz_host: Support the expression parser within the require
++  *) mod_authz_user: Support the expression parser within the require
+      directives. [Graham Leggett]
+ 
+-  *) mod_authnz_groupfile: Support the expression parser within the require
++  *) mod_authz_host: Support the expression parser within the require
+      directives. [Graham Leggett]
+ 
+-  *) mod_authnz_dbm: Support the expression parser within the require
++  *) mod_authz_groupfile: Support the expression parser within the require
+      directives. [Graham Leggett]
+ 
+-  *) mod_authnz_dbd: Support the expression parser within the require
++  *) mod_authz_dbm: Support the expression parser within the require
++     directives. [Graham Leggett]
++
++  *) mod_authz_dbd: Support the expression parser within the require
+      directives. [Graham Leggett]
+ 
+   *) mod_authnz_ldap: Support the expression parser within the require
+diff --git a/docs/log-message-tags/next-number b/docs/log-message-tags/next-number
+index 76e69c8..49d31a3 100644
+--- a/docs/log-message-tags/next-number
++++ b/docs/log-message-tags/next-number
+@@ -1 +1 @@
+-2594
++2595
+diff --git a/docs/manual/mod/mod_authz_user.xml b/docs/manual/mod/mod_authz_user.xml
+index 327088f..6ca5d3a 100644
+--- a/docs/manual/mod/mod_authz_user.xml
++++ b/docs/manual/mod/mod_authz_user.xml
+@@ -38,4 +38,39 @@
+ </summary>
+ <seealso><directive module="mod_authz_core">Require</directive></seealso>
+ 
++<section id="requiredirectives"><title>The Require Directives</title>
++
++    <p>Apache's <directive module="mod_authz_core">Require</directive>
++    directives are used during the authorization phase to ensure that
++    a user is allowed to access a resource.  mod_authz_user extends the
++    authorization types with <code>user</code> and <code>valid-user</code>.
++    </p>
++
++    <p>Since v2.5.0, <a href="../expr.html">expressions</a> are supported
++    within the user require directives.</p>
++
++<section id="requser"><title>Require user</title>
++
++    <p>This directive specifies a list of users that are allowed to gain
++    access.</p>
++
++    <highlight language="config">
++      Require user john paul george ringo
++    </highlight>
++
++</section>
++
++<section id="reqvaliduser"><title>Require valid-user</title>
++
++    <p>When this directive is specified, any successfully authenticated
++    user will be allowed to gain access.</p>
++
++    <highlight language="config">
++      Require valid-user
++    </highlight>
++
++</section>
++
++</section>
++
+ </modulesynopsis>
+diff --git a/modules/aaa/mod_authz_user.c b/modules/aaa/mod_authz_user.c
+index e4af794..0f45395 100644
+--- a/modules/aaa/mod_authz_user.c
++++ b/modules/aaa/mod_authz_user.c
+@@ -49,13 +49,25 @@ static authz_status user_check_authorization(request_rec *r,
+                                              const char *require_args,
+                                              const void *parsed_require_args)
+ {
++    const char *err = NULL;
++    const ap_expr_info_t *expr = parsed_require_args;
++    const char *require;
++
+     const char *t, *w;
+ 
+     if (!r->user) {
+         return AUTHZ_DENIED_NO_USER;
+     }
+ 
+-    t = require_args;
++    require = ap_expr_str_exec(r, expr, &err);
++    if (err) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(02594)
++                      "authz_user authorize: require user: Can't "
++                      "evaluate require expression: %s", err);
++        return AUTHZ_DENIED;
++    }
++
++    t = require;
+     while ((w = ap_getword_conf(r->pool, &t)) && w[0]) {
+         if (!strcmp(r->user, w)) {
+             return AUTHZ_GRANTED;
+@@ -81,10 +93,29 @@ static authz_status validuser_check_authorization(request_rec *r,
+     return AUTHZ_GRANTED;
+ }
+ 
++static const char *user_parse_config(cmd_parms *cmd, const char *require_line,
++                                     const void **parsed_require_line)
++{
++    const char *expr_err = NULL;
++    ap_expr_info_t *expr = apr_pcalloc(cmd->pool, sizeof(*expr));
++
++    expr = ap_expr_parse_cmd(cmd, require_line, AP_EXPR_FLAG_STRING_RESULT,
++            &expr_err, NULL);
++
++    if (expr_err)
++        return apr_pstrcat(cmd->temp_pool,
++                           "Cannot parse expression in require line: ",
++                           expr_err, NULL);
++
++    *parsed_require_line = expr;
++
++    return NULL;
++}
++
+ static const authz_provider authz_user_provider =
+ {
+     &user_check_authorization,
+-    NULL,
++    &user_parse_config,
+ };
+ static const authz_provider authz_validuser_provider =
+ {

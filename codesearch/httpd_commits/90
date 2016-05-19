@@ -1,0 +1,110 @@
+commit 041282f86e0952760b7c45b644d3258e985f7999
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Mon Jun 13 11:04:29 2011 +0000
+
+    Avoid some memory allocations by using apr_table_setn where the string arguments
+    are allocated from the request pool and not modified later on.
+    
+    Submitted by: Christophe JAILLET <christophe jaillet wanadoo fr>
+    PR: 51358
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1135084 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_form.c b/modules/aaa/mod_auth_form.c
+index 41e1f2f..c713aac 100644
+--- a/modules/aaa/mod_auth_form.c
++++ b/modules/aaa/mod_auth_form.c
+@@ -832,8 +832,8 @@ static void fake_basic_authentication(request_rec *r, auth_form_config_rec *conf
+         char *base64 = apr_palloc(r->pool,
+                                   apr_base64_encode_len(size + 1) * sizeof(char));
+         apr_base64_encode(base64, basic, size);
+-        apr_table_set(r->headers_in, "Authorization",
+-                      apr_pstrcat(r->pool, "Basic ", base64, NULL));
++        apr_table_setn(r->headers_in, "Authorization",
++                       apr_pstrcat(r->pool, "Basic ", base64, NULL));
+     }
+ }
+ 
+diff --git a/modules/dav/main/mod_dav.c b/modules/dav/main/mod_dav.c
+index 1b18cb2..d021b91 100644
+--- a/modules/dav/main/mod_dav.c
++++ b/modules/dav/main/mod_dav.c
+@@ -2667,8 +2667,8 @@ static int dav_method_copymove(request_rec *r, int is_move)
+         if (lookup.rnew->status == HTTP_UNAUTHORIZED && auth != NULL) {
+             /* propagate the WWW-Authorization header up from the
+              * subreq so the client sees it. */
+-            apr_table_set(r->err_headers_out, "WWW-Authenticate",
+-                          apr_pstrdup(r->pool, auth));
++            apr_table_setn(r->err_headers_out, "WWW-Authenticate",
++                           apr_pstrdup(r->pool, auth));
+         }
+ 
+         /* ### how best to report this... */
+@@ -3148,7 +3148,7 @@ static int dav_method_lock(request_rec *r)
+                                         lock->locktoken),
+                                     ">", NULL);
+ 
+-        apr_table_set(r->headers_out, "Lock-Token", locktoken_txt);
++        apr_table_setn(r->headers_out, "Lock-Token", locktoken_txt);
+     }
+ 
+     (*locks_hooks->close_lockdb)(lockdb);
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 32def93..c090959 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -4482,8 +4482,8 @@ static int hook_uri2file(request_rec *r)
+          *  now apply the rules ...
+          */
+         rulestatus = apply_rewrite_list(r, conf->rewriterules, NULL);
+-        apr_table_set(r->notes,"mod_rewrite_rewritten",
+-                      apr_psprintf(r->pool,"%d",rulestatus));
++        apr_table_setn(r->notes, "mod_rewrite_rewritten",
++                       apr_psprintf(r->pool,"%d",rulestatus));
+     }
+     else {
+         rewritelog((r, 2, NULL, "uri already rewritten. Status %s, Uri %s, "
+diff --git a/modules/proxy/mod_proxy.c b/modules/proxy/mod_proxy.c
+index 10cd577..29802dc 100644
+--- a/modules/proxy/mod_proxy.c
++++ b/modules/proxy/mod_proxy.c
+@@ -880,8 +880,8 @@ static int proxy_handler(request_rec *r)
+         maxfwd = conf->maxfwd;
+     }
+     if (maxfwd >= 0) {
+-        apr_table_set(r->headers_in, "Max-Forwards",
+-                      apr_psprintf(r->pool, "%ld", maxfwd));
++        apr_table_setn(r->headers_in, "Max-Forwards",
++                       apr_psprintf(r->pool, "%ld", maxfwd));
+     }
+ 
+     if (r->method_number == M_TRACE) {
+diff --git a/modules/proxy/mod_proxy_ftp.c b/modules/proxy/mod_proxy_ftp.c
+index e9ddb61..20622be 100644
+--- a/modules/proxy/mod_proxy_ftp.c
++++ b/modules/proxy/mod_proxy_ftp.c
+@@ -1165,8 +1165,8 @@ static int proxy_ftp_handler(request_rec *r, proxy_worker *worker,
+                 break;
+         if (*secs_str != '\0') {
+             secs = atol(secs_str);
+-            apr_table_add(r->headers_out, "Retry-After",
+-                          apr_psprintf(p, "%lu", (unsigned long)(60 * secs)));
++            apr_table_addn(r->headers_out, "Retry-After",
++                           apr_psprintf(p, "%lu", (unsigned long)(60 * secs)));
+         }
+         return ftp_proxyerror(r, backend, HTTP_SERVICE_UNAVAILABLE, ftpmessage);
+     }
+diff --git a/modules/ssl/ssl_engine_kernel.c b/modules/ssl/ssl_engine_kernel.c
+index 3bb5846..1ff5d2e 100644
+--- a/modules/ssl/ssl_engine_kernel.c
++++ b/modules/ssl/ssl_engine_kernel.c
+@@ -1042,7 +1042,7 @@ int ssl_hook_UserCheck(request_rec *r)
+                                              apr_pstrcat(r->pool, clientdn,
+                                                          ":password", NULL)),
+                             NULL);
+-    apr_table_set(r->headers_in, "Authorization", auth_line);
++    apr_table_setn(r->headers_in, "Authorization", auth_line);
+ 
+     ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                   "Faking HTTP Basic Auth header: \"Authorization: %s\"",

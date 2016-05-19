@@ -1,0 +1,542 @@
+commit f49cd8095868737bdcceee663bae8c989baf022a
+Author: Ian Holsman <ianh@apache.org>
+Date:   Fri Nov 23 16:35:22 2001 +0000
+
+    Modify post_config hook so that it can return a error,
+    causing the server not to start.
+    previous method was to call exit(1) which would not fail
+    gracefully
+    
+    PR:
+    Obtained from:
+    Submitted by:
+    Reviewed by:	(Idea only Jeff Trawick)
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@92144 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 01532be..f9397fe 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,5 +1,10 @@
+ Changes with Apache 2.0.29-dev
+ 
++
++  *) Change post_config hook to return a value, allowing you
++     to flag a error post config
++     [Ian Holsman, Jeff Trawick]
++
+   *) Allow SUEXEC_BIN (the path to the suexec binary that is
+      hard-coded into the server) to be specified to the configure
+      script by the --with-suexec-bin parameter.  [Aaron Bannert]
+diff --git a/include/http_config.h b/include/http_config.h
+index 8efc81c..9f24aa4 100644
+--- a/include/http_config.h
++++ b/include/http_config.h
+@@ -979,8 +979,9 @@ AP_DECLARE_HOOK(void,pre_config,(apr_pool_t *pconf,apr_pool_t *plog,apr_pool_t *
+  * @param plog The logging streams pool
+  * @param ptemp The temporary pool
+  * @param s The list of server_recs
++ * @return OK or a 
+  */
+-AP_DECLARE_HOOK(void,post_config,(apr_pool_t *pconf,apr_pool_t *plog,apr_pool_t *ptemp,server_rec *s))
++AP_DECLARE_HOOK(int,post_config,(apr_pool_t *pconf,apr_pool_t *plog,apr_pool_t *ptemp,server_rec *s))
+ 
+ /**
+  * Run the open_logs functions for each module
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 5e55b89..4601867 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -407,14 +407,14 @@ static void initialize_tables(server_rec *s, apr_pool_t *ctx)
+ #endif /* APR_HAS_SHARED_MEMORY */
+ 
+ 
+-static void initialize_module(apr_pool_t *p, apr_pool_t *plog,
++static int initialize_module(apr_pool_t *p, apr_pool_t *plog,
+ 			      apr_pool_t *ptemp, server_rec *s)
+ {
+     /* keep from doing the init more than once at startup, and delay
+      * the init until the second round
+      */
+     if (++call_cnt < 2)
+-	return;
++	return OK;
+ 
+     /* only initialize the secret on startup, not on restarts */
+     if (call_cnt == 2)
+@@ -434,6 +434,7 @@ static void initialize_module(apr_pool_t *p, apr_pool_t *plog,
+     initialize_tables(s, p);
+     apr_pool_cleanup_register(p, NULL, cleanup_tables, apr_pool_cleanup_null);
+ #endif	/* APR_HAS_SHARED_MEMORY */
++    return OK;
+ }
+ 
+ static void initialize_child(apr_pool_t *p, server_rec *s)
+diff --git a/modules/arch/netware/mod_nw_ssl.c b/modules/arch/netware/mod_nw_ssl.c
+index a40c1c7..f507fab 100644
+--- a/modules/arch/netware/mod_nw_ssl.c
++++ b/modules/arch/netware/mod_nw_ssl.c
+@@ -340,7 +340,7 @@ static void nwssl_pre_config(apr_pool_t *pconf, apr_pool_t *plog,
+     ap_seclisteners = NULL;
+ }
+ 
+-static void nwssl_post_config(apr_pool_t *pconf, apr_pool_t *plog,
++static int nwssl_post_config(apr_pool_t *pconf, apr_pool_t *plog,
+                           apr_pool_t *ptemp, server_rec *s)
+ {
+     seclisten_rec* sl;
+@@ -373,16 +373,17 @@ static void nwssl_post_config(apr_pool_t *pconf, apr_pool_t *plog,
+                                               pconf)) != APR_SUCCESS) {
+                     ap_log_perror(APLOG_MARK, APLOG_CRIT, status, pconf,
+                                  "alloc_listener: failed to set up sockaddr for %s:%d", sl->addr, sl->port);
+-                    exit(1);
++                    return HTTP_INTERNAL_SERVER_ERROR;
+                 }
+                 lr->next = ap_listeners;
+                 ap_listeners = lr;
+                 apr_pool_cleanup_register(pconf, lr, nwssl_socket_cleanup, apr_pool_cleanup_null);
+             }                        
+         } else {
+-            exit(1);
++            return HTTP_INTERNAL_SERVER_ERROR;
+         }
+     } 
++    return OK;
+ }
+ 
+ static void *nwssl_config_server_create(apr_pool_t *p, server_rec *s)
+diff --git a/modules/arch/win32/mod_isapi.c b/modules/arch/win32/mod_isapi.c
+index 0825c05..f4f7185 100644
+--- a/modules/arch/win32/mod_isapi.c
++++ b/modules/arch/win32/mod_isapi.c
+@@ -213,7 +213,7 @@ static int compare_loaded(const void *av, const void *bv)
+     return strcmp((*a)->filename, (*b)->filename);
+ }
+ 
+-static void isapi_post_config(apr_pool_t *p, apr_pool_t *plog,
++static int isapi_post_config(apr_pool_t *p, apr_pool_t *plog,
+                               apr_pool_t *ptemp, server_rec *s)
+ {
+     isapi_server_conf *sconf = ap_get_module_config(s->module_config, 
+@@ -228,6 +228,7 @@ static void isapi_post_config(apr_pool_t *p, apr_pool_t *plog,
+     for (s = s->next; s; s = s->next) {
+ 	ap_set_module_config(s->module_config, &isapi_module, sconf);
+     }
++    return OK;
+ }
+ 
+ static apr_status_t isapi_load(apr_pool_t *p, isapi_server_conf *sconf, 
+diff --git a/modules/cache/mod_file_cache.c b/modules/cache/mod_file_cache.c
+index 98002cb..dbc4eb8 100644
+--- a/modules/cache/mod_file_cache.c
++++ b/modules/cache/mod_file_cache.c
+@@ -299,10 +299,11 @@ static const char *cachefilemmap(cmd_parms *cmd, void *dummy, const char *filena
+     return NULL;
+ }
+ 
+-static void file_cache_post_config(apr_pool_t *p, apr_pool_t *plog,
++static int file_cache_post_config(apr_pool_t *p, apr_pool_t *plog,
+                                    apr_pool_t *ptemp, server_rec *s)
+ {
+     /* Hummm, anything to do here? */
++    return OK;
+ }
+ 
+ /* If it's one of ours, fill in r->finfo now to avoid extra stat()... this is a
+diff --git a/modules/dav/main/mod_dav.c b/modules/dav/main/mod_dav.c
+index 8272daf..90879c4 100644
+--- a/modules/dav/main/mod_dav.c
++++ b/modules/dav/main/mod_dav.c
+@@ -132,12 +132,13 @@ typedef struct {
+ /* forward-declare for use in configuration lookup */
+ extern module DAV_DECLARE_DATA dav_module;
+ 
+-static void dav_init_handler(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
++static int dav_init_handler(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+                              server_rec *s)
+ {
+     /* DBG0("dav_init_handler"); */
+ 
+     ap_add_version_component(p, "DAV/2");
++    return OK;
+ }
+ 
+ static void *dav_create_server_config(apr_pool_t *p, server_rec *s)
+diff --git a/modules/experimental/mod_example.c b/modules/experimental/mod_example.c
+index 755e637..6636528 100644
+--- a/modules/experimental/mod_example.c
++++ b/modules/experimental/mod_example.c
+@@ -864,13 +864,14 @@ static void x_pre_config(apr_pool_t *pconf, apr_pool_t *plog,
+  * server will still call any remaining modules with an handler for this
+  * phase.
+  */
+-static void x_post_config(apr_pool_t *pconf, apr_pool_t *plog,
++static int x_post_config(apr_pool_t *pconf, apr_pool_t *plog,
+                           apr_pool_t *ptemp, server_rec *s)
+ {
+     /*
+      * Log the call and exit.
+      */
+     trace_add(NULL, NULL, NULL, "x_post_config()");
++    return OK;
+ }
+ 
+ /*
+diff --git a/modules/filters/mod_include.c b/modules/filters/mod_include.c
+index 3da84a9..0037f76 100644
+--- a/modules/filters/mod_include.c
++++ b/modules/filters/mod_include.c
+@@ -3121,7 +3121,7 @@ static void ap_register_include_handler(char *tag, include_handler_fn_t *func)
+     apr_hash_set(include_hash, tag, strlen(tag) + 1, (const void *)func);
+ }
+ 
+-static void include_post_config(apr_pool_t *p, apr_pool_t *plog,
++static int include_post_config(apr_pool_t *p, apr_pool_t *plog,
+                                 apr_pool_t *ptemp, server_rec *s)
+ {
+     include_hash = apr_hash_make(p);
+@@ -3145,6 +3145,7 @@ static void include_post_config(apr_pool_t *p, apr_pool_t *plog,
+         ssi_pfn_register("flastmod", handle_flastmod);
+         ssi_pfn_register("printenv", handle_printenv);
+     }
++    return OK;
+ }
+ 
+ static const char *set_default_error_msg(cmd_parms *cmd, void *mconfig, const char *msg)
+diff --git a/modules/generators/mod_cgi.c b/modules/generators/mod_cgi.c
+index df8950b..6424dd5 100644
+--- a/modules/generators/mod_cgi.c
++++ b/modules/generators/mod_cgi.c
+@@ -929,7 +929,7 @@ static int handle_exec(include_ctx_t *ctx, apr_bucket_brigade **bb, request_rec
+  *============================================================================*/
+ 
+ 
+-static void cgi_post_config(apr_pool_t *p, apr_pool_t *plog,
++static int cgi_post_config(apr_pool_t *p, apr_pool_t *plog,
+                                 apr_pool_t *ptemp, server_rec *s)
+ {
+     cgi_pfn_reg_with_ssi = APR_RETRIEVE_OPTIONAL_FN(ap_register_include_handler);
+@@ -950,6 +950,7 @@ static void cgi_post_config(apr_pool_t *p, apr_pool_t *plog,
+     if (!cgi_build_command) {
+         cgi_build_command = default_build_command;
+     }
++    return OK;
+ }
+ 
+ static void register_hooks(apr_pool_t *p)
+diff --git a/modules/generators/mod_cgid.c b/modules/generators/mod_cgid.c
+index 00c7fbb..efa4e12 100644
+--- a/modules/generators/mod_cgid.c
++++ b/modules/generators/mod_cgid.c
+@@ -587,7 +587,7 @@ static int cgid_server(void *data)
+     return -1; 
+ } 
+ 
+-static void cgid_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, 
++static int cgid_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, 
+                       server_rec *main_server) 
+ { 
+     pid_t pid; 
+@@ -613,6 +613,7 @@ static void cgid_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+         if ((pid = fork()) < 0) {
+             ap_log_error(APLOG_MARK, APLOG_ERR, errno, main_server, 
+                          "Couldn't spawn cgid daemon process"); 
++            /* XXX should we return a failure here ? */
+         }
+         else if (pid == 0) {
+             apr_pool_create(&pcgi, p); 
+@@ -638,6 +639,7 @@ static void cgid_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+             cgid_pfn_reg_with_ssi("exec", handle_exec);
+         }
+     }
++    return OK;
+ } 
+ 
+ static void *create_cgid_config(apr_pool_t *p, server_rec *s) 
+diff --git a/modules/generators/mod_status.c b/modules/generators/mod_status.c
+index 46e672d..a2ee0a9 100644
+--- a/modules/generators/mod_status.c
++++ b/modules/generators/mod_status.c
+@@ -767,7 +767,7 @@ static int status_handler(request_rec *r)
+ }
+ 
+ 
+-static void status_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
++static int status_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
+ {
+     status_flags[SERVER_DEAD] = '.';	/* We don't want to assume these are in */
+     status_flags[SERVER_READY] = '_';	/* any particular order in scoreboard.h */
+@@ -780,6 +780,7 @@ static void status_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, serv
+     status_flags[SERVER_CLOSING] = 'C';
+     status_flags[SERVER_GRACEFUL] = 'G';
+     status_flags[SERVER_IDLE_KILL] = 'I';
++    return OK;
+ }
+ 
+ static void register_hooks(apr_pool_t *p)
+diff --git a/modules/http/mod_mime.c b/modules/http/mod_mime.c
+index 1721e3e..041f5ed 100644
+--- a/modules/http/mod_mime.c
++++ b/modules/http/mod_mime.c
+@@ -428,7 +428,7 @@ AP_INIT_TAKE1("TypesConfig", set_types_config, NULL, RSRC_CONF,
+ 
+ static apr_hash_t *mime_type_extensions;
+ 
+-static void mime_post_config(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
++static int mime_post_config(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
+ {
+     ap_configfile_t *f;
+     char l[MAX_STRING_LEN];
+@@ -443,7 +443,7 @@ static void mime_post_config(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+     if ((status = ap_pcfg_openfile(&f, ptemp, types_confname)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, status, s,
+ 		     "could not open mime types config file %s.", types_confname);
+-        exit(1);
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     mime_type_extensions = apr_hash_make(p);
+@@ -462,6 +462,7 @@ static void mime_post_config(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+         }
+     }
+     ap_cfg_closefile(f);
++    return OK;
+ }
+ 
+ static char *zap_sp(char *s)
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index ceb4463..311af27 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -920,7 +920,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, rewriterule_entry *cfg
+ **
+ */
+ 
+-static void init_module(apr_pool_t *p,
++static int init_module(apr_pool_t *p,
+                         apr_pool_t *plog,
+                         apr_pool_t *ptemp,
+                         server_rec *s)
+@@ -945,7 +945,7 @@ static void init_module(apr_pool_t *p,
+                                NULL, p)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                      "mod_rewrite: could not create rewrite_log_lock");
+-        exit(1);
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     rewritelock_create(s, p);
+@@ -960,6 +960,7 @@ static void init_module(apr_pool_t *p,
+         if (!first_time)
+            run_rewritemap_programs(s, p);
+     }
++    return OK;
+ }
+ 
+ 
+diff --git a/modules/mappers/mod_rewrite.h b/modules/mappers/mod_rewrite.h
+index 2470989..b885e18 100644
+--- a/modules/mappers/mod_rewrite.h
++++ b/modules/mappers/mod_rewrite.h
+@@ -385,7 +385,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, rewriterule_entry *cfg
+                                            char *key, char *val);
+ 
+     /* initialisation */
+-static void init_module(apr_pool_t *p,
++static int init_module(apr_pool_t *p,
+                         apr_pool_t *plog,
+                         apr_pool_t *ptemp,
+                         server_rec *s);
+diff --git a/modules/metadata/mod_mime_magic.c b/modules/metadata/mod_mime_magic.c
+index 6f1f039..b4162bc 100644
+--- a/modules/metadata/mod_mime_magic.c
++++ b/modules/metadata/mod_mime_magic.c
+@@ -2395,7 +2395,7 @@ static int revision_suffix(request_rec *r)
+ /*
+  * initialize the module
+  */
+-static void magic_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *main_server)
++static int magic_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *main_server)
+ {
+     int result;
+     magic_server_config_rec *conf;
+@@ -2415,7 +2415,7 @@ static void magic_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, serve
+ 	else if (conf->magicfile) {
+ 	    result = apprentice(s, p);
+ 	    if (result == -1)
+-		return;
++		return OK;
+ #if MIME_MAGIC_DEBUG
+ 	    prevm = 0;
+ 	    ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, s,
+@@ -2440,6 +2440,7 @@ static void magic_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, serve
+ #endif
+ 	}
+     }
++    return OK;
+ }
+ 
+ /*
+diff --git a/modules/metadata/mod_unique_id.c b/modules/metadata/mod_unique_id.c
+index 851334d..a0daca8 100644
+--- a/modules/metadata/mod_unique_id.c
++++ b/modules/metadata/mod_unique_id.c
+@@ -172,7 +172,7 @@ static unsigned short unique_id_rec_offset[UNIQUE_ID_REC_MAX],
+                       unique_id_rec_total_size,
+                       unique_id_rec_size_uu;
+ 
+-static void unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *main_server)
++static int unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *main_server)
+ {
+     char str[APRMAXHOSTLEN + 1];
+     apr_short_interval_time_t pause;
+@@ -210,7 +210,7 @@ static void unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *p
+     if ((rv = apr_gethostname(str, sizeof(str) - 1, p)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ALERT, rv, main_server,
+           "mod_unique_id: unable to find hostname of the server");
+-        exit(1);
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     /* XXX theoretically there are boxes out there which want to use
+@@ -219,7 +219,7 @@ static void unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *p
+     if ((rv = apr_sockaddr_info_get(&sockaddr, str, AF_INET, 0, 0, p)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ALERT, rv, main_server,
+                     "mod_unique_id: unable to find IPv4 address of \"%s\"", str);
+-        exit(1);
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     global_in_addr = sockaddr->sa.sin.sin_addr.s_addr;
+@@ -244,6 +244,7 @@ static void unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *p
+      */
+     pause = (apr_short_interval_time_t)(1000000 - (apr_time_now() % APR_USEC_PER_SEC));
+     apr_sleep(pause);
++    return OK;
+ }
+ 
+ static void unique_id_child_init(apr_pool_t *p, server_rec *s)
+diff --git a/modules/ssl/mod_ssl.h b/modules/ssl/mod_ssl.h
+index 9634499..8bd0c71 100644
+--- a/modules/ssl/mod_ssl.h
++++ b/modules/ssl/mod_ssl.h
+@@ -605,7 +605,7 @@ const char  *ssl_cmd_SSLProxyMachineCertificateFile(cmd_parms *, char *, char *)
+ #endif
+ 
+ /*  module initialization  */
+-void         ssl_init_Module(apr_pool_t *, apr_pool_t *, apr_pool_t *, server_rec *);
++int          ssl_init_Module(apr_pool_t *, apr_pool_t *, apr_pool_t *, server_rec *);
+ void         ssl_init_SSLLibrary(void);
+ void         ssl_init_Engine(server_rec *, apr_pool_t *);
+ void         ssl_init_TmpKeysHandle(int, server_rec *, apr_pool_t *);
+diff --git a/modules/ssl/ssl_engine_init.c b/modules/ssl/ssl_engine_init.c
+index 02c68b9..cbb86d1 100644
+--- a/modules/ssl/ssl_engine_init.c
++++ b/modules/ssl/ssl_engine_init.c
+@@ -70,7 +70,7 @@
+ /*
+  *  Per-module initialization
+  */
+-void ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
++int ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
+     apr_pool_t *ptemp, server_rec *s)
+ {
+     SSLModConfigRec *mc = myModConfig(s);
+@@ -191,7 +191,7 @@ void ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
+     if (mc->nInitCount == 1) {
+         ssl_pphrase_Handle(s, p);
+         ssl_init_TmpKeysHandle(SSL_TKP_GEN, s, p);
+-        return;
++        return OK;
+     }
+ 
+     /*
+@@ -265,7 +265,7 @@ void ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
+     ap_add_version_component(p, ssl_var_lookup(p, s, NULL, NULL, "SSL_VERSION_LIBRARY"));
+ 
+     SSL_init_app_data2_idx(); /* for SSL_get_app_data2() at request time */
+-    return;
++    return OK;
+ }
+ 
+ /*
+diff --git a/server/config.c b/server/config.c
+index b44957f..587e452 100644
+--- a/server/config.c
++++ b/server/config.c
+@@ -121,9 +121,9 @@ AP_IMPLEMENT_HOOK_RUN_ALL(int,header_parser,
+ AP_IMPLEMENT_HOOK_VOID(pre_config,
+ 		       (apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp),
+                        (pconf,plog,ptemp))
+-AP_IMPLEMENT_HOOK_VOID(post_config,
++AP_IMPLEMENT_HOOK_RUN_ALL(int,post_config,
+ 		       (apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp,
+-                        server_rec *s),(pconf,plog,ptemp,s))
++                        server_rec *s),(pconf,plog,ptemp,s),OK,DECLINED)
+ /* During the course of debugging I expanded this macro out, so
+  * rather than remove all the useful information there is in the
+  * following lines, I'm going to leave it here in case anyone
+@@ -131,7 +131,7 @@ AP_IMPLEMENT_HOOK_VOID(post_config,
+  *
+  * Ben has looked at it and thinks it correct :)
+  *
+-AP_DECLARE(void) ap_hook_post_config(ap_HOOK_post_config_t *pf,
++AP_DECLARE(int) ap_hook_post_config(ap_HOOK_post_config_t *pf,
+                                      const char * const *aszPre,
+                                      const char * const *aszSucc,
+                                      int nOrder)
+@@ -159,7 +159,7 @@ AP_DECLARE(apr_array_header_t *) ap_hook_get_post_config(void) {
+     return _hooks.link_post_config;
+ }
+ 
+-AP_DECLARE(void) ap_run_post_config (apr_pool_t *pconf,
++AP_DECLARE(int) ap_run_post_config (apr_pool_t *pconf,
+                                      apr_pool_t *plog,
+                                      apr_pool_t *ptemp,
+                                      server_rec *s)
+diff --git a/server/core.c b/server/core.c
+index 1296fea..e690fcb 100644
+--- a/server/core.c
++++ b/server/core.c
+@@ -3258,9 +3258,10 @@ static apr_status_t core_output_filter(ap_filter_t *f, apr_bucket_brigade *b)
+     return APR_SUCCESS;
+ }
+ 
+-static void core_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
++static int core_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
+ {
+     ap_set_version(pconf);
++    return OK;
+ }
+ 
+ static void core_open_logs(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
+diff --git a/server/main.c b/server/main.c
+index 9aa11f6..9e27941 100644
+--- a/server/main.c
++++ b/server/main.c
+@@ -397,7 +397,10 @@ int main(int argc, const char * const argv[])
+     }
+     apr_pool_clear(plog);
+     ap_run_open_logs(pconf, plog, ptemp, server_conf);
+-    ap_run_post_config(pconf, plog, ptemp, server_conf);
++    if ( ap_run_post_config(pconf, plog, ptemp, server_conf) != OK) {
++        ap_log_error(APLOG_MARK, APLOG_STARTUP |APLOG_ERR| APLOG_NOERRNO, 0, NULL, "Configuration Failed\n");
++        destroy_and_exit_process(process, 1);
++    }
+     apr_pool_destroy(ptemp);
+ 
+     for (;;) {
+@@ -423,7 +426,10 @@ int main(int argc, const char * const argv[])
+         apr_sort_hooks();
+ 	apr_pool_clear(plog);
+ 	ap_run_open_logs(pconf, plog, ptemp, server_conf);
+-	ap_run_post_config(pconf, plog, ptemp, server_conf);
++	if  (ap_run_post_config(pconf, plog, ptemp, server_conf) != OK) {
++            ap_log_error(APLOG_MARK, APLOG_STARTUP |APLOG_ERR | APLOG_NOERRNO, 0, NULL, "Configuration Failed\n");
++            destroy_and_exit_process(process, 1);
++        }
+ 	apr_pool_destroy(ptemp);
+ 	apr_pool_lock(pconf, 1);
+ 

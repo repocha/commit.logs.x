@@ -1,0 +1,59 @@
+commit a193ef6153db0a8b1cf2ee002e7b2b99741b630f
+Author: Eric Covener <covener@apache.org>
+Date:   Sun Aug 7 14:07:19 2011 +0000
+
+    PR46214: axe some misleading DEBUG messages in mod_authz_host.
+    
+    Access is not necessarily denied because a single requirement failed to grant
+    access, and mod_authz_core is already reporting at DEBUG the require line and
+    the providers result.
+    
+    Elaborate on one remaining legitimate message to include the require line.
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1154706 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authz_host.c b/modules/aaa/mod_authz_host.c
+index 20c7169..2509b50 100644
+--- a/modules/aaa/mod_authz_host.c
++++ b/modules/aaa/mod_authz_host.c
+@@ -158,11 +158,7 @@ static authz_status ip_check_authorization(request_rec *r,
+         ip++;
+     }
+ 
+-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                  "access to %s failed, reason: ip address list does not meet "
+-                  "'require'ments for user '%s' to be allowed access",
+-                  r->uri, r->user);
+-
++    /* authz_core will log the require line and the result at DEBUG */
+     return AUTHZ_DENIED;
+ }
+ 
+@@ -181,8 +177,8 @@ static authz_status host_check_authorization(request_rec *r,
+ 
+     if ((remotehost == NULL) || remotehost_is_ip) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "access to %s failed, reason: unable to get the "
+-                      "remote host name", r->uri);
++                      "access check of '%s' to %s failed, reason: unable to get the "
++                      "remote host name", require_line, r->uri);
+     }
+     else {
+         /* The 'host' provider will allow the configuration to specify a list of
+@@ -194,13 +190,9 @@ static authz_status host_check_authorization(request_rec *r,
+                 return AUTHZ_GRANTED;
+             }
+         }
+-
+-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                      "access to %s failed, reason: host name list does not meet "
+-                      "'require'ments for user '%s' to be allowed access",
+-                      r->uri, r->user);
+     }
+ 
++    /* authz_core will log the require line and the result at DEBUG */
+     return AUTHZ_DENIED;
+ }
+ 

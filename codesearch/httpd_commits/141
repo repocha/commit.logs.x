@@ -1,0 +1,188 @@
+commit 65d1ef004aa715b417ad5bdf6fc323119209403e
+Author: Chris Darroch <chrisd@apache.org>
+Date:   Thu Oct 16 21:09:27 2008 +0000
+
+    Prior to authn/z refactoring in r368027, if authorization Require
+    directives had no matching AuthType and associated authentication
+    directives, requests would generally fall through in the
+    check_user_id hook to mod_authn_default.c's authentication_no_user()
+    handler, which returned DECLINED if ap_auth_type() was not set.
+    The ap_process_request_internal() function in request.c would handle
+    this case by logging an "AuthType not set!" error and returning
+    HTTP_INTERNAL_SERVER_ERROR.
+    
+    The refactoring removes this error handling in request.c, so
+    individual modules will need to test for a lack of authentication,
+    as necessary.  Since some modules such as mod_authz_host.c support
+    Require directives that do not need any authentication, the
+    mod_authn_default.c handler no longer returns DECLINED if ap_auth_type()
+    is not set.  (Also, mod_authn_default can be compiled out with
+    --disable-authn-default, so it can't be relied upon to exist.)
+    
+    Since r->user may now be NULL, individual handlers must test for that
+    case when necessary.  Otherwise, most Require directives in the
+    absence of AuthType directives cause handlers to crash while performing
+    strcmp() and friends on a NULL r->user value.
+    
+    NOTE: I can't test mod_authnz_ldap.c myself, so I'm not sure if it
+    needs similar fixes.  On the one hand, a NULL r->user in the authz
+    handlers always generates a log message.  However, it appears that
+    authn_ldap_build_filter() will sometimes then be called, perform no
+    action, which may result in a possibly uninitialized filtbuf buffer
+    being passed to util_ldap_cache_getuserdn().  I don't know if that
+    could cause problems in the LDAP cache code.  If someone familiar with
+    LDAP authz could take a look, that would be much appreciated.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@705361 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authz_dbd.c b/modules/aaa/mod_authz_dbd.c
+index 33e2ec8..42fdc0d 100644
+--- a/modules/aaa/mod_authz_dbd.c
++++ b/modules/aaa/mod_authz_dbd.c
+@@ -253,6 +253,12 @@ static authz_status dbdgroup_check_authorization(request_rec *r,
+     authz_dbd_cfg *cfg = ap_get_module_config(r->per_dir_config,
+                                               &authz_dbd_module);
+ 
++    if (!r->user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     if (groups == NULL) {
+         groups = apr_array_make(r->pool, 4, sizeof(const char*));
+         rv = authz_dbd_group_query(r, cfg, groups);
+@@ -280,6 +286,12 @@ static authz_status dbdlogin_check_authorization(request_rec *r,
+     authz_dbd_cfg *cfg = ap_get_module_config(r->per_dir_config,
+                                               &authz_dbd_module);
+ 
++    if (!r->user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     return (authz_dbd_login(r, cfg, "login") == OK ? AUTHZ_GRANTED : AUTHZ_DENIED);
+ }
+ 
+@@ -289,6 +301,12 @@ static authz_status dbdlogout_check_authorization(request_rec *r,
+     authz_dbd_cfg *cfg = ap_get_module_config(r->per_dir_config,
+                                               &authz_dbd_module);
+ 
++    if (!r->user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     return (authz_dbd_login(r, cfg, "logout") == OK ? AUTHZ_GRANTED : AUTHZ_DENIED);
+ }
+ 
+diff --git a/modules/aaa/mod_authz_dbm.c b/modules/aaa/mod_authz_dbm.c
+index a0d4f91..9979e1e 100644
+--- a/modules/aaa/mod_authz_dbm.c
++++ b/modules/aaa/mod_authz_dbm.c
+@@ -143,6 +143,12 @@ static authz_status dbmgroup_check_authorization(request_rec *r,
+     const char *groups;
+     char *v;
+ 
++    if (!user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     if (!conf->grpfile) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                         "No group file was specified in the configuration");
+@@ -209,6 +215,12 @@ static authz_status dbmfilegroup_check_authorization(request_rec *r,
+     const char *groups;
+     char *v;
+ 
++    if (!user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     if (!conf->grpfile) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                         "No group file was specified in the configuration");
+diff --git a/modules/aaa/mod_authz_groupfile.c b/modules/aaa/mod_authz_groupfile.c
+index efa8932..0631cbb 100644
+--- a/modules/aaa/mod_authz_groupfile.c
++++ b/modules/aaa/mod_authz_groupfile.c
+@@ -147,6 +147,12 @@ static authz_status group_check_authorization(request_rec *r,
+     apr_table_t *grpstatus = NULL;
+     apr_status_t status;
+ 
++    if (!user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     /* If there is no group file - then we are not
+      * configured. So decline.
+      */
+@@ -202,6 +208,12 @@ static authz_status filegroup_check_authorization(request_rec *r,
+     apr_status_t status;
+     const char *filegroup = NULL;
+ 
++    if (!user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     /* If there is no group file - then we are not
+      * configured. So decline.
+      */
+diff --git a/modules/aaa/mod_authz_owner.c b/modules/aaa/mod_authz_owner.c
+index 5c8f929..5075fd3 100644
+--- a/modules/aaa/mod_authz_owner.c
++++ b/modules/aaa/mod_authz_owner.c
+@@ -54,6 +54,12 @@ static authz_status fileowner_check_authorization(request_rec *r,
+     char *owner = NULL;
+     apr_finfo_t finfo;
+ 
++    if (!r->user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     if (!r->filename) {
+         reason = "no filename available";
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+diff --git a/modules/aaa/mod_authz_user.c b/modules/aaa/mod_authz_user.c
+index ea7f8a0..73590eb 100644
+--- a/modules/aaa/mod_authz_user.c
++++ b/modules/aaa/mod_authz_user.c
+@@ -50,6 +50,12 @@ static authz_status user_check_authorization(request_rec *r,
+ {
+     const char *t, *w;
+ 
++    if (!r->user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     t = require_args;
+     while ((w = ap_getword_conf(r->pool, &t)) && w[0]) {
+         if (!strcmp(r->user, w)) {
+@@ -67,6 +73,12 @@ static authz_status user_check_authorization(request_rec *r,
+ 
+ static authz_status validuser_check_authorization(request_rec *r, const char *require_line)
+ {
++    if (!r->user) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "access to %s failed, reason: no authenticated user", r->uri);
++        return AUTHZ_DENIED;
++    }
++
+     return AUTHZ_GRANTED;
+ }
+ 

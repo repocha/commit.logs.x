@@ -1,0 +1,212 @@
+commit 84eeb1a857a693546e3c536c1948b06d6df877e2
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sun May 22 07:42:18 2011 +0000
+
+    Fix various "variable 'x' set but not used" warnings.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1125877 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index f9f0227..1343f1d 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -1100,7 +1100,6 @@ static const char *gen_nonce(apr_pool_t *p, apr_time_t now, const char *opaque,
+                              const digest_config_rec *conf)
+ {
+     char *nonce = apr_palloc(p, NONCE_LEN+1);
+-    int len;
+     time_rec t;
+ 
+     if (conf->nonce_lifetime != 0) {
+@@ -1116,7 +1115,7 @@ static const char *gen_nonce(apr_pool_t *p, apr_time_t now, const char *opaque,
+         /* XXX: WHAT IS THIS CONSTANT? */
+         t.time = 42;
+     }
+-    len = apr_base64_encode_binary(nonce, t.arr, sizeof(t.arr));
++    apr_base64_encode_binary(nonce, t.arr, sizeof(t.arr));
+     gen_nonce_hash(nonce+NONCE_TIME_LEN, nonce, opaque, server, conf);
+ 
+     return nonce;
+@@ -1515,7 +1514,6 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+                        const digest_config_rec *conf)
+ {
+     apr_time_t dt;
+-    int len;
+     time_rec nonce_time;
+     char tmp, hash[NONCE_HASH_LEN+1];
+ 
+@@ -1529,7 +1527,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 
+     tmp = resp->nonce[NONCE_TIME_LEN];
+     resp->nonce[NONCE_TIME_LEN] = '\0';
+-    len = apr_base64_decode_binary(nonce_time.arr, resp->nonce);
++    apr_base64_decode_binary(nonce_time.arr, resp->nonce);
+     gen_nonce_hash(hash, resp->nonce, resp->opaque, r->server, conf);
+     resp->nonce[NONCE_TIME_LEN] = tmp;
+     resp->nonce_time = nonce_time.time;
+diff --git a/modules/dav/fs/dbm.c b/modules/dav/fs/dbm.c
+index e5c2dca..a456dc5 100644
+--- a/modules/dav/fs/dbm.c
++++ b/modules/dav/fs/dbm.c
+@@ -39,6 +39,8 @@
+ 
+ #include "mod_dav.h"
+ #include "repos.h"
++#include "http_log.h"
++#include "http_main.h"      /* for ap_server_conf */
+ 
+ 
+ struct dav_db {
+@@ -487,7 +489,9 @@ static void dav_propdb_close(dav_db *db)
+         memcpy(db->ns_table.buf, &m, sizeof(m));
+ 
+         err = dav_dbm_store(db, key, value);
+-        /* ### what to do with the error? */
++        if (err != NULL)
++            ap_log_error(APLOG_MARK, APLOG_WARNING, err->aprerr,
++                         ap_server_conf, "Error writing propdb: %s", err->desc);
+     }
+ 
+     dav_dbm_close(db);
+diff --git a/modules/examples/mod_example_hooks.c b/modules/examples/mod_example_hooks.c
+index 564fab9..2a685de 100644
+--- a/modules/examples/mod_example_hooks.c
++++ b/modules/examples/mod_example_hooks.c
+@@ -1113,11 +1113,8 @@ static int x_quick_handler(request_rec *r, int lookup_uri)
+  */
+ static int x_pre_connection(conn_rec *c, void *csd)
+ {
+-    x_cfg *cfg;
+     char *note; 
+ 
+-    cfg = our_cconfig(c);
+-
+     /*
+      * Log the call and exit.
+      */
+@@ -1138,9 +1135,6 @@ static int x_pre_connection(conn_rec *c, void *csd)
+  */
+ static int x_process_connection(conn_rec *c)
+ {
+-    x_cfg *cfg;
+-    cfg = our_cconfig(c);
+-    
+     trace_connection(c, "x_process_connection()");
+     
+     return DECLINED;
+diff --git a/modules/filters/mod_include.c b/modules/filters/mod_include.c
+index c8d90fd..ad69dc2 100644
+--- a/modules/filters/mod_include.c
++++ b/modules/filters/mod_include.c
+@@ -1127,7 +1127,6 @@ static int parse_expr(include_ctx_t *ctx, const char *expr, int *was_error)
+     request_rec *rr = NULL;
+     const char *error = "Invalid expression \"%s\" in file %s";
+     const char *parse = expr;
+-    int was_unmatched = 0;
+     unsigned regex = 0;
+ 
+     *was_error = 0;
+@@ -1144,14 +1143,18 @@ static int parse_expr(include_ctx_t *ctx, const char *expr, int *was_error)
+          */
+         CREATE_NODE(ctx, new);
+ 
+-        was_unmatched = get_ptoken(ctx, &parse, &new->token,
+-                         (current != NULL ? &current->token : NULL));
+-        if (!parse) {
+-            break;
+-        }
++        {
++#ifdef DEBUG_INCLUDE
++            int was_unmatched =
++#endif
++            get_ptoken(ctx, &parse, &new->token,
++                       (current != NULL ? &current->token : NULL));
++            if (!parse)
++                break;
+ 
+-        DEBUG_DUMP_UNMATCHED(ctx, was_unmatched);
+-        DEBUG_DUMP_TOKEN(ctx, &new->token);
++            DEBUG_DUMP_UNMATCHED(ctx, was_unmatched);
++            DEBUG_DUMP_TOKEN(ctx, &new->token);
++        }
+ 
+         if (!current) {
+             switch (new->token.type) {
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 580dd6b..9e83e66 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -1114,12 +1114,14 @@ static int config_log_transaction(request_rec *r, config_log_state *cls,
+         len += strl[i] = strlen(strs[i]);
+     }
+     if (!log_writer) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, r,
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                 "log writer isn't correctly setup");
+          return HTTP_INTERNAL_SERVER_ERROR;
+     }
+     rv = log_writer(r, cls->log_writer, strs, strl, format->nelts, len);
+-    /* xxx: do we return an error on log_writer? */
++    if (rv != APR_SUCCESS)
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r, "Error writing to %s",
++                      cls->fname);
+     return OK;
+ }
+ 
+diff --git a/modules/proxy/mod_serf.c b/modules/proxy/mod_serf.c
+index 929ba35..c0fec73 100644
+--- a/modules/proxy/mod_serf.c
++++ b/modules/proxy/mod_serf.c
+@@ -380,10 +380,6 @@ static apr_status_t setup_request(serf_request_t *request,
+     serf_bucket_headers_setn(hdrs_bkt, "Accept-Encoding", "gzip");
+ 
+     if (ctx->want_ssl) {
+-        serf_bucket_alloc_t *req_alloc;
+-
+-        req_alloc = serf_request_get_alloc(request);
+-
+         if (ctx->ssl_ctx == NULL) {
+             *req_bkt = serf_bucket_ssl_encrypt_create(*req_bkt, NULL,
+                                            ctx->bkt_alloc);
+@@ -442,7 +438,6 @@ static int drive_serf(request_rec *r, serf_config_t *conf)
+     /* XXXXX: make persistent/per-process or something.*/
+     serf_context_t *serfme;
+     serf_connection_t *conn;
+-    serf_request_t *srequest;
+     serf_server_config_t *ctx = 
+         (serf_server_config_t *)ap_get_module_config(r->server->module_config,
+                                                      &serf_module);
+@@ -598,8 +593,8 @@ static int drive_serf(request_rec *r, serf_config_t *conf)
+                                   closed_connection, baton,
+                                   pool);
+ 
+-    srequest = serf_connection_request_create(conn, setup_request,
+-                                              baton);
++    /* XXX: Is it correct that we don't use the returned serf_request_t? */
++    serf_connection_request_create(conn, setup_request, baton);
+ 
+     if (mpm_supprts_serf) {
+         return SUSPENDED;
+diff --git a/support/ab.c b/support/ab.c
+index 903bb2b..efe9137 100644
+--- a/support/ab.c
++++ b/support/ab.c
+@@ -2096,7 +2096,7 @@ int main(int argc, const char * const argv[])
+             case 'p':
+                 if (method != NO_METH)
+                     err("Cannot mix POST with other methods\n");
+-                if ((status = open_postfile(opt_arg)) != APR_SUCCESS) {
++                if (open_postfile(opt_arg) != APR_SUCCESS) {
+                     exit(1);
+                 }
+                 method = POST;
+@@ -2105,7 +2105,7 @@ int main(int argc, const char * const argv[])
+             case 'u':
+                 if (method != NO_METH)
+                     err("Cannot mix PUT with other methods\n");
+-                if ((status = open_postfile(opt_arg)) != APR_SUCCESS) {
++                if (open_postfile(opt_arg) != APR_SUCCESS) {
+                     exit(1);
+                 }
+                 method = PUT;

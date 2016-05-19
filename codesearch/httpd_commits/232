@@ -1,0 +1,606 @@
+commit 546a09ce1e80f792e7841fabf6f3ac468d86bff9
+Author: Greg Stein <gstein@apache.org>
+Date:   Sun Feb 18 02:07:26 2001 +0000
+
+    use "conf" rather than "sec" for the configuration data. misc style,
+    whitespace, and other cleaning nits.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@88222 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth.c b/modules/aaa/mod_auth.c
+index 422746c..84779fe 100644
+--- a/modules/aaa/mod_auth.c
++++ b/modules/aaa/mod_auth.c
+@@ -71,8 +71,7 @@
+  */
+ 
+ #include "apr_strings.h"
+-#include "apr_md5.h"
+-#include "apr_lib.h"
++#include "apr_lib.h"            /* for apr_password_validate */
+ 
+ #include "ap_config.h"
+ #include "httpd.h"
+@@ -82,7 +81,8 @@
+ #include "http_protocol.h"
+ #include "http_request.h"
+ 
+-typedef struct auth_config_struct {
++
++typedef struct {
+     char *auth_pwfile;
+     char *auth_grpfile;
+     int auth_authoritative;
+@@ -90,12 +90,12 @@ typedef struct auth_config_struct {
+ 
+ static void *create_auth_dir_config(apr_pool_t *p, char *d)
+ {
+-    auth_config_rec *sec =
+-    (auth_config_rec *) apr_pcalloc(p, sizeof(auth_config_rec));
+-    sec->auth_pwfile = NULL;	/* just to illustrate the default really */
+-    sec->auth_grpfile = NULL;	/* unless you have a broken HP cc */
+-    sec->auth_authoritative = 1;	/* keep the fortress secure by default */
+-    return sec;
++    auth_config_rec *conf = apr_pcalloc(p, sizeof(*conf));
++
++    conf->auth_pwfile = NULL;	/* just to illustrate the default really */
++    conf->auth_grpfile = NULL;	/* unless you have a broken HP cc */
++    conf->auth_authoritative = 1;	/* keep the fortress secure by default */
++    return conf;
+ }
+ 
+ static const char *set_auth_slot(cmd_parms *cmd, void *offset, const char *f, 
+@@ -206,8 +206,8 @@ static apr_table_t *groups_for_user(apr_pool_t *p, char *user, char *grpfile)
+ 
+ static int authenticate_basic_user(request_rec *r)
+ {
+-    auth_config_rec *sec =
+-    (auth_config_rec *) ap_get_module_config(r->per_dir_config, &auth_module);
++    auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                 &auth_module);
+     const char *sent_pw;
+     char *real_pw;
+     apr_status_t invalid_pw;
+@@ -216,11 +216,11 @@ static int authenticate_basic_user(request_rec *r)
+     if ((res = ap_get_basic_auth_pw(r, &sent_pw)))
+ 	return res;
+ 
+-    if (!sec->auth_pwfile)
++    if (!conf->auth_pwfile)
+ 	return DECLINED;
+ 
+-    if (!(real_pw = get_pw(r, r->user, sec->auth_pwfile))) {
+-	if (!(sec->auth_authoritative))
++    if (!(real_pw = get_pw(r, r->user, conf->auth_pwfile))) {
++	if (!(conf->auth_authoritative))
+ 	    return DECLINED;
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "user %s not found: %s", r->user, r->uri);
+@@ -243,8 +243,8 @@ static int authenticate_basic_user(request_rec *r)
+ 
+ static int check_user_access(request_rec *r)
+ {
+-    auth_config_rec *sec =
+-    (auth_config_rec *) ap_get_module_config(r->per_dir_config, &auth_module);
++    auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                 &auth_module);
+     char *user = r->user;
+     int m = r->method_number;
+     int method_restricted = 0;
+@@ -261,8 +261,8 @@ static int check_user_access(request_rec *r)
+ 	return (OK);
+     reqs = (require_line *) reqs_arr->elts;
+ 
+-    if (sec->auth_grpfile)
+-	grpstatus = groups_for_user(r->pool, user, sec->auth_grpfile);
++    if (conf->auth_grpfile)
++	grpstatus = groups_for_user(r->pool, user, conf->auth_grpfile);
+     else
+ 	grpstatus = NULL;
+ 
+@@ -293,7 +293,7 @@ static int check_user_access(request_rec *r)
+ 		if (apr_table_get(grpstatus, w))
+ 		    return OK;
+ 	    }
+-	} else if (sec->auth_authoritative) {
++	} else if (conf->auth_authoritative) {
+ 	    /* if we aren't authoritative, any require directive could be
+ 	     * valid even if we don't grok it.  However, if we are 
+ 	     * authoritative, we can warn the user they did something wrong.
+@@ -309,7 +309,7 @@ static int check_user_access(request_rec *r)
+     if (!method_restricted)
+ 	return OK;
+ 
+-    if (!(sec->auth_authoritative))
++    if (!(conf->auth_authoritative))
+ 	return DECLINED;
+ 
+     ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+diff --git a/modules/aaa/mod_auth_anon.c b/modules/aaa/mod_auth_anon.c
+index db83c9a..5b008ae 100644
+--- a/modules/aaa/mod_auth_anon.c
++++ b/modules/aaa/mod_auth_anon.c
+@@ -94,15 +94,18 @@
+  * 
+  */
+ 
++#include "apr_strings.h"
++
++#define APR_WANT_STRFUNC
++#include "apr_want.h"
++
+ #include "httpd.h"
+ #include "http_config.h"
+ #include "http_core.h"
+ #include "http_log.h"
+-#include "http_protocol.h"
+ #include "http_request.h"
+-#include "apr_strings.h"
+-#define APR_WANT_STRFUNC
+-#include "apr_want.h"
++#include "http_protocol.h"
++
+ 
+ typedef struct anon_auth {
+     char *password;
+@@ -120,82 +123,79 @@ typedef struct {
+ 
+ } anon_auth_config_rec;
+ 
++
+ static void *create_anon_auth_dir_config(apr_pool_t *p, char *d)
+ {
+-    anon_auth_config_rec *sec = (anon_auth_config_rec *)
+-    apr_pcalloc(p, sizeof(anon_auth_config_rec));
+-
+-    if (!sec)
+-	return NULL;		/* no memory... */
++    anon_auth_config_rec *conf = apr_pcalloc(p, sizeof(*conf));
+ 
+     /* just to illustrate the defaults really. */
+-    sec->anon_auth_passwords = NULL;
+-
+-    sec->anon_auth_nouserid = 0;
+-    sec->anon_auth_logemail = 1;
+-    sec->anon_auth_verifyemail = 0;
+-    sec->anon_auth_mustemail = 1;
+-    sec->anon_auth_authoritative = 0;
+-    return sec;
++    conf->anon_auth_passwords = NULL;
++
++    conf->anon_auth_nouserid = 0;
++    conf->anon_auth_logemail = 1;
++    conf->anon_auth_verifyemail = 0;
++    conf->anon_auth_mustemail = 1;
++    conf->anon_auth_authoritative = 0;
++    return conf;
+ }
+ 
+ static const char *anon_set_passwd_flag(cmd_parms *cmd,
+-				 void *dummy, int arg)
++                                        void *my_config, int arg)
+ {
+-    anon_auth_config_rec *sec = dummy;
+-    sec->anon_auth_mustemail = arg;
++    anon_auth_config_rec *conf = my_config;
++    conf->anon_auth_mustemail = arg;
+     return NULL;
+ }
+ 
+ static const char *anon_set_userid_flag(cmd_parms *cmd,
+-				 void *dummy, int arg)
++                                        void *my_config, int arg)
+ {
+-    anon_auth_config_rec *sec = dummy;
+-    sec->anon_auth_nouserid = arg;
++    anon_auth_config_rec *conf = my_config;
++    conf->anon_auth_nouserid = arg;
+     return NULL;
+ }
+ 
+ static const char *anon_set_logemail_flag(cmd_parms *cmd,
+-				   void *dummy, int arg)
++                                          void *my_config, int arg)
+ {
+-    anon_auth_config_rec *sec = dummy;
+-    sec->anon_auth_logemail = arg;
++    anon_auth_config_rec *conf = my_config;
++    conf->anon_auth_logemail = arg;
+     return NULL;
+ }
+ 
+ static const char *anon_set_verifyemail_flag(cmd_parms *cmd,
+-				      void *dummy, int arg)
++                                             void *my_config, int arg)
+ {
+-    anon_auth_config_rec *sec = dummy;
+-    sec->anon_auth_verifyemail = arg;
++    anon_auth_config_rec *conf = my_config;
++    conf->anon_auth_verifyemail = arg;
+     return NULL;
+ }
+ static const char *anon_set_authoritative_flag(cmd_parms *cmd,
+-					void *dummy, int arg)
++                                               void *my_config, int arg)
+ {
+-    anon_auth_config_rec *sec = dummy;
+-    sec->anon_auth_authoritative = arg;
++    anon_auth_config_rec *conf = my_config;
++    conf->anon_auth_authoritative = arg;
+     return NULL;
+ }
+ 
+ static const char *anon_set_string_slots(cmd_parms *cmd,
+-				  void *dummy, const char *arg)
++                                         void *my_config, const char *arg)
+ {
+-    anon_auth_config_rec *sec = dummy;
++    anon_auth_config_rec *conf = my_config;
+     anon_auth *first;
+ 
+     if (!(*arg))
+ 	return "Anonymous string cannot be empty, use Anonymous_NoUserId instead";
+ 
+     /* squeeze in a record */
+-    first = sec->anon_auth_passwords;
++    first = conf->anon_auth_passwords;
+ 
+-    if (!(sec->anon_auth_passwords = apr_palloc(cmd->pool, sizeof(anon_auth))) ||
+-       !(sec->anon_auth_passwords->password = apr_pstrdup(cmd->pool, arg)))
++    if (!(conf->anon_auth_passwords = apr_palloc(cmd->pool, sizeof(anon_auth))) ||
++       !(conf->anon_auth_passwords->password = apr_pstrdup(cmd->pool, arg)))
+ 	     return "Failed to claim memory for an anonymous password...";
+ 
+     /* and repair the next */
+-    sec->anon_auth_passwords->next = first;
++    conf->anon_auth_passwords->next = first;
+ 
+     return NULL;
+ }
+@@ -221,9 +221,8 @@ module AP_MODULE_DECLARE_DATA auth_anon_module;
+ 
+ static int anon_authenticate_basic_user(request_rec *r)
+ {
+-    anon_auth_config_rec *sec =
+-    (anon_auth_config_rec *) ap_get_module_config(r->per_dir_config,
+-					       &auth_anon_module);
++    anon_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                      &auth_anon_module);
+     const char *sent_pw;
+     int res = DECLINED;
+ 
+@@ -231,17 +230,17 @@ static int anon_authenticate_basic_user(request_rec *r)
+ 	return res;
+ 
+     /* Ignore if we are not configured */
+-    if (!sec->anon_auth_passwords)
++    if (!conf->anon_auth_passwords)
+ 	return DECLINED;
+ 
+     /* Do we allow an empty userID and/or is it the magic one
+      */
+ 
+-    if ((!(r->user[0])) && (sec->anon_auth_nouserid)) {
++    if ((!(r->user[0])) && (conf->anon_auth_nouserid)) {
+ 	res = OK;
+     }
+     else {
+-	anon_auth *p = sec->anon_auth_passwords;
++	anon_auth *p = conf->anon_auth_passwords;
+ 	res = DECLINED;
+ 	while ((res == DECLINED) && (p != NULL)) {
+ 	    if (!(strcasecmp(r->user, p->password)))
+@@ -253,12 +252,12 @@ static int anon_authenticate_basic_user(request_rec *r)
+     /* username is OK */
+ 	   (res == OK)
+     /* password been filled out ? */
+-	   && ((!sec->anon_auth_mustemail) || strlen(sent_pw))
++	   && ((!conf->anon_auth_mustemail) || strlen(sent_pw))
+     /* does the password look like an email address ? */
+-	   && ((!sec->anon_auth_verifyemail)
++	   && ((!conf->anon_auth_verifyemail)
+ 	       || ((strpbrk("@", sent_pw) != NULL)
+ 		   && (strpbrk(".", sent_pw) != NULL)))) {
+-	if (sec->anon_auth_logemail && ap_is_initial_req(r)) {
++	if (conf->anon_auth_logemail && ap_is_initial_req(r)) {
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_INFO, APR_SUCCESS, r,
+ 			"Anonymous: Passwd <%s> Accepted",
+ 			sent_pw ? sent_pw : "\'none\'");
+@@ -266,7 +265,7 @@ static int anon_authenticate_basic_user(request_rec *r)
+ 	return OK;
+     }
+     else {
+-	if (sec->anon_auth_authoritative) {
++	if (conf->anon_auth_authoritative) {
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, APR_SUCCESS, r,
+ 			"Anonymous: Authoritative, Passwd <%s> not accepted",
+ 			sent_pw ? sent_pw : "\'none\'");
+@@ -282,14 +281,13 @@ static int check_anon_access(request_rec *r)
+ {
+ #ifdef NOTYET
+     conn_rec *c = r->connection;
+-    anon_auth_config_rec *sec =
+-    (anon_auth_config_rec *) ap_get_module_config(r->per_dir_config,
+-					       &auth_anon_module);
++    anon_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                      &auth_anon_module);
+ 
+-    if (!sec->anon_auth)
++    if (!conf->anon_auth)
+ 	return DECLINED;
+ 
+-    if (strcasecmp(r->connection->user, sec->anon_auth))
++    if (strcasecmp(r->connection->user, conf->anon_auth))
+ 	return DECLINED;
+ 
+     return OK;
+diff --git a/modules/aaa/mod_auth_db.c b/modules/aaa/mod_auth_db.c
+index 54d6e96..a1925a8 100644
+--- a/modules/aaa/mod_auth_db.c
++++ b/modules/aaa/mod_auth_db.c
+@@ -93,6 +93,11 @@
+  *         no control is passed along.
+  */
+ 
++#include "apr_lib.h"
++
++#define APR_WANT_STRFUNC
++#include "apr_want.h"
++
+ #include "ap_config.h"
+ #include "httpd.h"
+ #include "http_config.h"
+@@ -100,9 +105,7 @@
+ #include "http_log.h"
+ #include "http_protocol.h"
+ #include "http_request.h"  /* for ap_hook_(check_user_id | auth_check) */
+-#include "apr_lib.h"
+-#define APR_WANT_STRFUNC
+-#include "apr_want.h"
++
+ #ifdef HAVE_DB_H
+ #include <db.h>
+ #endif
+@@ -124,12 +127,12 @@ typedef struct {
+ 
+ static void *create_db_auth_dir_config(apr_pool_t *p, char *d)
+ {
+-    db_auth_config_rec *sec
+-    = (db_auth_config_rec *) apr_pcalloc(p, sizeof(db_auth_config_rec));
+-    sec->auth_dbpwfile = NULL;
+-    sec->auth_dbgrpfile = NULL;
+-    sec->auth_dbauthoritative = 1;	/* fortress is secure by default */
+-    return sec;
++    db_auth_config_rec *conf = apr_pcalloc(p, sizeof(*conf));
++
++    conf->auth_dbpwfile = NULL;
++    conf->auth_dbgrpfile = NULL;
++    conf->auth_dbauthoritative = 1;	/* fortress is secure by default */
++    return conf;
+ }
+ 
+ static const char *set_db_slot(cmd_parms *cmd, void *offset, const char *f, const char *t)
+@@ -291,9 +294,8 @@ static char *get_db_grp(request_rec *r, char *user, const char *auth_dbgrpfile)
+ 
+ static int db_authenticate_basic_user(request_rec *r)
+ {
+-    db_auth_config_rec *sec =
+-    (db_auth_config_rec *) ap_get_module_config(r->per_dir_config,
+-						&auth_db_module);
++    db_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                    &auth_db_module);
+     const char *sent_pw;
+     char *real_pw, *colon_pw;
+     apr_status_t invalid_pw;
+@@ -302,14 +304,14 @@ static int db_authenticate_basic_user(request_rec *r)
+     if ((res = ap_get_basic_auth_pw(r, &sent_pw)))
+ 	return res;
+ 
+-    if (!sec->auth_dbpwfile) {
++    if (!conf->auth_dbpwfile) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+-		      "DB file %s not found", sec->auth_dbpwfile);
++		      "DB file %s not found", conf->auth_dbpwfile);
+ 	return DECLINED;
+     }
+ 
+-    if (!(real_pw = get_db_pw(r, r->user, sec->auth_dbpwfile))) {
+-	if (!(sec->auth_dbauthoritative))
++    if (!(real_pw = get_db_pw(r, r->user, conf->auth_dbpwfile))) {
++	if (!(conf->auth_dbauthoritative))
+ 	    return DECLINED;
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "DB user %s not found: %s", r->user, r->filename);
+@@ -339,9 +341,8 @@ static int db_authenticate_basic_user(request_rec *r)
+ 
+ static int db_check_auth(request_rec *r)
+ {
+-    db_auth_config_rec *sec =
+-    (db_auth_config_rec *) ap_get_module_config(r->per_dir_config,
+-						&auth_db_module);
++    db_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                    &auth_db_module);
+     char *user = r->user;
+     int m = r->method_number;
+ 
+@@ -352,7 +353,7 @@ static int db_check_auth(request_rec *r)
+     const char *t;
+     char *w;
+ 
+-    if (!sec->auth_dbgrpfile)
++    if (!conf->auth_dbgrpfile)
+ 	return DECLINED;
+     if (!reqs_arr)
+ 	return DECLINED;
+@@ -365,16 +366,16 @@ static int db_check_auth(request_rec *r)
+ 	t = reqs[x].requirement;
+ 	w = ap_getword_white(r->pool, &t);
+ 
+-	if (!strcmp(w, "group") && sec->auth_dbgrpfile) {
++	if (!strcmp(w, "group") && conf->auth_dbgrpfile) {
+ 	    const char *orig_groups, *groups;
+ 	    char *v;
+ 
+-	    if (!(groups = get_db_grp(r, user, sec->auth_dbgrpfile))) {
+-		if (!(sec->auth_dbauthoritative))
++	    if (!(groups = get_db_grp(r, user, conf->auth_dbgrpfile))) {
++		if (!(conf->auth_dbauthoritative))
+ 		    return DECLINED;
+ 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			      "user %s not in DB group file %s: %s",
+-			      user, sec->auth_dbgrpfile, r->filename);
++			      user, conf->auth_dbgrpfile, r->filename);
+ 		ap_note_basic_auth_failure(r);
+ 		return HTTP_UNAUTHORIZED;
+ 	    }
+@@ -400,8 +401,9 @@ static int db_check_auth(request_rec *r)
+ 
+ static void register_hooks(apr_pool_t *p)
+ {
+-    ap_hook_check_user_id(db_authenticate_basic_user,NULL,NULL,APR_HOOK_MIDDLE);
+-    ap_hook_auth_checker(db_check_auth,NULL,NULL,APR_HOOK_MIDDLE);
++    ap_hook_check_user_id(db_authenticate_basic_user, NULL, NULL,
++                          APR_HOOK_MIDDLE);
++    ap_hook_auth_checker(db_check_auth, NULL, NULL, APR_HOOK_MIDDLE);
+ }
+ 
+ module auth_db_module =
+diff --git a/modules/aaa/mod_auth_dbm.c b/modules/aaa/mod_auth_dbm.c
+index 6896c86..f8fd400 100644
+--- a/modules/aaa/mod_auth_dbm.c
++++ b/modules/aaa/mod_auth_dbm.c
+@@ -70,13 +70,8 @@
+  *         no control is passed along.
+  */
+ 
+-#include "httpd.h"
+-#include "http_config.h"
+-#include "http_core.h"
+-#include "http_log.h"
+-#include "http_protocol.h"
+-#include "http_request.h"   /* for ap_hook_(check_user_id | auth_checker)*/
+ #include "apr_lib.h"
++
+ #define APR_WANT_STRFUNC
+ #include "apr_want.h"
+ 
+@@ -94,6 +89,14 @@
+ #include <ndbm.h>
+ #endif
+ 
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"   /* for ap_hook_(check_user_id | auth_checker)*/
++
++
+ /*
+  * Module definition information - the part between the -START and -END
+  * lines below is used by Configure. This could be stored in a separate
+@@ -118,17 +121,17 @@ typedef struct {
+ 
+ static void *create_dbm_auth_dir_config(apr_pool_t *p, char *d)
+ {
+-    dbm_auth_config_rec *sec
+-    = (dbm_auth_config_rec *) apr_pcalloc(p, sizeof(dbm_auth_config_rec));
++    dbm_auth_config_rec *conf = apr_pcalloc(p, sizeof(*conf));
+ 
+-    sec->auth_dbmpwfile = NULL;
+-    sec->auth_dbmgrpfile = NULL;
+-    sec->auth_dbmauthoritative = 1;	/* fortress is secure by default */
++    conf->auth_dbmpwfile = NULL;
++    conf->auth_dbmgrpfile = NULL;
++    conf->auth_dbmauthoritative = 1;	/* fortress is secure by default */
+ 
+-    return sec;
++    return conf;
+ }
+ 
+-static const char *set_dbm_slot(cmd_parms *cmd, void *offset, const char *f, const char *t)
++static const char *set_dbm_slot(cmd_parms *cmd, void *offset,
++                                const char *f, const char *t)
+ {
+     if (!t || strcmp(t, "dbm"))
+ 	return DECLINE_CMD;
+@@ -235,9 +238,8 @@ static char *get_dbm_grp(request_rec *r, char *user, char *auth_dbmgrpfile)
+ 
+ static int dbm_authenticate_basic_user(request_rec *r)
+ {
+-    dbm_auth_config_rec *sec =
+-    (dbm_auth_config_rec *) ap_get_module_config(r->per_dir_config,
+-					      &auth_dbm_module);
++    dbm_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                     &auth_dbm_module);
+     const char *sent_pw;
+     char *real_pw, *colon_pw;
+     apr_status_t invalid_pw;
+@@ -246,11 +248,11 @@ static int dbm_authenticate_basic_user(request_rec *r)
+     if ((res = ap_get_basic_auth_pw(r, &sent_pw)))
+ 	return res;
+ 
+-    if (!sec->auth_dbmpwfile)
++    if (!conf->auth_dbmpwfile)
+ 	return DECLINED;
+ 
+-    if (!(real_pw = get_dbm_pw(r, r->user, sec->auth_dbmpwfile))) {
+-	if (!(sec->auth_dbmauthoritative))
++    if (!(real_pw = get_dbm_pw(r, r->user, conf->auth_dbmpwfile))) {
++	if (!(conf->auth_dbmauthoritative))
+ 	    return DECLINED;
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		    "DBM user %s not found: %s", r->user, r->filename);
+@@ -278,9 +280,8 @@ static int dbm_authenticate_basic_user(request_rec *r)
+ 
+ static int dbm_check_auth(request_rec *r)
+ {
+-    dbm_auth_config_rec *sec =
+-    (dbm_auth_config_rec *) ap_get_module_config(r->per_dir_config,
+-					      &auth_dbm_module);
++    dbm_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                     &auth_dbm_module);
+     char *user = r->user;
+     int m = r->method_number;
+ 
+@@ -291,7 +292,7 @@ static int dbm_check_auth(request_rec *r)
+     const char *t;
+     char *w;
+ 
+-    if (!sec->auth_dbmgrpfile)
++    if (!conf->auth_dbmgrpfile)
+ 	return DECLINED;
+     if (!reqs_arr)
+ 	return DECLINED;
+@@ -304,16 +305,16 @@ static int dbm_check_auth(request_rec *r)
+ 	t = reqs[x].requirement;
+ 	w = ap_getword_white(r->pool, &t);
+ 
+-	if (!strcmp(w, "group") && sec->auth_dbmgrpfile) {
++	if (!strcmp(w, "group") && conf->auth_dbmgrpfile) {
+ 	    const char *orig_groups, *groups;
+ 	    char *v;
+ 
+-	    if (!(groups = get_dbm_grp(r, user, sec->auth_dbmgrpfile))) {
+-		if (!(sec->auth_dbmauthoritative))
++	    if (!(groups = get_dbm_grp(r, user, conf->auth_dbmgrpfile))) {
++		if (!(conf->auth_dbmauthoritative))
+ 		    return DECLINED;
+ 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			    "user %s not in DBM group file %s: %s",
+-			    user, sec->auth_dbmgrpfile, r->filename);
++			    user, conf->auth_dbmgrpfile, r->filename);
+ 		ap_note_basic_auth_failure(r);
+ 		return HTTP_UNAUTHORIZED;
+ 	    }
+@@ -340,7 +341,8 @@ static int dbm_check_auth(request_rec *r)
+ 
+ static void register_hooks(apr_pool_t *p)
+ {
+-    ap_hook_check_user_id(dbm_authenticate_basic_user, NULL, NULL, APR_HOOK_MIDDLE);
++    ap_hook_check_user_id(dbm_authenticate_basic_user, NULL, NULL,
++                          APR_HOOK_MIDDLE);
+     ap_hook_auth_checker(dbm_check_auth, NULL, NULL, APR_HOOK_MIDDLE);
+ }
+ 

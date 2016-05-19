@@ -1,0 +1,504 @@
+commit fd824394d1d5fdb6e5d9771abcf1b937b6ba0894
+Author: Nick Kew <niq@apache.org>
+Date:   Fri Oct 14 23:33:40 2005 +0000
+
+    Add mod_authn_dbd
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@321247 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/docs/manual/mod/mod_authn_dbd.html b/docs/manual/mod/mod_authn_dbd.html
+new file mode 100644
+index 0000000..f86a5a6
+--- /dev/null
++++ b/docs/manual/mod/mod_authn_dbd.html
+@@ -0,0 +1,3 @@
++URI: mod_authn_dbd.html.en
++Content-Language: en
++Content-type: text/html; charset=ISO-8859-1
+diff --git a/docs/manual/mod/mod_authn_dbd.html.en b/docs/manual/mod/mod_authn_dbd.html.en
+new file mode 100644
+index 0000000..e23cd17
+--- /dev/null
++++ b/docs/manual/mod/mod_authn_dbd.html.en
+@@ -0,0 +1,117 @@
++<?xml version="1.0" encoding="ISO-8859-1"?>
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
++<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" /><!--
++        XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
++              This file is generated from xml source: DO NOT EDIT
++        XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
++      -->
++<title>mod_authn_dbd - Apache HTTP Server</title>
++<link title="Main stylesheet" type="text/css" media="all" rel="stylesheet" href="../style/css/manual.css" />
++<link title="No Sidebar - Default font size" type="text/css" media="all" rel="alternate stylesheet" href="../style/css/manual-loose-100pc.css" />
++<link type="text/css" media="print" rel="stylesheet" href="../style/css/manual-print.css" />
++<link rel="shortcut icon" href="../images/favicon.ico" /></head>
++<body>
++<div id="page-header">
++<p class="menu"><a href="../mod/">Modules</a> | <a href="../mod/directives.html">Directives</a> | <a href="../faq/">FAQ</a> | <a href="../glossary.html">Glossary</a> | <a href="../sitemap.html">Sitemap</a></p>
++<p class="apache">Apache HTTP Server Version 2.1</p>
++<img src="../images/feather.gif" alt="" /></div>
++<div class="up"><a href="./"><img src="../images/left.gif" alt="&lt;-" title="&lt;-" /></a></div>
++<div id="path">
++<a href="http://www.apache.org/">Apache</a> &gt; <a href="http://httpd.apache.org/">HTTP Server</a> &gt; <a href="http://httpd.apache.org/docs-project/">Documentation</a> &gt; <a href="../">Version 2.1</a> &gt; <a href="./">Modules</a></div>
++<div id="page-content">
++<div id="preamble"><h1>Apache Module mod_authn_dbd</h1>
++<div class="toplang">
++<p><span>Available Languages: </span><a href="../en/mod/mod_authn_dbd.html" title="English">&nbsp;en&nbsp;</a></p>
++</div>
++<table class="module"><tr><th><a href="module-dict.html#Description">Description:</a></th><td>User authentication using an SQL database</td></tr>
++<tr><th><a href="module-dict.html#Status">Status:</a></th><td>Extension</td></tr>
++<tr><th><a href="module-dict.html#ModuleIdentifier">Module Identifier:</a></th><td>authn_dbd_module</td></tr>
++<tr><th><a href="module-dict.html#SourceFile">Source File:</a></th><td>mod_authn_dbd.c</td></tr>
++<tr><th><a href="module-dict.html#Compatibility">Compatibility:</a></th><td>Available in Apache 2.1 and later</td></tr></table>
++<h3>Summary</h3>
++
++    <p>This module provides authentication front-ends such as
++    <code class="module"><a href="../mod/mod_auth_digest.html">mod_auth_digest</a></code> and <code class="module"><a href="../mod/mod_auth_basic.html">mod_auth_basic</a></code>
++    to authenticate users by looking up users in SQL tables.
++    Similar functionality is provided by, for example,
++    <code class="module"><a href="../mod/mod_authn_file.html">mod_authn_file</a></code>.</p>
++    <p>This module relies on <code class="module"><a href="../mod/mod_dbd.html">mod_dbd</a></code> to specify
++    the backend database driver and connection parameters, and
++    manage the database connections.</p>
++
++    <p>When using <code class="module"><a href="../mod/mod_auth_basic.html">mod_auth_basic</a></code> or
++    <code class="module"><a href="../mod/mod_auth_digest.html">mod_auth_digest</a></code>, this module is invoked via the
++    <code class="directive"><a href="../mod/mod_auth_basic.html#authbasicprovider">AuthBasicProvider</a></code> or
++    <code class="directive"><a href="../mod/mod_auth_digest.html#authdigestprovider">AuthDigestProvider</a></code>
++    with the <code>dbd</code> value.</p>
++</div>
++<div id="quickview"><h3 class="directives">Directives</h3>
++<ul id="toc">
++<li><img src="../images/down.gif" alt="" /> <a href="#authdbduserpwquery">AuthDBDUserPWQuery</a></li>
++<li><img src="../images/down.gif" alt="" /> <a href="#authdbduserrealmquery">AuthDBDUserRealmQuery</a></li>
++</ul>
++<h3>See also</h3>
++<ul class="seealso">
++<li><code class="directive"><a href="../mod/core.html#authname">AuthName</a></code></li>
++<li><code class="directive"><a href="../mod/core.html#authtype">AuthType</a></code></li>
++<li>
++  <code class="directive"><a href="../mod/mod_auth_basic.html#authbasicprovider">AuthBasicProvider</a></code>
++</li>
++<li>
++  <code class="directive"><a href="../mod/mod_auth_digest.html#authdigestprovider">AuthDigestProvider</a></code>
++</li>
++<li><code class="directive"><a href="../mod/mod_dbd.html#dbdriver">DBDriver</a></code></li>
++<li><code class="directive"><a href="../mod/mod_dbd.html#dbdparams">DBDParams</a></code></li>
++</ul></div>
++
++<div class="top"><a href="#page-header"><img src="../images/up.gif" alt="top" /></a></div>
++<div class="directive-section"><h2><a id="AuthDBDUserPWQuery" name="AuthDBDUserPWQuery">AuthDBDUserPWQuery</a> <a id="authdbduserpwquery" name="authdbduserpwquery">Directive</a></h2>
++<table class="directive">
++<tr><th><a href="directive-dict.html#Description">Description:</a></th><td>SQL query to look up a password for a user</td></tr>
++<tr><th><a href="directive-dict.html#Syntax">Syntax:</a></th><td><code>AuthDBDUserPWQuery <var>query</var></code></td></tr>
++<tr><th><a href="directive-dict.html#Context">Context:</a></th><td>directory, .htaccess</td></tr>
++<tr><th><a href="directive-dict.html#Override">Override:</a></th><td>AuthConfig</td></tr>
++<tr><th><a href="directive-dict.html#Status">Status:</a></th><td>Extension</td></tr>
++<tr><th><a href="directive-dict.html#Module">Module:</a></th><td>mod_authn_dbd</td></tr>
++</table>
++    <p>The <code class="directive">AuthDBDUserPWQuery</code> specifies an
++    SQL query to look up a password for a specified user.
++    The query must take a single string (typically SQL varchar)
++    argument (username), and return a single value (encrypted password).
++    </p>
++    <div class="example"><p><code>
++    AuthDBDUserPWQuery "SELECT password FROM authn WHERE username = %s"
++    </code></p></div>
++
++
++</div>
++<div class="top"><a href="#page-header"><img src="../images/up.gif" alt="top" /></a></div>
++<div class="directive-section"><h2><a id="AuthDBDUserRealmQuery" name="AuthDBDUserRealmQuery">AuthDBDUserRealmQuery</a> <a id="authdbduserrealmquery" name="authdbduserrealmquery">Directive</a></h2>
++<table class="directive">
++<tr><th><a href="directive-dict.html#Description">Description:</a></th><td>SQL query to look up a password hash for a user and realm.
++</td></tr>
++<tr><th><a href="directive-dict.html#Syntax">Syntax:</a></th><td><code>AuthDBDUserRealmQuery <var>query</var></code></td></tr>
++<tr><th><a href="directive-dict.html#Context">Context:</a></th><td>directory, .htaccess</td></tr>
++<tr><th><a href="directive-dict.html#Override">Override:</a></th><td>AuthConfig</td></tr>
++<tr><th><a href="directive-dict.html#Status">Status:</a></th><td>Extension</td></tr>
++<tr><th><a href="directive-dict.html#Module">Module:</a></th><td>mod_authn_dbd</td></tr>
++</table>
++    <p>The <code class="directive">AuthDBDUserRealmPWQuery</code> specifies an
++    SQL query to look up a password for a specified user and realm.
++    The query must take two string (typically SQL varchar) arguments
++    (username and realm), and return a single value (encrypted password).
++    </p>
++    <div class="example"><p><code>
++    AuthDBDUserRealmPWQuery "SELECT password FROM authn
++                                    WHERE username = %s AND realm = %s"
++    </code></p></div>
++
++
++</div>
++</div>
++<div class="bottomlang">
++<p><span>Available Languages: </span><a href="../en/mod/mod_authn_dbd.html" title="English">&nbsp;en&nbsp;</a></p>
++</div><div id="footer">
++<p class="apache">Copyright 1995-2005 The Apache Software Foundation or its licensors, as applicable.<br />Licensed under the <a href="http://www.apache.org/licenses/LICENSE-2.0">Apache License, Version 2.0</a>.</p>
++<p class="menu"><a href="../mod/">Modules</a> | <a href="../mod/directives.html">Directives</a> | <a href="../faq/">FAQ</a> | <a href="../glossary.html">Glossary</a> | <a href="../sitemap.html">Sitemap</a></p></div>
++</body></html>
+diff --git a/docs/manual/mod/mod_authn_dbd.xml b/docs/manual/mod/mod_authn_dbd.xml
+new file mode 100644
+index 0000000..728d86b
+--- /dev/null
++++ b/docs/manual/mod/mod_authn_dbd.xml
+@@ -0,0 +1,104 @@
++<?xml version="1.0"?>
++<!DOCTYPE modulesynopsis SYSTEM "../style/modulesynopsis.dtd">
++<?xml-stylesheet type="text/xsl" href="../style/manual.en.xsl"?>
++<!-- $LastChangedRevision: 151408 $ -->
++
++<!--
++ Copyright 2002-2005 The Apache Software Foundation or its licensors, as
++ applicable.
++
++ Licensed under the Apache License, Version 2.0 (the "License");
++ you may not use this file except in compliance with the License.
++ You may obtain a copy of the License at
++
++     http://www.apache.org/licenses/LICENSE-2.0
++
++ Unless required by applicable law or agreed to in writing, software
++ distributed under the License is distributed on an "AS IS" BASIS,
++ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ See the License for the specific language governing permissions and
++ limitations under the License.
++-->
++
++<modulesynopsis metafile="mod_authn_dbd.xml.meta">
++
++<name>mod_authn_dbd</name>
++<description>User authentication using an SQL database</description>
++<status>Extension</status>
++<sourcefile>mod_authn_dbd.c</sourcefile>
++<identifier>authn_dbd_module</identifier>
++<compatibility>Available in Apache 2.1 and later</compatibility>
++
++<summary>
++    <p>This module provides authentication front-ends such as
++    <module>mod_auth_digest</module> and <module>mod_auth_basic</module>
++    to authenticate users by looking up users in SQL tables.
++    Similar functionality is provided by, for example,
++    <module>mod_authn_file</module>.</p>
++    <p>This module relies on <module>mod_dbd</module> to specify
++    the backend database driver and connection parameters, and
++    manage the database connections.</p>
++
++    <p>When using <module>mod_auth_basic</module> or
++    <module>mod_auth_digest</module>, this module is invoked via the
++    <directive module="mod_auth_basic">AuthBasicProvider</directive> or
++    <directive module="mod_auth_digest">AuthDigestProvider</directive>
++    with the <code>dbd</code> value.</p>
++</summary>
++
++<seealso><directive module="core">AuthName</directive></seealso>
++<seealso><directive module="core">AuthType</directive></seealso>
++<seealso>
++  <directive module="mod_auth_basic">AuthBasicProvider</directive>
++</seealso>
++<seealso>
++  <directive module="mod_auth_digest">AuthDigestProvider</directive>
++</seealso>
++<seealso><directive module="mod_dbd">DBDriver</directive></seealso>
++<seealso><directive module="mod_dbd">DBDParams</directive></seealso>
++
++<directivesynopsis>
++<name>AuthDBDUserPWQuery</name>
++<description>SQL query to look up a password for a user</description>
++<syntax>AuthDBDUserPWQuery <var>query</var></syntax>
++<contextlist><context>directory</context><context>.htaccess</context>
++</contextlist>
++<override>AuthConfig</override>
++
++<usage>
++    <p>The <directive>AuthDBDUserPWQuery</directive> specifies an
++    SQL query to look up a password for a specified user.
++    The query must take a single string (typically SQL varchar)
++    argument (username), and return a single value (encrypted password).
++    </p>
++    <example>
++    AuthDBDUserPWQuery "SELECT password FROM authn WHERE username = %s"
++    </example>
++
++</usage>
++</directivesynopsis>
++
++<directivesynopsis>
++<name>AuthDBDUserRealmQuery</name>
++<description>SQL query to look up a password hash for a user and realm.
++</description>
++<syntax>AuthDBDUserRealmQuery <var>query</var></syntax>
++<contextlist><context>directory</context><context>.htaccess</context>
++</contextlist>
++<override>AuthConfig</override>
++
++<usage>
++    <p>The <directive>AuthDBDUserRealmPWQuery</directive> specifies an
++    SQL query to look up a password for a specified user and realm.
++    The query must take two string (typically SQL varchar) arguments
++    (username and realm), and return a single value (encrypted password).
++    </p>
++    <example>
++    AuthDBDUserRealmPWQuery "SELECT password FROM authn
++                                    WHERE username = %s AND realm = %s"
++    </example>
++
++</usage>
++</directivesynopsis>
++
++</modulesynopsis>
+diff --git a/docs/manual/mod/mod_authn_dbd.xml.meta b/docs/manual/mod/mod_authn_dbd.xml.meta
+new file mode 100644
+index 0000000..f5d8c8a
+--- /dev/null
++++ b/docs/manual/mod/mod_authn_dbd.xml.meta
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="UTF-8" ?>
++
++<metafile>
++  <basename>mod_authn_dbd</basename>
++  <path>/mod/</path>
++  <relpath>..</relpath>
++
++  <variants>
++    <variant>en</variant>
++  </variants>
++</metafile>
+diff --git a/modules/aaa/mod_authn_dbd.c b/modules/aaa/mod_authn_dbd.c
+new file mode 100644
+index 0000000..fc5c241
+--- /dev/null
++++ b/modules/aaa/mod_authn_dbd.c
+@@ -0,0 +1,230 @@
++/* Copyright 2000-2005 The Apache Software Foundation or its licensors, as
++ * applicable.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "ap_provider.h"
++#include "httpd.h"
++#include "http_config.h"
++#include "http_log.h"
++#include "apr_dbd.h"
++#include "mod_dbd.h"
++#include "apr_strings.h"
++#include "mod_auth.h"
++#include "apr_md5.h"
++
++module AP_MODULE_DECLARE_DATA authn_dbd_module;
++
++typedef struct {
++    const char *user;
++    const char *realm;
++} authn_dbd_conf;
++typedef struct {
++    const char *label;
++    const char *query;
++} authn_dbd_rec;
++
++/* optional function - look it up once in post_config */
++static ap_dbd_t *(*authn_dbd_acquire_fn)(request_rec*) = NULL;
++static void (*authn_dbd_prepare_fn)(server_rec*, const char*, const char*) = NULL;
++
++static void *authn_dbd_cr_conf(apr_pool_t *pool, char *dummy)
++{
++    authn_dbd_conf *ret = apr_pcalloc(pool, sizeof(authn_dbd_conf));
++    return ret;
++}
++static void *authn_dbd_merge_conf(apr_pool_t *pool, void *BASE, void *ADD)
++{
++    authn_dbd_conf *add = ADD;
++    authn_dbd_conf *base = BASE;
++    authn_dbd_conf *ret = apr_palloc(pool, sizeof(authn_dbd_conf));
++    ret->user = (add->user == NULL) ? base->user : add->user;
++    ret->realm = (add->realm == NULL) ? base->realm : add->realm;
++    return ret;
++}
++static const char *authn_dbd_prepare(cmd_parms *cmd, void *cfg, const char *query)
++{
++    static unsigned int label_num = 0;
++    char *label;
++
++    if (authn_dbd_prepare_fn == NULL) {
++        authn_dbd_prepare_fn = APR_RETRIEVE_OPTIONAL_FN(ap_dbd_prepare);
++        if (authn_dbd_prepare_fn == NULL) {
++            return "You must load mod_dbd to enable AuthDBD functions";
++        }
++        authn_dbd_acquire_fn = APR_RETRIEVE_OPTIONAL_FN(ap_dbd_acquire);
++    }
++    label = apr_psprintf(cmd->pool, "authn_dbd_%d", ++label_num);
++
++    authn_dbd_prepare_fn(cmd->server, query, label);
++
++    /* save the label here for our own use */
++    *(void**)cfg = label;
++    return NULL;
++}
++static const command_rec authn_dbd_cmds[] =
++{
++    AP_INIT_TAKE1("AuthDBDUserPWQuery", authn_dbd_prepare,
++                  (void *)APR_OFFSETOF(authn_dbd_conf, user), OR_AUTHCFG,
++                  "Query used to fetch password for user"),
++    AP_INIT_TAKE1("AuthDBDUserRealmPWQuery", authn_dbd_prepare,
++                  (void *)APR_OFFSETOF(authn_dbd_conf, realm), OR_AUTHCFG,
++                  "Query used to fetch password for user+realm"),
++    {NULL}
++};
++static authn_status authn_dbd_password(request_rec *r, const char *user,
++                                       const char *password)
++{
++    apr_status_t rv;
++    const char *dbd_password = NULL;
++    char *colon_pw;
++    apr_dbd_prepared_t *statement;
++    apr_dbd_results_t *res = NULL;
++    apr_dbd_row_t *row = NULL;
++
++    authn_dbd_conf *conf = ap_get_module_config(r->per_dir_config,
++                                                &authn_dbd_module);
++    ap_dbd_t *dbd = authn_dbd_acquire_fn(r);
++    if (dbd == NULL) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "Error looking up %s in database", user);
++        return AUTH_GENERAL_ERROR;
++    }
++
++    if (conf->user == NULL) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "No DBD Authn configured!");
++        return AUTH_GENERAL_ERROR;
++    }
++
++    statement = apr_hash_get(dbd->prepared, conf->user, APR_HASH_KEY_STRING);
++    if (statement == NULL) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "No DBD Authn configured!");
++        return AUTH_GENERAL_ERROR;
++    }
++    if (apr_dbd_pvselect(dbd->driver, r->pool, dbd->handle, &res, statement,
++                              0, user, NULL) != 0) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "Error looking up %s in database", user);
++        return AUTH_GENERAL_ERROR;
++    }
++    for (rv = apr_dbd_get_row(dbd->driver, r->pool, res, &row, -1);
++         rv != -1;
++         rv = apr_dbd_get_row(dbd->driver, r->pool, res, &row, -1)) {
++        if (rv != 0) {
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
++                      "Error looking up %s in database", user);
++            return AUTH_GENERAL_ERROR;
++        }
++        if (dbd_password == NULL) {
++            dbd_password = apr_dbd_get_entry(dbd->driver, row, 0);
++        }
++	/* we can't break out here or row won't get cleaned up */
++    }
++
++    if (!dbd_password) {
++        return AUTH_USER_NOT_FOUND;
++    }
++
++    colon_pw = ap_strchr(dbd_password, ':');
++    if (colon_pw) {
++        *colon_pw = '\0';
++    }
++
++    rv = apr_password_validate(password, dbd_password);
++
++    if (rv != APR_SUCCESS) {
++        return AUTH_DENIED;
++    }
++
++    return AUTH_GRANTED;
++}
++static authn_status authn_dbd_realm(request_rec *r, const char *user,
++                                    const char *realm, char **rethash)
++{
++    apr_status_t rv;
++    const char *dbd_hash = NULL;
++    char *colon_hash;
++    apr_dbd_prepared_t *statement;
++    apr_dbd_results_t *res = NULL;
++    apr_dbd_row_t *row = NULL;
++
++    authn_dbd_conf *conf = ap_get_module_config(r->per_dir_config,
++                                                &authn_dbd_module);
++    ap_dbd_t *dbd = authn_dbd_acquire_fn(r);
++    if (dbd == NULL) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "Error looking up %s in database", user);
++        return AUTH_GENERAL_ERROR;
++    }
++    if (conf->realm == NULL) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "No DBD Authn configured!");
++        return AUTH_GENERAL_ERROR;
++    }
++    statement = apr_hash_get(dbd->prepared, conf->realm, APR_HASH_KEY_STRING);
++    if (statement == NULL) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "No DBD Authn configured!");
++        return AUTH_GENERAL_ERROR;
++    }
++    if (apr_dbd_pvselect(dbd->driver, r->pool, dbd->handle, &res, statement,
++                              0, user, realm, NULL) != 0) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "Error looking up %s:%s in database", user, realm);
++        return AUTH_GENERAL_ERROR;
++    }
++    for (rv = apr_dbd_get_row(dbd->driver, r->pool, res, &row, -1);
++         rv != -1;
++         rv = apr_dbd_get_row(dbd->driver, r->pool, res, &row, -1)) {
++        if (rv != 0) {
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
++                      "Error looking up %s in database", user);
++            return AUTH_GENERAL_ERROR;
++        }
++        if (dbd_hash == NULL) {
++            dbd_hash = apr_dbd_get_entry(dbd->driver, row, 0);
++        }
++	/* we can't break out here or row won't get cleaned up */
++    }
++
++    if (!dbd_hash) {
++        return AUTH_USER_NOT_FOUND;
++    }
++
++    colon_hash = ap_strchr(dbd_hash, ':');
++    if (colon_hash) {
++        *colon_hash = '\0';
++    }
++
++    *rethash = apr_pstrdup(r->pool, dbd_hash);
++
++    return AUTH_USER_FOUND;
++}
++static void authn_dbd_hooks(apr_pool_t *p)
++{
++    static const authn_provider authn_dbd_provider = {
++        &authn_dbd_password,
++        &authn_dbd_realm
++    };
++    
++    ap_register_provider(p, AUTHN_PROVIDER_GROUP, "dbd", "0", &authn_dbd_provider);
++}
++module AP_MODULE_DECLARE_DATA authn_dbd_module =
++{
++    STANDARD20_MODULE_STUFF,
++    authn_dbd_cr_conf,
++    authn_dbd_merge_conf,
++    NULL,
++    NULL,
++    authn_dbd_cmds,
++    authn_dbd_hooks
++};

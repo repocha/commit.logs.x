@@ -1,0 +1,131 @@
+commit 5d5758c071e2f3f0e71f26d452881e8e4f6894f7
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sun Jun 20 19:15:01 2010 +0000
+
+    Fix authorization by user or IP/ENV/...
+    Note ap_note_auth_failure() breakage in STATUS
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@956387 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index d0e4fbd..2a4c43e 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,9 @@
+ 
+ Changes with Apache 2.3.7
+ 
++  *) core: Try to proceed with authorization even if authentication failed.
++     This allows e.g. to authorize by user _or_ ip address. [Stefan Fritsch]
++
+   *) configure: Add reallyall option for --enable-mods-shared. [Stefan Fritsch]
+ 
+   *) Fix Windows build when using VC6. [Gregg L. Smith <lists glewis com>]
+diff --git a/STATUS b/STATUS
+index 77d6463..af24a1f 100644
+--- a/STATUS
++++ b/STATUS
+@@ -67,15 +67,17 @@ RELEASE SHOWSTOPPERS:
+   * Modules without documentation need to be moved to experimental or be
+     removed.
+ 
+-  * There is no working equivalent to 'Satisfy any' to authorize by
+-    user _or_ IP address:
+-    http://mail-archives.apache.org/mod_mbox/httpd-dev/200912.mbox/<4B28E73C.4050209%40kippdata.de>
+-
+   * Not all MPMs are updated to set conn_rec::current_thread correctly.
+       (Prefork, Worker, Event, Simple are updated).
+       jim sez: Then we just ship with those... mark any others as
+                 experimental
+ 
++  * Fix or remove ap_note_auth_failure():
++    There are two incompatible sets of *note_*_auth_failure functions, one in
++    server/protocol.c, the other in mod_auth_*.c. The set in server/protocol.c
++    should be axed and ap_note_auth_failure() must either call the functions in
++    mod_auth_*.c or must be removed, too.
++
+   FOR NEXT ALPHA:
+ 
+ 
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index 3ba1857..50a715e 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -754,7 +754,7 @@ static int authorize_user(request_rec *r)
+         return OK;
+     }
+     else if (auth_result == AUTHZ_DENIED || auth_result == AUTHZ_NEUTRAL) {
+-        if (r->ap_auth_type == NULL) {
++        if (ap_auth_type(r) == NULL) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_SUCCESS, r,
+                           "client denied by server configuration: %s%s",
+                           r->filename ? "" : "uri ",
+@@ -768,7 +768,8 @@ static int authorize_user(request_rec *r)
+                           r->user, r->uri);
+ 
+             /* If we're returning 403, tell them to try again. */
+-            ap_note_auth_failure(r);
++            /* XXX: ap_note_auth_failure is currently broken */
++            /*ap_note_auth_failure(r);*/
+ 
+             return HTTP_UNAUTHORIZED;
+         }
+diff --git a/server/request.c b/server/request.c
+index 2c414e2..d371113 100644
+--- a/server/request.c
++++ b/server/request.c
+@@ -201,6 +201,7 @@ AP_DECLARE(int) ap_process_request_internal(request_rec *r)
+         r->ap_auth_type = r->main->ap_auth_type;
+     }
+     else {
++        char *failed_user = NULL;
+         switch (ap_satisfies(r)) {
+         case SATISFY_ALL:
+         case SATISFY_NOSPEC:
+@@ -209,10 +210,21 @@ AP_DECLARE(int) ap_process_request_internal(request_rec *r)
+             }
+ 
+             if ((access_status = ap_run_check_user_id(r)) != OK) {
+-                return decl_die(access_status, "check user", r);
++                if (access_status == HTTP_UNAUTHORIZED) {
++                    failed_user = r->user;
++                    r->user = NULL;
++                    ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r,
++                                  "authn failed with HTTP_UNAUTHORIZED, "
++                                  "trying authz without user");
++                }
++                else {
++                    return decl_die(access_status, "check user", r);
++                }
+             }
+ 
+             if ((access_status = ap_run_auth_checker(r)) != OK) {
++                if (failed_user)
++                    r->user = failed_user;
+                 return decl_die(access_status, "check authorization", r);
+             }
+             break;
+@@ -220,10 +232,21 @@ AP_DECLARE(int) ap_process_request_internal(request_rec *r)
+             if ((access_status = ap_run_access_checker(r)) != OK) {
+ 
+                 if ((access_status = ap_run_check_user_id(r)) != OK) {
+-                    return decl_die(access_status, "check user", r);
++                    if (access_status == HTTP_UNAUTHORIZED) {
++                        failed_user = r->user;
++                        r->user = NULL;
++                        ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r,
++                                      "authn failed with HTTP_UNAUTHORIZED, "
++                                      "trying authz without user");
++                    }
++                    else {
++                        return decl_die(access_status, "check user", r);
++                    }
+                 }
+ 
+                 if ((access_status = ap_run_auth_checker(r)) != OK) {
++                    if (failed_user)
++                        r->user = failed_user;
+                     return decl_die(access_status, "check authorization", r);
+                 }
+             }

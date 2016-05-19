@@ -1,0 +1,168 @@
+commit 176c79a20654ac022a67f58d7a9e6c514e9836f5
+Author: Justin Erenkrantz <jerenkrantz@apache.org>
+Date:   Sun Nov 16 02:22:25 2003 +0000
+
+    Sync with APR-util deprecated functions.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@101789 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/util_ldap.h b/include/util_ldap.h
+index b0a3b04..4d9c606 100644
+--- a/include/util_ldap.h
++++ b/include/util_ldap.h
+@@ -58,7 +58,7 @@
+ #include <apr_ldap.h>
+ 
+ /* this whole thing disappears if LDAP is not enabled */
+-#ifdef APU_HAS_LDAP
++#if APR_HAS_LDAP
+ 
+ /* APR header files */
+ #include <apr_thread_mutex.h>
+@@ -328,5 +328,5 @@ char *util_ald_cache_display(apr_pool_t *pool, util_ldap_state_t *st);
+  */
+ char *util_ald_cache_display(apr_pool_t *pool, util_ldap_state_t *st);
+ 
+-#endif /* APU_HAS_LDAP */
++#endif /* APR_HAS_LDAP */
+ #endif /* UTIL_LDAP_H */
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 6eb33d5..b9e1459 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -164,7 +164,7 @@ typedef struct hash_entry {
+     unsigned long      key;                     /* the key for this entry    */
+     struct hash_entry *next;                    /* next entry in the bucket  */
+     unsigned long      nonce_count;             /* for nonce-count checking  */
+-    char               ha1[2*MD5_DIGESTSIZE+1]; /* for algorithm=MD5-sess    */
++    char               ha1[2*APR_MD5_DIGESTSIZE+1]; /* for algorithm=MD5-sess    */
+     char               last_nonce[NONCE_LEN+1]; /* for one-time nonce's      */
+ } client_entry;
+ 
+diff --git a/modules/experimental/mod_auth_ldap.c b/modules/experimental/mod_auth_ldap.c
+index 920365e..e33455e 100644
+--- a/modules/experimental/mod_auth_ldap.c
++++ b/modules/experimental/mod_auth_ldap.c
+@@ -81,7 +81,7 @@
+ #include "http_request.h"
+ #include "util_ldap.h"
+ 
+-#ifndef APU_HAS_LDAP
++#if !APR_HAS_LDAP
+ #error mod_auth_ldap requires APR-util to have LDAP support built in
+ #endif
+ 
+diff --git a/modules/experimental/util_ldap.c b/modules/experimental/util_ldap.c
+index e588201..43aa1e9 100644
+--- a/modules/experimental/util_ldap.c
++++ b/modules/experimental/util_ldap.c
+@@ -77,7 +77,7 @@
+ #include <unistd.h>
+ #endif
+ 
+-#ifndef APU_HAS_LDAP
++#if !APR_HAS_LDAP
+ #error mod_ldap requires APR-util to have LDAP support built in
+ #endif
+ 
+diff --git a/modules/experimental/util_ldap_cache.c b/modules/experimental/util_ldap_cache.c
+index 6fb2934..cb20f29 100644
+--- a/modules/experimental/util_ldap_cache.c
++++ b/modules/experimental/util_ldap_cache.c
+@@ -64,7 +64,7 @@
+ #include "util_ldap.h"
+ #include "util_ldap_cache.h"
+ 
+-#ifdef APU_HAS_LDAP
++#if APR_HAS_LDAP
+ 
+ #if APR_HAS_SHARED_MEMORY
+ #define MODLDAP_SHMEM_CACHE "/tmp/mod_ldap_cache"
+@@ -331,4 +331,4 @@ apr_status_t util_ldap_cache_init(apr_pool_t *pool, util_ldap_state_t *st)
+ }
+ 
+ 
+-#endif /* APU_HAS_LDAP */
++#endif /* APR_HAS_LDAP */
+diff --git a/modules/experimental/util_ldap_cache.h b/modules/experimental/util_ldap_cache.h
+index e9c2937..caab8b9 100644
+--- a/modules/experimental/util_ldap_cache.h
++++ b/modules/experimental/util_ldap_cache.h
+@@ -61,7 +61,7 @@
+  */
+ 
+ /* this whole thing disappears if LDAP is not enabled */
+-#ifdef APU_HAS_LDAP
++#if APR_HAS_LDAP
+ 
+ 
+ /*
+@@ -235,5 +235,5 @@ void util_ald_cache_remove(util_ald_cache_t *cache, void *payload);
+ char *util_ald_cache_display_stats(apr_pool_t *p, util_ald_cache_t *cache,
+                                  char *name);
+ 
+-#endif /* APU_HAS_LDAP */
++#endif /* APR_HAS_LDAP */
+ #endif /* APU_LDAP_CACHE_H */
+diff --git a/modules/experimental/util_ldap_cache_mgr.c b/modules/experimental/util_ldap_cache_mgr.c
+index 58e2655..1046dc6 100644
+--- a/modules/experimental/util_ldap_cache_mgr.c
++++ b/modules/experimental/util_ldap_cache_mgr.c
+@@ -65,7 +65,7 @@
+ #include "util_ldap_cache.h"
+ #include <apr_strings.h>
+ 
+-#ifdef APU_HAS_LDAP
++#if APR_HAS_LDAP
+ 
+ /* only here until strdup is gone */
+ #include <string.h>
+@@ -552,4 +552,4 @@ char *util_ald_cache_display(apr_pool_t *pool, util_ldap_state_t *st)
+     return buf;
+ }
+ 
+-#endif /* APU_HAS_LDAP */
++#endif /* APR_HAS_LDAP */
+diff --git a/modules/ssl/mod_ssl.c b/modules/ssl/mod_ssl.c
+index cdff9f6..361937e 100644
+--- a/modules/ssl/mod_ssl.c
++++ b/modules/ssl/mod_ssl.c
+@@ -397,7 +397,7 @@ int ssl_init_ssl_connection(conn_rec *c)
+                               sc->vhost_id_len);
+ 
+     if (!SSL_set_session_id_context(ssl, (unsigned char *)vhost_md5,
+-                                    MD5_DIGESTSIZE*2))
++                                    APR_MD5_DIGESTSIZE*2))
+     {
+         ap_log_error(APLOG_MARK, APLOG_ERR, 0, c->base_server,
+                      "Unable to set session id context to `%s'", vhost_md5);
+diff --git a/server/util_md5.c b/server/util_md5.c
+index 6ec4571..4f028e2 100644
+--- a/server/util_md5.c
++++ b/server/util_md5.c
+@@ -96,7 +96,7 @@ AP_DECLARE(char *) ap_md5_binary(apr_pool_t *p, const unsigned char *buf, int le
+ {
+     const char *hex = "0123456789abcdef";
+     apr_md5_ctx_t my_md5;
+-    unsigned char hash[MD5_DIGESTSIZE];
++    unsigned char hash[APR_MD5_DIGESTSIZE];
+     char *r, result[33]; /* (MD5_DIGESTSIZE * 2) + 1 */
+     int i;
+ 
+@@ -111,13 +111,13 @@ AP_DECLARE(char *) ap_md5_binary(apr_pool_t *p, const unsigned char *buf, int le
+     apr_md5_update(&my_md5, buf, (unsigned int)length);
+     apr_md5_final(hash, &my_md5);
+ 
+-    for (i = 0, r = result; i < MD5_DIGESTSIZE; i++) {
++    for (i = 0, r = result; i < APR_MD5_DIGESTSIZE; i++) {
+ 	*r++ = hex[hash[i] >> 4];
+ 	*r++ = hex[hash[i] & 0xF];
+     }
+     *r = '\0';
+ 
+-    return apr_pstrndup(p, result, MD5_DIGESTSIZE*2);
++    return apr_pstrndup(p, result, APR_MD5_DIGESTSIZE*2);
+ }
+ 
+ AP_DECLARE(char *) ap_md5(apr_pool_t *p, const unsigned char *string)

@@ -1,0 +1,446 @@
+commit 89c82ae14d66125ff8ca64a81ce29e34d3af52fc
+Author: Eric Covener <covener@apache.org>
+Date:   Sat May 29 02:32:22 2010 +0000
+
+    Allow mod_authnz_ldap to set environment variables when it only performs authorization.
+    AuthLDAPAuthorizePrefix can be used to force this to overlap with the prefix used
+    for authentication.
+    
+    PR 45584
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@949336 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 30c893a..ca7bc90 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -28,6 +28,10 @@ Changes with Apache 2.3.7
+      processing is completed, avoiding orphaned callback pointers.
+      [Brett Gervasoni <brettg senseofsecurity.com>, Jeff Trawick]
+ 
++  *) mod_authnz_ldap: Publish requested LDAP data with an AUTHORIZE_ prefix
++     when this module is used for authorization. See AuthLDAPAuthorizePrefix.
++     PR 45584 [Eric Covener]
++
+   *) apxs -q: Stop filtering out ':' characters from the reported values.
+      PR 45343.  [Bill Cole]
+ 
+diff --git a/docs/manual/mod/mod_authnz_ldap.html.en b/docs/manual/mod/mod_authnz_ldap.html.en
+index 5731454..0a0f4df 100644
+--- a/docs/manual/mod/mod_authnz_ldap.html.en
++++ b/docs/manual/mod/mod_authnz_ldap.html.en
+@@ -59,6 +59,7 @@ for HTTP Basic authentication.</td></tr>
+ </div>
+ <div id="quickview"><h3 class="directives">Directives</h3>
+ <ul id="toc">
++<li><img alt="" src="../images/down.gif" /> <a href="#authldapauthorizeprefix">AuthLDAPAuthorizePrefix</a></li>
+ <li><img alt="" src="../images/down.gif" /> <a href="#authldapbindauthoritative">AuthLDAPBindAuthoritative</a></li>
+ <li><img alt="" src="../images/down.gif" /> <a href="#authldapbinddn">AuthLDAPBindDN</a></li>
+ <li><img alt="" src="../images/down.gif" /> <a href="#authldapbindpassword">AuthLDAPBindPassword</a></li>
+@@ -624,10 +625,14 @@ Require valid-user
+ <div class="section">
+ <h2><a name="exposed" id="exposed">Exposing Login Information</a></h2>
+ 
+-    <p>When this module performs authentication, LDAP attributes specified
+-    in the <code class="directive"><a href="#authldapurl">AuthLDAPUrl</a></code> 
++    <p>when this module performs <em>authentication</em>, ldap attributes specified
++    in the <code class="directive"><a href="#authldapurl">authldapurl</a></code> 
+     directive are placed in environment variables with the prefix "AUTHENTICATE_".</p>
+ 
++    <p>when this module performs <em>authorization</em>, ldap attributes specified
++    in the <code class="directive"><a href="#authldapurl">authldapurl</a></code> 
++    directive are placed in environment variables with the prefix "AUTHORIZE_".</p>
++
+     <p>If the attribute field contains the username, common name
+     and telephone number of a user, a CGI program will have access to
+     this information without the need to make a second independent LDAP
+@@ -755,6 +760,30 @@ Require group <em>mygroupfile</em>
+ 
+ </div>
+ <div class="top"><a href="#page-header"><img alt="top" src="../images/up.gif" /></a></div>
++<div class="directive-section"><h2><a name="AuthLDAPAuthorizePrefix" id="AuthLDAPAuthorizePrefix">AuthLDAPAuthorizePrefix</a> <a name="authldapauthorizeprefix" id="authldapauthorizeprefix">Directive</a></h2>
++<table class="directive">
++<tr><th><a href="directive-dict.html#Description">Description:</a></th><td>Specifies the prefix for environment variables set during
++authorization</td></tr>
++<tr><th><a href="directive-dict.html#Syntax">Syntax:</a></th><td><code>AuthLDAPAuthorizePrefix <em>prefix</em></code></td></tr>
++<tr><th><a href="directive-dict.html#Default">Default:</a></th><td><code>AuthLDAPAuthorizePrefix AUTHORIZE_</code></td></tr>
++<tr><th><a href="directive-dict.html#Context">Context:</a></th><td>directory, .htaccess</td></tr>
++<tr><th><a href="directive-dict.html#Override">Override:</a></th><td>AuthConfig</td></tr>
++<tr><th><a href="directive-dict.html#Status">Status:</a></th><td>Extension</td></tr>
++<tr><th><a href="directive-dict.html#Module">Module:</a></th><td>mod_authnz_ldap</td></tr>
++<tr><th><a href="directive-dict.html#Compatibility">Compatibility:</a></th><td>Available in version 2.3.7 and later</td></tr>
++</table>
++    <p>This directive allows you to override the prefix used for environment
++    variables set during LDAP authorization.  If <em>AUTHENTICATE_</em> is
++    specified, consumers of these environment variables see the same information
++    whether LDAP has performed authentication, authorization, or both.</p>
++
++    <div class="note"><h3>Note</h3>
++    No authorization variables are set when a user is authorized on the basis of 
++    <code>Require valid-user</code>.
++    </div>
++
++</div>
++<div class="top"><a href="#page-header"><img alt="top" src="../images/up.gif" /></a></div>
+ <div class="directive-section"><h2><a name="AuthLDAPBindAuthoritative" id="AuthLDAPBindAuthoritative">AuthLDAPBindAuthoritative</a> <a name="authldapbindauthoritative" id="authldapbindauthoritative">Directive</a></h2>
+ <table class="directive">
+ <tr><th><a href="directive-dict.html#Description">Description:</a></th><td>Determines if other authentication providers are used when a user can be mapped to a DN but the server cannot successfully bind with the users credentials.</td></tr>
+diff --git a/docs/manual/mod/mod_authnz_ldap.xml b/docs/manual/mod/mod_authnz_ldap.xml
+index 8b1ee4a..7b931bc 100644
+--- a/docs/manual/mod/mod_authnz_ldap.xml
++++ b/docs/manual/mod/mod_authnz_ldap.xml
+@@ -618,10 +618,14 @@ Require valid-user
+ 
+ <section id="exposed"><title>Exposing Login Information</title>
+ 
+-    <p>When this module performs authentication, LDAP attributes specified
+-    in the <directive module="mod_authnz_ldap">AuthLDAPUrl</directive> 
++    <p>when this module performs <em>authentication</em>, ldap attributes specified
++    in the <directive module="mod_authnz_ldap">authldapurl</directive> 
+     directive are placed in environment variables with the prefix "AUTHENTICATE_".</p>
+ 
++    <p>when this module performs <em>authorization</em>, ldap attributes specified
++    in the <directive module="mod_authnz_ldap">authldapurl</directive> 
++    directive are placed in environment variables with the prefix "AUTHORIZE_".</p>
++
+     <p>If the attribute field contains the username, common name
+     and telephone number of a user, a CGI program will have access to
+     this information without the need to make a second independent LDAP
+@@ -752,6 +756,30 @@ Require group <em>mygroupfile</em>
+ </section>
+ 
+ <directivesynopsis>
++<name>AuthLDAPAuthorizePrefix</name>
++<description>Specifies the prefix for environment variables set during
++authorization</description>
++<syntax>AuthLDAPAuthorizePrefix <em>prefix</em></syntax>
++<default>AuthLDAPAuthorizePrefix AUTHORIZE_</default>
++<contextlist><context>directory</context><context>.htaccess</context>
++</contextlist>
++<override>AuthConfig</override>
++<compatibility>Available in version 2.3.7 and later</compatibility>
++<usage>
++    <p>This directive allows you to override the prefix used for environment
++    variables set during LDAP authorization.  If <em>AUTHENTICATE_</em> is
++    specified, consumers of these environment variables see the same information
++    whether LDAP has performed authentication, authorization, or both.</p>
++
++    <note><title>Note</title>
++    No authorization variables are set when a user is authorized on the basis of 
++    <code>Require valid-user</code>.
++    </note>
++</usage>
++</directivesynopsis>
++
++
++<directivesynopsis>
+ <name>AuthLDAPBindAuthoritative</name>
+ <description>Determines if other authentication providers are used when a user can be mapped to a DN but the server cannot successfully bind with the users credentials.</description>
+ <syntax>AuthLDAPBindAuthoritative<em>off|on</em></syntax>
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 8addb11..2678850 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -79,13 +79,19 @@ typedef struct {
+     int maxNestingDepth;            /* Maximum recursive nesting depth permitted during subgroup processing. Default: 10 */
+ 
+     int secure;                     /* True if SSL connections are requested */
++    char *authz_prefix;             /* Prefix for environment variables added during authz */
+ } authn_ldap_config_t;
+ 
+ typedef struct {
+     char *dn;                       /* The saved dn from a successful search */
+     char *user;                     /* The username provided by the client */
++    const char **vals;              /* The additional values pulled during the DN search*/
+ } authn_ldap_request_t;
+ 
++enum auth_ldap_phase{
++    LDAP_AUTHN, LDAP_AUTHZ
++};
++ 
+ /* maximum group elements supported */
+ #define GROUPATTR_MAX_ELTS 10
+ 
+@@ -331,6 +337,8 @@ static void *create_authnz_ldap_dir_config(apr_pool_t *p, char *d)
+     sec->remote_user_attribute = NULL;
+     sec->compare_dn_on_server = 0;
+ 
++    sec->authz_prefix = AUTHZ_PREFIX;
++
+     return sec;
+ }
+ 
+@@ -341,6 +349,42 @@ static apr_status_t authnz_ldap_cleanup_connection_close(void *param)
+     return APR_SUCCESS;
+ }
+ 
++static int set_request_vars(request_rec *r, enum auth_ldap_phase phase) { 
++    char *prefix = NULL;
++    int prefix_len, remote_user_attribute_set;
++    authn_ldap_request_t *req =
++        (authn_ldap_request_t *)ap_get_module_config(r->request_config, &authnz_ldap_module);
++    authn_ldap_config_t *sec =
++        (authn_ldap_config_t *)ap_get_module_config(r->per_dir_config, &authnz_ldap_module);
++    const char **vals = req->vals;
++
++    prefix = (phase == LDAP_AUTHN) ? AUTHN_PREFIX : sec->authz_prefix;
++    prefix_len = strlen(prefix);
++
++    if (sec->attributes && vals) {
++        apr_table_t *e = r->subprocess_env;
++        int i = 0;
++        while (sec->attributes[i]) {
++            char *str = apr_pstrcat(r->pool, prefix, sec->attributes[i], NULL);
++            int j = prefix_len;
++            while (str[j]) {
++                str[j] = apr_toupper(str[j]);
++                j++;
++            }
++            apr_table_setn(e, str, vals[i] ? vals[i] : "");
++
++            /* handle remote_user_attribute, if set */
++            if ((phase == LDAP_AUTHN) &&
++                sec->remote_user_attribute && 
++                !strcmp(sec->remote_user_attribute, sec->attributes[i])) {
++                r->user = (char *)apr_pstrdup(r->pool, vals[i]);
++                remote_user_attribute_set = 1;
++            }
++            i++;
++        }
++    }
++    return remote_user_attribute_set;
++}
+ 
+ /*
+  * Authentication Phase
+@@ -356,7 +400,6 @@ static authn_status authn_ldap_check_password(request_rec *r, const char *user,
+                                               const char *password)
+ {
+     int failures = 0;
+-    const char **vals = NULL;
+     char filtbuf[FILTER_LENGTH];
+     authn_ldap_config_t *sec =
+         (authn_ldap_config_t *)ap_get_module_config(r->per_dir_config, &authnz_ldap_module);
+@@ -425,7 +468,7 @@ start_over:
+     /* do the user search */
+     result = util_ldap_cache_checkuserid(r, ldc, sec->url, sec->basedn, sec->scope,
+                                          sec->attributes, filtbuf, utfpassword,
+-                                         &dn, &vals);
++                                         &dn, &(req->vals));
+     util_ldap_connection_close(ldc);
+ 
+     /* sanity check - if server is down, retry it up to 5 times */
+@@ -474,27 +517,7 @@ start_over:
+     }
+ 
+     /* add environment variables */
+-    if (sec->attributes && vals) {
+-        apr_table_t *e = r->subprocess_env;
+-        int i = 0;
+-        while (sec->attributes[i]) {
+-            char *str = apr_pstrcat(r->pool, AUTHN_PREFIX, sec->attributes[i], NULL);
+-            int j = sizeof(AUTHN_PREFIX)-1; /* string length of "AUTHENTICATE_", excluding the trailing NIL */
+-            while (str[j]) {
+-                str[j] = apr_toupper(str[j]);
+-                j++;
+-            }
+-            apr_table_setn(e, str, vals[i] ? vals[i] : "");
+-
+-            /* handle remote_user_attribute, if set */
+-            if (sec->remote_user_attribute && 
+-                !strcmp(sec->remote_user_attribute, sec->attributes[i])) {
+-                r->user = (char *)apr_pstrdup(r->pool, vals[i]);
+-                remote_user_attribute_set = 1;
+-            }
+-            i++;
+-        }
+-    }
++    remote_user_attribute_set = set_request_vars(r, LDAP_AUTHN);
+ 
+     /* sanity check */
+     if (sec->remote_user_attribute && !remote_user_attribute_set) {
+@@ -529,7 +552,6 @@ static authz_status ldapuser_check_authorization(request_rec *r,
+ 
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+-    const char **vals = NULL;
+ 
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+@@ -572,12 +594,15 @@ static authz_status ldapuser_check_authorization(request_rec *r,
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+             "ldap authorize: Creating LDAP req structure");
+ 
++        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
++            sizeof(authn_ldap_request_t));
++
+         /* Build the username filter */
+         authn_ldap_build_filter(filtbuf, r, r->user, NULL, sec);
+ 
+         /* Search for the user DN */
+         result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
+-             sec->scope, sec->attributes, filtbuf, &dn, &vals);
++             sec->scope, sec->attributes, filtbuf, &dn, &(req->vals));
+ 
+         /* Search failed, log error and return failure */
+         if(result != LDAP_SUCCESS) {
+@@ -586,11 +611,10 @@ static authz_status ldapuser_check_authorization(request_rec *r,
+             return AUTHZ_DENIED;
+         }
+ 
+-        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
+-            sizeof(authn_ldap_request_t));
+         ap_set_module_config(r->request_config, &authnz_ldap_module, req);
+         req->dn = apr_pstrdup(r->pool, dn);
+         req->user = r->user;
++
+     }
+ 
+     if (req->dn == NULL || strlen(req->dn) == 0) {
+@@ -611,6 +635,7 @@ static authz_status ldapuser_check_authorization(request_rec *r,
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                           "[%" APR_PID_T_FMT "] auth_ldap authorize: "
+                           "require user: authorization successful", getpid());
++            set_request_vars(r, LDAP_AUTHZ);
+             return AUTHZ_GRANTED;
+         }
+         default: {
+@@ -632,6 +657,7 @@ static authz_status ldapuser_check_authorization(request_rec *r,
+                 ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                               "[%" APR_PID_T_FMT "] auth_ldap authorize: "
+                               "require user: authorization successful", getpid());
++                set_request_vars(r, LDAP_AUTHZ);
+                 return AUTHZ_GRANTED;
+             }
+             default: {
+@@ -665,7 +691,6 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+ 
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+-    const char **vals = NULL;
+     struct mod_auth_ldap_groupattr_entry_t *ent;
+     int i;
+ 
+@@ -751,7 +776,7 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+ 
+         /* Search for the user DN */
+         result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
+-             sec->scope, sec->attributes, filtbuf, &dn, &vals);
++             sec->scope, sec->attributes, filtbuf, &dn, &(req->vals));
+ 
+         /* Search failed, log error and return failure */
+         if(result != LDAP_SUCCESS) {
+@@ -807,6 +832,7 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+                               "[%" APR_PID_T_FMT "] auth_ldap authorize: require group: "
+                               "authorization successful (attribute %s) [%s][%d - %s]",
+                               getpid(), ent[i].name, ldc->reason, result, ldap_err2string(result));
++                set_request_vars(r, LDAP_AUTHZ);
+                 return AUTHZ_GRANTED;
+             }
+             case LDAP_COMPARE_FALSE: {
+@@ -825,7 +851,8 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+                                    "[%" APR_PID_T_FMT "] auth_ldap authorise: require group (sub-group): "
+                                    "authorisation successful (attribute %s) [%s][%d - %s]",
+                                    getpid(), ent[i].name, ldc->reason, result, ldap_err2string(result));
+-                     return AUTHZ_GRANTED;
++                    set_request_vars(r, LDAP_AUTHZ);
++                    return AUTHZ_GRANTED;
+                 }
+                 else {
+                     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+@@ -866,7 +893,6 @@ static authz_status ldapdn_check_authorization(request_rec *r,
+ 
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+-    const char **vals = NULL;
+ 
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+@@ -914,7 +940,7 @@ static authz_status ldapdn_check_authorization(request_rec *r,
+ 
+         /* Search for the user DN */
+         result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
+-             sec->scope, sec->attributes, filtbuf, &dn, &vals);
++             sec->scope, sec->attributes, filtbuf, &dn, &(req->vals));
+ 
+         /* Search failed, log error and return failure */
+         if(result != LDAP_SUCCESS) {
+@@ -946,6 +972,7 @@ static authz_status ldapdn_check_authorization(request_rec *r,
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                           "[%" APR_PID_T_FMT "] auth_ldap authorize: "
+                           "require dn: authorization successful", getpid());
++            set_request_vars(r, LDAP_AUTHZ);
+             return AUTHZ_GRANTED;
+         }
+         default: {
+@@ -980,7 +1007,6 @@ static authz_status ldapattribute_check_authorization(request_rec *r,
+ 
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+-    const char **vals = NULL;
+ 
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+@@ -1028,7 +1054,7 @@ static authz_status ldapattribute_check_authorization(request_rec *r,
+ 
+         /* Search for the user DN */
+         result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
+-             sec->scope, sec->attributes, filtbuf, &dn, &vals);
++             sec->scope, sec->attributes, filtbuf, &dn, &(req->vals));
+ 
+         /* Search failed, log error and return failure */
+         if(result != LDAP_SUCCESS) {
+@@ -1067,6 +1093,7 @@ static authz_status ldapattribute_check_authorization(request_rec *r,
+                               0, r, "[%" APR_PID_T_FMT "] auth_ldap authorize: "
+                               "require attribute: authorization successful", 
+                               getpid());
++                set_request_vars(r, LDAP_AUTHZ);
+                 return AUTHZ_GRANTED;
+             }
+             default: {
+@@ -1099,7 +1126,6 @@ static authz_status ldapfilter_check_authorization(request_rec *r,
+ 
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+-    const char **vals = NULL;
+ 
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+@@ -1147,7 +1173,7 @@ static authz_status ldapfilter_check_authorization(request_rec *r,
+ 
+         /* Search for the user DN */
+         result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
+-             sec->scope, sec->attributes, filtbuf, &dn, &vals);
++             sec->scope, sec->attributes, filtbuf, &dn, &(req->vals));
+ 
+         /* Search failed, log error and return failure */
+         if(result != LDAP_SUCCESS) {
+@@ -1183,7 +1209,7 @@ static authz_status ldapfilter_check_authorization(request_rec *r,
+ 
+         /* Search for the user DN */
+         result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
+-             sec->scope, sec->attributes, filtbuf, &dn, &vals);
++             sec->scope, sec->attributes, filtbuf, &dn, &(req->vals));
+ 
+         /* Make sure that the filtered search returned the correct user dn */
+         if (result == LDAP_SUCCESS) {
+@@ -1200,6 +1226,7 @@ static authz_status ldapfilter_check_authorization(request_rec *r,
+                               0, r, "[%" APR_PID_T_FMT "] auth_ldap authorize: "
+                               "require ldap-filter: authorization "
+                               "successful", getpid());
++                set_request_vars(r, LDAP_AUTHZ);
+                 return AUTHZ_GRANTED;
+             }
+             case LDAP_FILTER_ERROR: {
+@@ -1516,6 +1543,10 @@ static const command_rec authnz_ldap_cmds[] =
+                   "Character set conversion configuration file. If omitted, character set"
+                   "conversion is disabled."),
+ 
++    AP_INIT_TAKE1("AuthLDAPAuthorizePrefix", ap_set_string_slot,
++                  (void *)APR_OFFSETOF(authn_ldap_config_t, authz_prefix), OR_AUTHCFG,
++                  "The prefix to add to environment variables set during "
++                  "successful authorization, default '" AUTHZ_PREFIX "'"),
+     {NULL}
+ };
+ 

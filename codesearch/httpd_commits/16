@@ -1,0 +1,116 @@
+commit e9507b496e341290c26d76f163706879195b83e3
+Author: Christophe Jaillet <jailletc36@apache.org>
+Date:   Mon Feb 9 20:32:18 2015 +0000
+
+    Fix a precedence issue.
+    The logic is unchanged but 'ret' does not have the expected value. So the logged error message may be incorrect.
+    
+    + add some empty lines between functions
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1658567 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 93383bd..df387bb 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -6,6 +6,9 @@ Changes with Apache 2.5.0
+      calls r:wsupgrade() can cause a child process crash. 
+      [Edward Lu <Chaosed0 gmail.com>]
+ 
++  *) mod_authn_dbd: Fix the error message logged in case of error while querying
++     the database. This is associated to AH01656 and AH01661. [Christophe Jaillet]
++  
+   *) mod_proxy(es): Avoid error response/document handling by the core if some
+      input filter already did it while reading client's payload. [Yann Ylavic]
+ 
+diff --git a/modules/aaa/mod_authn_dbd.c b/modules/aaa/mod_authn_dbd.c
+index c4183c5..421295b 100644
+--- a/modules/aaa/mod_authn_dbd.c
++++ b/modules/aaa/mod_authn_dbd.c
+@@ -33,6 +33,7 @@ typedef struct {
+     const char *user;
+     const char *realm;
+ } authn_dbd_conf;
++
+ typedef struct {
+     const char *label;
+     const char *query;
+@@ -51,6 +52,7 @@ static void *authn_dbd_cr_conf(apr_pool_t *pool, char *dummy)
+     authn_dbd_conf *ret = apr_pcalloc(pool, sizeof(authn_dbd_conf));
+     return ret;
+ }
++
+ static void *authn_dbd_merge_conf(apr_pool_t *pool, void *BASE, void *ADD)
+ {
+     authn_dbd_conf *add = ADD;
+@@ -60,6 +62,7 @@ static void *authn_dbd_merge_conf(apr_pool_t *pool, void *BASE, void *ADD)
+     ret->realm = (add->realm == NULL) ? base->realm : add->realm;
+     return ret;
+ }
++
+ static const char *authn_dbd_prepare(cmd_parms *cmd, void *cfg, const char *query)
+ {
+     static unsigned int label_num = 0;
+@@ -82,6 +85,7 @@ static const char *authn_dbd_prepare(cmd_parms *cmd, void *cfg, const char *quer
+     /* save the label here for our own use */
+     return ap_set_string_slot(cmd, cfg, label);
+ }
++
+ static const command_rec authn_dbd_cmds[] =
+ {
+     AP_INIT_TAKE1("AuthDBDUserPWQuery", authn_dbd_prepare,
+@@ -92,6 +96,7 @@ static const command_rec authn_dbd_cmds[] =
+                   "Query used to fetch password for user+realm"),
+     {NULL}
+ };
++
+ static authn_status authn_dbd_password(request_rec *r, const char *user,
+                                        const char *password)
+ {
+@@ -126,7 +131,7 @@ static authn_status authn_dbd_password(request_rec *r, const char *user,
+         return AUTH_GENERAL_ERROR;
+     }
+     if ((ret = apr_dbd_pvselect(dbd->driver, r->pool, dbd->handle, &res,
+-                                statement, 0, user, NULL) != 0)) {
++                                statement, 0, user, NULL)) != 0) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01656)
+                       "Query execution error looking up '%s' "
+                       "in database [%s]",
+@@ -187,6 +192,7 @@ static authn_status authn_dbd_password(request_rec *r, const char *user,
+ 
+     return AUTH_GRANTED;
+ }
++
+ static authn_status authn_dbd_realm(request_rec *r, const char *user,
+                                     const char *realm, char **rethash)
+ {
+@@ -219,7 +225,7 @@ static authn_status authn_dbd_realm(request_rec *r, const char *user,
+         return AUTH_GENERAL_ERROR;
+     }
+     if ((ret = apr_dbd_pvselect(dbd->driver, r->pool, dbd->handle, &res,
+-                                statement, 0, user, realm, NULL) != 0)) {
++                                statement, 0, user, realm, NULL)) != 0) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01661)
+                       "Query execution error looking up '%s:%s' "
+                       "in database [%s]",
+@@ -275,10 +281,12 @@ static authn_status authn_dbd_realm(request_rec *r, const char *user,
+     *rethash = apr_pstrdup(r->pool, dbd_hash);
+     return AUTH_USER_FOUND;
+ }
++
+ static void opt_retr(void)
+ {
+     authn_cache_store = APR_RETRIEVE_OPTIONAL_FN(ap_authn_cache_store);
+ }
++
+ static void authn_dbd_hooks(apr_pool_t *p)
+ {
+     static const authn_provider authn_dbd_provider = {
+@@ -291,6 +299,7 @@ static void authn_dbd_hooks(apr_pool_t *p)
+                               &authn_dbd_provider, AP_AUTH_INTERNAL_PER_CONF);
+     ap_hook_optional_fn_retrieve(opt_retr, NULL, NULL, APR_HOOK_MIDDLE);
+ }
++
+ AP_DECLARE_MODULE(authn_dbd) =
+ {
+     STANDARD20_MODULE_STUFF,

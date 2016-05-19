@@ -1,0 +1,32 @@
+commit b6eb50b0190d552982d24c766136fa1c0e400757
+Author: Eric Covener <covener@apache.org>
+Date:   Tue Dec 17 16:38:36 2013 +0000
+
+    Log a warning when the LDAP authn provider is configured but an AuthLDAPURL
+    isn't -- IOW, avoid silently skipping a misconfigured [or buggy?] LDAP provider.
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1551611 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/docs/log-message-tags/next-number b/docs/log-message-tags/next-number
+index 45f6930..12fda76 100644
+--- a/docs/log-message-tags/next-number
++++ b/docs/log-message-tags/next-number
+@@ -1 +1 @@
+-2557
++2559
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 3cd0ddc..4d3d48e 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -490,6 +490,9 @@ static authn_status authn_ldap_check_password(request_rec *r, const char *user,
+      * Basic sanity checks before any LDAP operations even happen.
+      */
+     if (!sec->have_ldap_url) {
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, APLOGNO(02558) 
++                      "no AuthLDAPURL");
++
+         return AUTH_GENERAL_ERROR;
+     }
+ 

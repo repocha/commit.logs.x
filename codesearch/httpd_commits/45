@@ -1,0 +1,124 @@
+commit eef53d4e772f075a22a089ca5b26436a007f7d91
+Author: Chris Darroch <chrisd@apache.org>
+Date:   Mon Oct 14 16:08:41 2013 +0000
+
+    Support optional initialization arguments for socache providers in
+    mod_authn_socache.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1531961 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 5914b51..183503c 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,6 +1,9 @@
+                                                          -*- coding: utf-8 -*-
+ Changes with Apache 2.5.0
+ 
++  *) mod_authn_socache: Support optional initialization arguments for
++     socache providers.  [Chris Darroch]
++
+   *) mod_session: Reset the max-age on session save. PR 47476. [Alexey
+      Varlamov <alexey.v.varlamov gmail com>]
+ 
+diff --git a/docs/manual/mod/mod_authn_socache.xml b/docs/manual/mod/mod_authn_socache.xml
+index a48b3dd..76c08f9 100644
+--- a/docs/manual/mod/mod_authn_socache.xml
++++ b/docs/manual/mod/mod_authn_socache.xml
+@@ -115,16 +115,17 @@ AuthnCacheSOCache dbm
+ <directivesynopsis>
+ <name>AuthnCacheSOCache</name>
+ <description>Select socache backend provider to use</description>
+-<syntax>AuthnCacheSOCache <var>provider-name</var></syntax>
++<syntax>AuthnCacheSOCache <var>provider-name[:provider-args]</var></syntax>
+ <contextlist><context>server config</context></contextlist>
+ <override>None</override>
+ 
+ <usage>
+     <p>This is a server-wide setting to select a provider for the
+-    <a href="../socache.html">shared object cache</a>.
+-    Values are "dbm", "dc", "memcache", or "shmcb", each subject to the
+-    appropriate module being loaded.  If not set, your platform's
+-       default will be used.</p>
++    <a href="../socache.html">shared object cache</a>, followed by
++    optional arguments for that provider.
++    Some possible values for <var>provider-name</var> are "dbm", "dc",
++    "memcache", or "shmcb", each subject to the appropriate module
++    being loaded.  If not set, your platform's default will be used.</p>
+ </usage>
+ </directivesynopsis>
+ 
+diff --git a/modules/aaa/mod_authn_socache.c b/modules/aaa/mod_authn_socache.c
+index 6019977..73c3274 100644
+--- a/modules/aaa/mod_authn_socache.c
++++ b/modules/aaa/mod_authn_socache.c
+@@ -39,7 +39,7 @@ typedef struct authn_cache_dircfg {
+     const char *context;
+ } authn_cache_dircfg;
+ 
+-/* FIXME: figure out usage of socache create vs init
++/* FIXME:
+  * I think the cache and mutex should be global
+  */
+ static apr_global_mutex_t *authn_cache_mutex = NULL;
+@@ -85,7 +85,6 @@ static int authn_cache_post_config(apr_pool_t *pconf, apr_pool_t *plog,
+                                    apr_pool_t *ptmp, server_rec *s)
+ {
+     apr_status_t rv;
+-    const char *errmsg;
+     static struct ap_socache_hints authn_cache_hints = {64, 32, 60000000};
+ 
+     if (!configured) {
+@@ -108,12 +107,6 @@ static int authn_cache_post_config(apr_pool_t *pconf, apr_pool_t *plog,
+     }
+     apr_pool_cleanup_register(pconf, NULL, remove_lock, apr_pool_cleanup_null);
+ 
+-    errmsg = socache_provider->create(&socache_instance, NULL, ptmp, pconf);
+-    if (errmsg) {
+-        ap_log_perror(APLOG_MARK, APLOG_CRIT, rv, plog, APLOGNO(01676) "%s", errmsg);
+-        return 500; /* An HTTP status would be a misnomer! */
+-    }
+-
+     rv = socache_provider->init(socache_instance, authn_cache_id,
+                                 &authn_cache_hints, s, pconf);
+     if (rv != APR_SUCCESS) {
+@@ -143,9 +136,22 @@ static const char *authn_cache_socache(cmd_parms *cmd, void *CFG,
+                                        const char *arg)
+ {
+     const char *errmsg = ap_check_cmd_context(cmd, GLOBAL_ONLY);
++    const char *sep, *name;
++
+     if (errmsg)
+         return errmsg;
+-    socache_provider = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP, arg,
++
++    /* Argument is of form 'name:args' or just 'name'. */
++    sep = ap_strchr_c(arg, ':');
++    if (sep) {
++        name = apr_pstrmemdup(cmd->pool, arg, sep - arg);
++        sep++;
++    }
++    else {
++        name = arg;
++    }
++
++    socache_provider = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP, name,
+                                           AP_SOCACHE_PROVIDER_VERSION);
+     if (socache_provider == NULL) {
+         errmsg = apr_psprintf(cmd->pool,
+@@ -153,6 +159,14 @@ static const char *authn_cache_socache(cmd_parms *cmd, void *CFG,
+                               "to load the appropriate socache module "
+                               "(mod_socache_%s?)", arg, arg);
+     }
++    else {
++        errmsg = socache_provider->create(&socache_instance, sep,
++                                          cmd->temp_pool, cmd->pool);
++    }
++
++    if (errmsg) {
++        errmsg = apr_psprintf(cmd->pool, "AuthnCacheSOCache: %s", errmsg);
++    }
+     return errmsg;
+ }
+ 

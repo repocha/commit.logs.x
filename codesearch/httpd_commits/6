@@ -1,0 +1,358 @@
+commit 2f198685bfae4d9f5a66be2d558a41477be7ab97
+Author: asf-sync-process <asf-sync-process@unknown>
+Date:   Tue Nov 24 14:38:54 2015 +0000
+
+    Follow up to r1715880: revert abusive ap_casecmpstr[n]() usages.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1716151 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_basic.c b/modules/aaa/mod_auth_basic.c
+index 9402463..3e3da35 100644
+--- a/modules/aaa/mod_auth_basic.c
++++ b/modules/aaa/mod_auth_basic.c
+@@ -324,7 +324,7 @@ static int authenticate_basic_user(request_rec *r)
+     }
+ 
+     if (conf->use_digest_algorithm
+-        && !ap_casecmpstr(conf->use_digest_algorithm, "MD5")) {
++        && !strcasecmp(conf->use_digest_algorithm, "MD5")) {
+         realm = ap_auth_name(r);
+         digest = ap_md5(r->pool,
+                         (unsigned char *)apr_pstrcat(r->pool, sent_user, ":",
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index 1d614c7..b669c8c 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -1054,7 +1054,7 @@ struct require_expr_info {
+ static int expr_lookup_fn(ap_expr_lookup_parms *parms)
+ {
+     if (parms->type == AP_EXPR_FUNC_VAR
+-        && ap_casecmpstr(parms->name, "REMOTE_USER") == 0) {
++        && strcasecmp(parms->name, "REMOTE_USER") == 0) {
+         struct require_expr_info *info;
+         apr_pool_userdata_get((void**)&info, REQUIRE_EXPR_NOTE, parms->ptemp);
+         AP_DEBUG_ASSERT(info != NULL);
+diff --git a/modules/dav/main/std_liveprop.c b/modules/dav/main/std_liveprop.c
+index 1284ad8..e760c65 100644
+--- a/modules/dav/main/std_liveprop.c
++++ b/modules/dav/main/std_liveprop.c
+@@ -88,7 +88,7 @@ static dav_prop_insert dav_core_insert_prop(const dav_resource *resource,
+                 if (!res_hooks->get_resource_type(resource, &name, &uri) &&
+                     name) {
+ 
+-                    if (!uri || !ap_casecmpstr(uri, "DAV:"))
++                    if (!uri || !strcasecmp(uri, "DAV:"))
+                         value = apr_pstrcat(p, value ? value : "",
+                                             "<D:", name, "/>", NULL);
+                     else
+diff --git a/modules/generators/mod_autoindex.c b/modules/generators/mod_autoindex.c
+index 177bd51..67d7e5a 100644
+--- a/modules/generators/mod_autoindex.c
++++ b/modules/generators/mod_autoindex.c
+@@ -348,64 +348,64 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+         else {
+             action = '\0';
+         }
+-        if (!ap_casecmpstr(w, "FancyIndexing")) {
++        if (!strcasecmp(w, "FancyIndexing")) {
+             option = FANCY_INDEXING;
+         }
+-        else if (!ap_casecmpstr(w, "FoldersFirst")) {
++        else if (!strcasecmp(w, "FoldersFirst")) {
+             option = FOLDERS_FIRST;
+         }
+-        else if (!ap_casecmpstr(w, "HTMLTable")) {
++        else if (!strcasecmp(w, "HTMLTable")) {
+             option = TABLE_INDEXING;
+         }
+-        else if (!ap_casecmpstr(w, "IconsAreLinks")) {
++        else if (!strcasecmp(w, "IconsAreLinks")) {
+             option = ICONS_ARE_LINKS;
+         }
+-        else if (!ap_casecmpstr(w, "IgnoreCase")) {
++        else if (!strcasecmp(w, "IgnoreCase")) {
+             option = IGNORE_CASE;
+         }
+-        else if (!ap_casecmpstr(w, "IgnoreClient")) {
++        else if (!strcasecmp(w, "IgnoreClient")) {
+             option = IGNORE_CLIENT;
+         }
+-        else if (!ap_casecmpstr(w, "ScanHTMLTitles")) {
++        else if (!strcasecmp(w, "ScanHTMLTitles")) {
+             option = SCAN_HTML_TITLES;
+         }
+-        else if (!ap_casecmpstr(w, "SuppressColumnSorting")) {
++        else if (!strcasecmp(w, "SuppressColumnSorting")) {
+             option = SUPPRESS_COLSORT;
+         }
+-        else if (!ap_casecmpstr(w, "SuppressDescription")) {
++        else if (!strcasecmp(w, "SuppressDescription")) {
+             option = SUPPRESS_DESC;
+         }
+-        else if (!ap_casecmpstr(w, "SuppressHTMLPreamble")) {
++        else if (!strcasecmp(w, "SuppressHTMLPreamble")) {
+             option = SUPPRESS_PREAMBLE;
+         }
+-        else if (!ap_casecmpstr(w, "SuppressIcon")) {
++        else if (!strcasecmp(w, "SuppressIcon")) {
+             option = SUPPRESS_ICON;
+         }
+-        else if (!ap_casecmpstr(w, "SuppressLastModified")) {
++        else if (!strcasecmp(w, "SuppressLastModified")) {
+             option = SUPPRESS_LAST_MOD;
+         }
+-        else if (!ap_casecmpstr(w, "SuppressSize")) {
++        else if (!strcasecmp(w, "SuppressSize")) {
+             option = SUPPRESS_SIZE;
+         }
+-        else if (!ap_casecmpstr(w, "SuppressRules")) {
++        else if (!strcasecmp(w, "SuppressRules")) {
+             option = SUPPRESS_RULES;
+         }
+-        else if (!ap_casecmpstr(w, "TrackModified")) {
++        else if (!strcasecmp(w, "TrackModified")) {
+             option = TRACK_MODIFIED;
+         }
+-        else if (!ap_casecmpstr(w, "VersionSort")) {
++        else if (!strcasecmp(w, "VersionSort")) {
+             option = VERSION_SORT;
+         }
+-        else if (!ap_casecmpstr(w, "XHTML")) {
++        else if (!strcasecmp(w, "XHTML")) {
+             option = EMIT_XHTML;
+         }
+-        else if (!ap_casecmpstr(w, "ShowForbidden")) {
++        else if (!strcasecmp(w, "ShowForbidden")) {
+             option = SHOW_FORBIDDEN;
+         }
+-        else if (!ap_casecmpstr(w, "AddAltClass")) {
++        else if (!strcasecmp(w, "AddAltClass")) {
+             option = ADDALTCLASS;
+         }
+-        else if (!ap_casecmpstr(w, "None")) {
++        else if (!strcasecmp(w, "None")) {
+             if (action != '\0') {
+                 return "Cannot combine '+' or '-' with 'None' keyword";
+             }
+@@ -413,7 +413,7 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+             opts_add = 0;
+             opts_remove = 0;
+         }
+-        else if (!ap_casecmpstr(w, "IconWidth")) {
++        else if (!strcasecmp(w, "IconWidth")) {
+             if (action != '-') {
+                 d_cfg->icon_width = DEFAULT_ICON_WIDTH;
+             }
+@@ -421,13 +421,13 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+                 d_cfg->icon_width = 0;
+             }
+         }
+-        else if (!ap_casecmpstrn(w, "IconWidth=", 10)) {
++        else if (!strncasecmp(w, "IconWidth=", 10)) {
+             if (action == '-') {
+                 return "Cannot combine '-' with IconWidth=n";
+             }
+             d_cfg->icon_width = atoi(&w[10]);
+         }
+-        else if (!ap_casecmpstr(w, "IconHeight")) {
++        else if (!strcasecmp(w, "IconHeight")) {
+             if (action != '-') {
+                 d_cfg->icon_height = DEFAULT_ICON_HEIGHT;
+             }
+@@ -435,13 +435,13 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+                 d_cfg->icon_height = 0;
+             }
+         }
+-        else if (!ap_casecmpstrn(w, "IconHeight=", 11)) {
++        else if (!strncasecmp(w, "IconHeight=", 11)) {
+             if (action == '-') {
+                 return "Cannot combine '-' with IconHeight=n";
+             }
+             d_cfg->icon_height = atoi(&w[11]);
+         }
+-        else if (!ap_casecmpstr(w, "NameWidth")) {
++        else if (!strcasecmp(w, "NameWidth")) {
+             if (action != '-') {
+                 return "NameWidth with no value may only appear as "
+                        "'-NameWidth'";
+@@ -449,7 +449,7 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+             d_cfg->name_width = DEFAULT_NAME_WIDTH;
+             d_cfg->name_adjust = K_NOADJUST;
+         }
+-        else if (!ap_casecmpstrn(w, "NameWidth=", 10)) {
++        else if (!strncasecmp(w, "NameWidth=", 10)) {
+             if (action == '-') {
+                 return "Cannot combine '-' with NameWidth=n";
+             }
+@@ -466,7 +466,7 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+                 d_cfg->name_adjust = K_NOADJUST;
+             }
+         }
+-        else if (!ap_casecmpstr(w, "DescriptionWidth")) {
++        else if (!strcasecmp(w, "DescriptionWidth")) {
+             if (action != '-') {
+                 return "DescriptionWidth with no value may only appear as "
+                        "'-DescriptionWidth'";
+@@ -474,7 +474,7 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+             d_cfg->desc_width = DEFAULT_DESC_WIDTH;
+             d_cfg->desc_adjust = K_NOADJUST;
+         }
+-        else if (!ap_casecmpstrn(w, "DescriptionWidth=", 17)) {
++        else if (!strncasecmp(w, "DescriptionWidth=", 17)) {
+             if (action == '-') {
+                 return "Cannot combine '-' with DescriptionWidth=n";
+             }
+@@ -491,10 +491,10 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+                 d_cfg->desc_adjust = K_NOADJUST;
+             }
+         }
+-        else if (!ap_casecmpstrn(w, "Type=", 5)) {
++        else if (!strncasecmp(w, "Type=", 5)) {
+             d_cfg->ctype = apr_pstrdup(cmd->pool, &w[5]);
+         }
+-        else if (!ap_casecmpstrn(w, "Charset=", 8)) {
++        else if (!strncasecmp(w, "Charset=", 8)) {
+             d_cfg->charset = apr_pstrdup(cmd->pool, &w[8]);
+         }
+         else {
+@@ -528,26 +528,26 @@ static const char *set_default_order(cmd_parms *cmd, void *m,
+ {
+     autoindex_config_rec *d_cfg = (autoindex_config_rec *) m;
+ 
+-    if (!ap_casecmpstr(direction, "Ascending")) {
++    if (!strcasecmp(direction, "Ascending")) {
+         d_cfg->default_direction = D_ASCENDING;
+     }
+-    else if (!ap_casecmpstr(direction, "Descending")) {
++    else if (!strcasecmp(direction, "Descending")) {
+         d_cfg->default_direction = D_DESCENDING;
+     }
+     else {
+         return "First keyword must be 'Ascending' or 'Descending'";
+     }
+ 
+-    if (!ap_casecmpstr(key, "Name")) {
++    if (!strcasecmp(key, "Name")) {
+         d_cfg->default_keyid = K_NAME;
+     }
+-    else if (!ap_casecmpstr(key, "Date")) {
++    else if (!strcasecmp(key, "Date")) {
+         d_cfg->default_keyid = K_LAST_MOD;
+     }
+-    else if (!ap_casecmpstr(key, "Size")) {
++    else if (!strcasecmp(key, "Size")) {
+         d_cfg->default_keyid = K_SIZE;
+     }
+-    else if (!ap_casecmpstr(key, "Description")) {
++    else if (!strcasecmp(key, "Description")) {
+         d_cfg->default_keyid = K_DESC;
+     }
+     else {
+diff --git a/modules/mappers/mod_negotiation.c b/modules/mappers/mod_negotiation.c
+index dc10961..a165d87 100644
+--- a/modules/mappers/mod_negotiation.c
++++ b/modules/mappers/mod_negotiation.c
+@@ -111,20 +111,20 @@ static const char *set_force_priority(cmd_parms *cmd, void *n_, const char *w)
+ {
+     neg_dir_config *n = n_;
+ 
+-    if (!ap_casecmpstr(w, "None")) {
++    if (!strcasecmp(w, "None")) {
+         if (n->forcelangpriority & ~FLP_NONE) {
+             return "Cannot combine ForceLanguagePriority options with None";
+         }
+         n->forcelangpriority = FLP_NONE;
+     }
+-    else if (!ap_casecmpstr(w, "Prefer")) {
++    else if (!strcasecmp(w, "Prefer")) {
+         if (n->forcelangpriority & FLP_NONE) {
+             return "Cannot combine ForceLanguagePriority options None and "
+                    "Prefer";
+         }
+         n->forcelangpriority |= FLP_PREFER;
+     }
+-    else if (!ap_casecmpstr(w, "Fallback")) {
++    else if (!strcasecmp(w, "Fallback")) {
+         if (n->forcelangpriority & FLP_NONE) {
+             return "Cannot combine ForceLanguagePriority options None and "
+                    "Fallback";
+diff --git a/modules/proxy/mod_proxy_fcgi.c b/modules/proxy/mod_proxy_fcgi.c
+index 2cd32fd..48dc81f 100644
+--- a/modules/proxy/mod_proxy_fcgi.c
++++ b/modules/proxy/mod_proxy_fcgi.c
+@@ -91,11 +91,11 @@ static int proxy_fcgi_canon(request_rec *r, char *url)
+ 
+     if (NULL != (pathinfo_type = apr_table_get(r->subprocess_env, "proxy-fcgi-pathinfo"))) {
+         /* It has to be on disk for this to work */
+-        if (!ap_casecmpstr(pathinfo_type, "full")) { 
++        if (!strcasecmp(pathinfo_type, "full")) { 
+             rconf->need_dirwalk = 1;
+             ap_unescape_url_keep2f(path, 0);
+         }
+-        else if (!ap_casecmpstr(pathinfo_type, "first-dot")) { 
++        else if (!strcasecmp(pathinfo_type, "first-dot")) { 
+             char *split = ap_strchr(path, '.');
+             if (split) { 
+                 char *slash = ap_strchr(split, '/');
+@@ -106,7 +106,7 @@ static int proxy_fcgi_canon(request_rec *r, char *url)
+                 }
+             }
+         }
+-        else if (!ap_casecmpstr(pathinfo_type, "last-dot")) { 
++        else if (!strcasecmp(pathinfo_type, "last-dot")) { 
+             char *split = ap_strrchr(path, '.');
+             if (split) { 
+                 char *slash = ap_strchr(split, '/');
+@@ -122,7 +122,7 @@ static int proxy_fcgi_canon(request_rec *r, char *url)
+              * the FCGI server to fixup PATH_INFO because it's the entire path
+              */
+             r->path_info = apr_pstrcat(r->pool, "/", path, NULL);
+-            if (!ap_casecmpstr(pathinfo_type, "unescape")) { 
++            if (!strcasecmp(pathinfo_type, "unescape")) { 
+                 ap_unescape_url_keep2f(r->path_info, 0);
+             }
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01061)
+diff --git a/modules/proxy/mod_proxy_http.c b/modules/proxy/mod_proxy_http.c
+index b1d6aef..c367604 100644
+--- a/modules/proxy/mod_proxy_http.c
++++ b/modules/proxy/mod_proxy_http.c
+@@ -1641,14 +1641,13 @@ int ap_proxy_http_process_response(apr_pool_t * p, request_rec *r,
+             ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r,
+                           "HTTP: received interim %d response", r->status);
+             if (!policy
+-                    || (!ap_casecmpstr(policy, "RFC")
+-                        && ((r->expecting_100 = 1)))) {
++                    || (!strcasecmp(policy, "RFC") && ((r->expecting_100 = 1)))) {
+                 ap_send_interim_response(r, 1);
+             }
+             /* FIXME: refine this to be able to specify per-response-status
+              * policies and maybe also add option to bail out with 502
+              */
+-            else if (ap_casecmpstr(policy, "Suppress")) {
++            else if (strcasecmp(policy, "Suppress")) {
+                 ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, APLOGNO(01108)
+                               "undefined proxy interim response policy");
+             }
+diff --git a/server/log.c b/server/log.c
+index c545bfc..11b8237 100644
+--- a/server/log.c
++++ b/server/log.c
+@@ -596,7 +596,7 @@ static int log_log_id(const ap_errorlog_info *info, const char *arg,
+      * c: log conn log id if available and not a once-per-request log line
+      * else: log request log id if available
+      */
+-    if (arg && !ap_casecmpstr(arg, "c")) {
++    if (arg && (*arg == 'c' || *arg == 'C')) {
+         if (info->c && (*arg != 'C' || !info->r)) {
+             return cpystrn(buf, info->c->log_id, buflen);
+         }
+@@ -1864,7 +1864,7 @@ AP_DECLARE(const char *) ap_parse_log_level(const char *str, int *val)
+         return err;
+ 
+     while (priorities[i].t_name != NULL) {
+-        if (!ap_casecmpstr(str, priorities[i].t_name)) {
++        if (!strcasecmp(str, priorities[i].t_name)) {
+             *val = priorities[i].t_val;
+             return NULL;
+         }

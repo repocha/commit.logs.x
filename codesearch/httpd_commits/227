@@ -1,0 +1,325 @@
+commit 95a2ba01ed4638f5e2169a3af4a8dae77bd87299
+Author: Roy T. Fielding <fielding@apache.org>
+Date:   Tue May 22 01:31:12 2001 +0000
+
+    Moved util_uri to apr-util/uri/apr_uri, which means adding the apr_
+    prefix to all of the uri functions (yuck), changing some includes,
+    and using APR error codes instead of HTTP-specific error codes.
+    
+    Other notes to test this patch:
+    - You need to delete the util_uri.h file - exports picks up on this.
+    - I'd like to remove the apr_uri.h from httpd.h, but that might
+      increase the complexity of this patch even further.  Once this patch
+      is accepted (in some form), then I can focus on removing apr_uri.h
+      from httpd.h entirely.  I need baby steps (heh) right now.
+    - I imagine that this might break a bunch of stuff in Win32 or other OS
+      builds with foreign dependency files.  Any help here is appreciated.
+    
+    This is a start...  -- justin
+    
+    Submitted by:	Justin Erenkrantz
+    Reviewed by:	Roy Fielding
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@89198 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 3f55be1..5170be8 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,5 +1,8 @@
+ Changes with Apache 2.0.19-dev
+ 
++  *) Moved util_uri to the apr-util library.  This required a bunch of
++     apr_name changes for the uri utility functions.  [Justin Erenkrantz]
++
+   *) Move the addition of default AP_HTTP_HTTP_HEADER filters to the
+      insert_filter phase so that other filters are not bypassed by default.
+      [Graham Leggett]
+diff --git a/include/httpd.h b/include/httpd.h
+index ca3fe20..ace6606 100644
+--- a/include/httpd.h
++++ b/include/httpd.h
+@@ -578,7 +578,7 @@ typedef struct request_rec request_rec;
+ 
+ /* ### would be nice to not include this from httpd.h ... */
+ /* This comes after we have defined the request_rec type */
+-#include "util_uri.h"
++#include "apr_uri.h"
+ 
+ /** A structure that represents one process */
+ struct process_rec {
+@@ -777,7 +777,7 @@ struct request_rec {
+     /** ST_MODE set to zero if no such file */
+     apr_finfo_t finfo;
+     /** components of uri, dismantled */
+-    uri_components parsed_uri;
++    apr_uri_components parsed_uri;
+ 
+     /* Various other config info which may change with .htaccess files
+      * These are config vectors, with one void* pointer for each module
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 3acd910..1cbdc4f 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -114,7 +114,7 @@
+ #include "http_request.h"
+ #include "http_log.h"
+ #include "http_protocol.h"
+-#include "util_uri.h"
++#include "apr_uri.h"
+ #include "util_md5.h"
+ 
+ /* Disable shmem until pools/init gets sorted out - remove next line when fixed */
+@@ -236,7 +236,7 @@ typedef struct digest_header_struct {
+     apr_time_t             nonce_time;
+     enum hdr_sts          auth_hdr_sts;
+     const char           *raw_request_uri;
+-    uri_components       *psd_request_uri;
++    apr_uri_components    *psd_request_uri;
+     int                   needed_auth;
+     client_entry         *client;
+ } digest_header_rec;
+@@ -1514,8 +1514,8 @@ static const char *new_digest(const request_rec *r,
+ }
+ 
+ 
+-static void copy_uri_components(uri_components *dst, uri_components *src,
+-				request_rec *r) {
++static void copy_uri_components(apr_uri_components *dst, 
++                                apr_uri_components *src, request_rec *r) {
+     if (src->scheme && src->scheme[0] != '\0')
+ 	dst->scheme = src->scheme;
+     else
+@@ -1624,10 +1624,10 @@ static int authenticate_digest_user(request_rec *r)
+ 	/* Hmm, the simple match didn't work (probably a proxy modified the
+ 	 * request-uri), so lets do a more sophisticated match
+ 	 */
+-	uri_components r_uri, d_uri;
++	apr_uri_components r_uri, d_uri;
+ 
+ 	copy_uri_components(&r_uri, resp->psd_request_uri, r);
+-	if (ap_parse_uri_components(r->pool, resp->uri, &d_uri) != HTTP_OK) {
++	if (apr_uri_parse_components(r->pool, resp->uri, &d_uri) != APR_SUCCESS) {
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 			  "Digest: invalid uri <%s> in Authorization header",
+ 			  resp->uri);
+diff --git a/modules/dav/main/util.c b/modules/dav/main/util.c
+index 5a8d472..059655d 100644
+--- a/modules/dav/main/util.c
++++ b/modules/dav/main/util.c
+@@ -189,12 +189,12 @@ dav_lookup_result dav_lookup_uri(const char *uri, request_rec * r,
+     dav_lookup_result result = { 0 };
+     const char *scheme;
+     apr_port_t port;
+-    uri_components comp;
++    apr_uri_components comp;
+     char *new_file;
+     const char *domain;
+ 
+     /* first thing to do is parse the URI into various components */
+-    if (ap_parse_uri_components(r->pool, uri, &comp) != HTTP_OK) {
++    if (apr_uri_parse_components(r->pool, uri, &comp) != APR_SUCCESS) {
+ 	result.err.status = HTTP_BAD_REQUEST;
+ 	result.err.desc = "Invalid syntax in Destination URI.";
+ 	return result;
+@@ -233,7 +233,7 @@ dav_lookup_result dav_lookup_uri(const char *uri, request_rec * r,
+ 
+         /* insert a port if the URI did not contain one */
+         if (comp.port == 0)
+-            comp.port = ap_default_port_for_scheme(comp.scheme);
++            comp.port = apr_uri_default_port_for_scheme(comp.scheme);
+ 
+         /* now, verify that the URI uses the same scheme as the current.
+            request. the port must match our port.
+@@ -288,7 +288,7 @@ dav_lookup_result dav_lookup_uri(const char *uri, request_rec * r,
+        the current request. Therefore, we can use ap_sub_req_lookup_uri() */
+ 
+     /* reconstruct a URI as just the path */
+-    new_file = ap_unparse_uri_components(r->pool, &comp, UNP_OMITSITEPART);
++    new_file = apr_uri_unparse_components(r->pool, &comp, UNP_OMITSITEPART);
+ 
+     /*
+      * Lookup the URI and return the sub-request. Note that we use the
+@@ -542,7 +542,7 @@ static dav_error * dav_process_if_header(request_rec *r, dav_if_header **p_ih)
+     const char *uri = NULL;	/* scope of current production; NULL=no-tag */
+     size_t uri_len = 0;
+     dav_if_header *ih = NULL;
+-    uri_components parsed_uri;
++    apr_uri_components parsed_uri;
+     const dav_hooks_locks *locks_hooks = DAV_GET_HOOKS_LOCKS(r);
+     enum {no_tagged, tagged, unknown} list_type = unknown;
+     int condition;
+@@ -566,7 +566,7 @@ static dav_error * dav_process_if_header(request_rec *r, dav_if_header **p_ih)
+             
+             /* 2518 specifies this must be an absolute URI; just take the
+              * relative part for later comparison against r->uri */
+-            if (ap_parse_uri_components(r->pool, uri, &parsed_uri) != HTTP_OK) {
++            if (apr_uri_parse_components(r->pool, uri, &parsed_uri) != APR_SUCCESS) {
+                 return dav_new_error(r->pool, HTTP_BAD_REQUEST,
+                                      DAV_ERR_IF_TAGGED,
+                                      "Invalid URI in tagged If-header.");
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 3056177..2890cc9 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -344,7 +344,7 @@ static const char *log_request_line(request_rec *r, char *a)
+ 	     * (note also that r->the_request contains the unmodified request)
+ 	     */
+     return (r->parsed_uri.password) ? apr_pstrcat(r->pool, r->method, " ",
+-					 ap_unparse_uri_components(r->pool, &r->parsed_uri, 0),
++					 apr_uri_unparse_components(r->pool, &r->parsed_uri, 0),
+ 					 r->assbackwards ? NULL : " ", r->protocol, NULL)
+ 					: r->the_request;
+ }
+diff --git a/modules/mappers/mod_alias.c b/modules/mappers/mod_alias.c
+index 5217ff3..f372285 100644
+--- a/modules/mappers/mod_alias.c
++++ b/modules/mappers/mod_alias.c
+@@ -335,8 +335,8 @@ static char *try_alias_list(request_rec *r, apr_array_header_t *aliases, int doe
+ 		    found = ap_pregsub(r->pool, p->real, r->uri,
+ 				    p->regexp->re_nsub + 1, regm);
+ 		    if (found && doesc) {
+-                        uri_components uri;
+-                        ap_parse_uri_components(r->pool, found, &uri);
++                        apr_uri_components uri;
++                        apr_uri_parse_components(r->pool, found, &uri);
+ 			found = ap_escape_uri(r->pool, uri.path);
+                         if (uri.query) {
+                             found = apr_pstrcat(r->pool, found, "?", uri.query, NULL);
+diff --git a/modules/test/mod_test_util_uri.c b/modules/test/mod_test_util_uri.c
+index 5472243..dbe3405 100644
+--- a/modules/test/mod_test_util_uri.c
++++ b/modules/test/mod_test_util_uri.c
+@@ -142,7 +142,7 @@ static unsigned iterate_pieces(request_rec *r, const test_uri_t *pieces, int row
+     apr_pool_t *sub;
+     char *input_uri;
+     char *strp;
+-    uri_components result;
++    apr_uri_components result;
+     unsigned expect;
+     int status;
+     unsigned failures;
+@@ -208,8 +208,8 @@ static unsigned iterate_pieces(request_rec *r, const test_uri_t *pieces, int row
+ 	*strp = 0;
+ 
+ 	sub = apr_pool_sub_make(r->pool);
+-	status = ap_parse_uri_components(sub, input_uri, &result);
+-	if (status == HTTP_OK) {
++	status = apr_uri_parse_components(sub, input_uri, &result);
++	if (status == APR_SUCCESS) {
+ #define CHECK(f)							\
+ 	    if ((expect & T_##f)					\
+ 		&& (result.f == NULL || strcmp(result.f, pieces->f))) { \
+@@ -228,7 +228,7 @@ static unsigned iterate_pieces(request_rec *r, const test_uri_t *pieces, int row
+ 	    CHECK(fragment)
+ #undef CHECK
+ 	}
+-	if (status != HTTP_OK) {
++	if (status != APR_SUCCESS) {
+ 	    ap_rprintf(r, "<tr><td>%d</td><td>0x%02x</td><td>0x%02x</td><td>%d</td><td>\"%s\"</td>", row, u, expect, status, input_uri);
+ #define DUMP(f) 							\
+ 	    if (result.f) {						\
+diff --git a/server/Makefile.in b/server/Makefile.in
+index c7d5451..d5742ed 100644
+--- a/server/Makefile.in
++++ b/server/Makefile.in
+@@ -1,6 +1,6 @@
+ 
+ TARGET_EXPORTS    = apache.exports
+-CLEAN_TARGETS = gen_test_char gen_uri_delims test_char.h uri_delims.h \
++CLEAN_TARGETS = gen_test_char test_char.h \
+ 	$(TARGET_EXPORTS) ApacheCoreOS2.def
+ EXTRACLEAN_TARGETS = exports.c
+ 
+@@ -8,9 +8,9 @@ SUBDIRS = mpm
+ 
+ LTLIBRARY_NAME    = libmain.la
+ LTLIBRARY_SOURCES = \
+-    uri_delims.h test_char.h \
++    test_char.h \
+ 	config.c log.c main.c vhost.c util.c util_date.c \
+-	util_script.c util_uri.c util_md5.c util_cfgtree.c util_ebcdic.c \
++	util_script.c util_md5.c util_cfgtree.c util_ebcdic.c \
+ 	rfc1413.c connection.c listen.c \
+         mpm_common.c util_charset.c util_debug.c util_xml.c \
+ 	util_filter.c exports.c buildmark.c scoreboard.c \
+@@ -21,21 +21,13 @@ TARGETS = delete-exports $(LTLIBRARY_NAME) $(CORE_IMPLIB_FILE)
+ include $(top_srcdir)/build/rules.mk
+ include $(top_srcdir)/build/library.mk
+ 
+-gen_uri_delims_OBJECTS = gen_uri_delims.lo
+-gen_uri_delims: $(gen_uri_delims_OBJECTS)
+-	$(LINK) $(EXTRA_LDFLAGS) $(gen_uri_delims_OBJECTS) $(EXTRA_LIBS)
+-
+ gen_test_char_OBJECTS = gen_test_char.lo util_debug.lo
+ gen_test_char: $(gen_test_char_OBJECTS)
+ 	$(LINK) $(EXTRA_LDFLAGS) $(gen_test_char_OBJECTS) $(EXTRA_LIBS)
+ 
+-uri_delims.h: gen_uri_delims
+-	./gen_uri_delims > uri_delims.h
+-
+ test_char.h: gen_test_char
+ 	./gen_test_char > test_char.h
+ 
+-util_uri.lo: uri_delims.h
+ util.lo: test_char.h
+ 
+ EXPORT_FILES = ../srclib/apr/apr.exports ../srclib/apr-util/aprutil.exports \
+diff --git a/server/main.c b/server/main.c
+index 3aabc71..cfee4a9 100644
+--- a/server/main.c
++++ b/server/main.c
+@@ -72,7 +72,7 @@
+ #include "http_log.h" 
+ #include "http_config.h"
+ #include "http_vhost.h"
+-#include "util_uri.h" 
++#include "apr_uri.h" 
+ #include "util_ebcdic.h"
+ #include "ap_mpm.h"
+ 
+diff --git a/server/protocol.c b/server/protocol.c
+index 28bb4de..987e01c 100644
+--- a/server/protocol.c
++++ b/server/protocol.c
+@@ -326,14 +326,14 @@ AP_CORE_DECLARE(void) ap_parse_uri(request_rec *r, const char *uri)
+     r->unparsed_uri = apr_pstrdup(r->pool, uri);
+ 
+     if (r->method_number == M_CONNECT) {
+-	status = ap_parse_hostinfo_components(r->pool, uri, &r->parsed_uri);
++	status = apr_uri_parse_hostinfo_components(r->pool, uri, &r->parsed_uri);
+     }
+     else {
+ 	/* Simple syntax Errors in URLs are trapped by parse_uri_components(). */
+-	status = ap_parse_uri_components(r->pool, uri, &r->parsed_uri);
++	status = apr_uri_parse_components(r->pool, uri, &r->parsed_uri);
+     }
+ 
+-    if (ap_is_HTTP_SUCCESS(status)) {
++    if (status == APR_SUCCESS) {
+ 	/* if it has a scheme we may need to do absoluteURI vhost stuff */
+ 	if (r->parsed_uri.scheme
+ 	    && !strcasecmp(r->parsed_uri.scheme, ap_http_method(r))) {
+@@ -361,7 +361,7 @@ AP_CORE_DECLARE(void) ap_parse_uri(request_rec *r, const char *uri)
+     else {
+ 	r->args = NULL;
+ 	r->hostname = NULL;
+-	r->status = status;             /* set error status */
++	r->status = HTTP_BAD_REQUEST;             /* set error status */
+ 	r->uri = apr_pstrdup(r->pool, uri);
+     }
+ }
+diff --git a/server/scoreboard.c b/server/scoreboard.c
+index 9052723..265bf23 100644
+--- a/server/scoreboard.c
++++ b/server/scoreboard.c
+@@ -310,7 +310,7 @@ int ap_update_child_status(int child_num, int thread_num, int status, request_re
+ 	    } else {
+ 		/* Don't reveal the password in the server-status view */
+ 		    apr_cpystrn(ws->request, apr_pstrcat(r->pool, r->method, " ",
+-					       ap_unparse_uri_components(r->pool, &r->parsed_uri, UNP_OMITPASSWORD),
++					       apr_uri_unparse_components(r->pool, &r->parsed_uri, UNP_OMITPASSWORD),
+ 					       r->assbackwards ? NULL : " ", r->protocol, NULL),
+ 				       sizeof(ws->request));
+ 	    }

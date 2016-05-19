@@ -1,0 +1,327 @@
+commit 06473fad924e714438cebb7e403254e8d236f05b
+Author: Bradley Nicholes <bnicholes@apache.org>
+Date:   Wed May 2 16:31:39 2007 +0000
+
+    re-introduce ap_satisfies API back into core and modify how the access_checker, check_user_id and auth_checker hooks are called so that they respect the precedence that is set through the satisfy ALL/ANY directive. This also restores the directives order, allow, deny, satisfyas supported directives rather than being deprecated.  These directives still remain in mod_access_compat however.
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@534533 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/http_core.h b/include/http_core.h
+index d308e42..aadab1e 100644
+--- a/include/http_core.h
++++ b/include/http_core.h
+@@ -114,6 +114,13 @@ extern "C" {
+ 
+ /** @} // get_remote_host */
+ 
++/** all of the requirements must be met */
++#define SATISFY_ALL 0
++/**  any of the requirements must be met */
++#define SATISFY_ANY 1
++/** There are no applicable satisfy lines */
++#define SATISFY_NOSPEC 2
++
+ /** Make sure we don't write less than 8000 bytes at any one time.
+  */
+ #define AP_MIN_BYTES_TO_WRITE  8000
+@@ -287,6 +294,18 @@ AP_DECLARE(const char *) ap_auth_type(request_rec *r);
+  */
+ AP_DECLARE(const char *) ap_auth_name(request_rec *r);     
+ 
++/**
++ * How the requires lines must be met.
++ * @param r The current request
++ * @return How the requirements must be met.  One of:
++ * <pre>
++ *      SATISFY_ANY    -- any of the requirements must be met.
++ *      SATISFY_ALL    -- all of the requirements must be met.
++ *      SATISFY_NOSPEC -- There are no applicable satisfy lines
++ * </pre>
++ */
++AP_DECLARE(int) ap_satisfies(request_rec *r);
++
+ #ifdef CORE_PRIVATE
+ 
+ /**
+@@ -649,13 +668,20 @@ APR_DECLARE_OPTIONAL_FN(const char *, ap_ident_lookup,
+ 
+ /* ----------------------------------------------------------------------
+  *
+- * authorization values with mod_authz_host
++ * authorization values with mod_authz_core
+  */
+ 
+ APR_DECLARE_OPTIONAL_FN(int, authz_some_auth_required, (request_rec *r));
+ APR_DECLARE_OPTIONAL_FN(const char *, authn_ap_auth_type, (request_rec *r));
+ APR_DECLARE_OPTIONAL_FN(const char *, authn_ap_auth_name, (request_rec *r));
+ 
++/* ----------------------------------------------------------------------
++ *
++ * authorization values with mod_access_compat
++ */
++
++APR_DECLARE_OPTIONAL_FN(int, access_compat_ap_satisfies, (request_rec *r));
++
+ /* ---------------------------------------------------------------------- */
+ 
+ #ifdef __cplusplus
+diff --git a/modules/aaa/mod_access_compat.c b/modules/aaa/mod_access_compat.c
+index 38d341a..b93e9fc 100644
+--- a/modules/aaa/mod_access_compat.c
++++ b/modules/aaa/mod_access_compat.c
+@@ -98,10 +98,6 @@ static const char *order(cmd_parms *cmd, void *dv, const char *arg)
+     access_compat_dir_conf *d = (access_compat_dir_conf *) dv;
+     int i, o;
+ 
+-    ap_log_error(APLOG_MARK, APLOG_INFO, 0, cmd->server,
+-                  "The 'Order' directive has been deprecated. "
+-                  "Consider using '<SatisfyAll><SatisfyOne>' directives."); 
+-
+     if (!strcasecmp(arg, "allow,deny"))
+         o = ALLOW_THEN_DENY;
+     else if (!strcasecmp(arg, "deny,allow"))
+@@ -124,10 +120,6 @@ static const char *satisfy(cmd_parms *cmd, void *dv, const char *arg)
+     int satisfy = SATISFY_NOSPEC;
+     int i;
+ 
+-    ap_log_error(APLOG_MARK, APLOG_INFO, 0, cmd->server,
+-                  "The 'Satisfy' directive has been deprecated. "
+-                  "Consider using '<SatisfyAll><SatisfyOne>' directives."); 
+-
+     if (!strcasecmp(arg, "all")) {
+         satisfy = SATISFY_ALL;
+     }
+@@ -157,10 +149,6 @@ static const char *allow_cmd(cmd_parms *cmd, void *dv, const char *from,
+     char msgbuf[120];
+     apr_status_t rv;
+ 
+-    ap_log_error(APLOG_MARK, APLOG_INFO, 0, cmd->server,
+-                  "The 'Allow/Deny' directives have been deprecated. "
+-                  "Consider using one of the host providers in mod_authz_host.");   
+-
+     if (strcasecmp(from, "from"))
+         return "allow and deny must be followed by 'from'";
+ 
+@@ -307,7 +295,7 @@ static int find_allowdeny(request_rec *r, apr_array_header_t *a, int method)
+     return 0;
+ }
+ 
+-static int ap_satisfies(request_rec *r)
++static int access_compat_ap_satisfies(request_rec *r)
+ {
+     access_compat_dir_conf *conf = (access_compat_dir_conf *)
+         ap_get_module_config(r->per_dir_config, &access_compat_module);
+@@ -354,9 +342,9 @@ static int check_dir_access(request_rec *r)
+     }
+     else {
+         apr_table_setn(r->notes, AUTHZ_ACCESS_PASSED_NOTE, "N");
+-        /* If Satisfy is Any and authorization is required, then 
++        /* If Satisfy is not Any and authorization is required, then 
+            defer to the authorization stage */
+-        if ((ap_satisfies(r) == SATISFY_ANY) && ap_some_auth_required(r)) {
++        if ((access_compat_ap_satisfies(r) != SATISFY_ANY) && ap_some_auth_required(r)) {
+             ret = OK;
+         }
+     }
+@@ -373,7 +361,7 @@ static int check_dir_access(request_rec *r)
+ 
+ static void register_hooks(apr_pool_t *p)
+ {
+-    APR_REGISTER_OPTIONAL_FN(ap_satisfies);
++    APR_REGISTER_OPTIONAL_FN(access_compat_ap_satisfies);
+ 
+     /* This can be access checker since we don't require r->user to be set. */
+     ap_hook_access_checker(check_dir_access,NULL,NULL,APR_HOOK_MIDDLE);
+diff --git a/modules/aaa/mod_auth.h b/modules/aaa/mod_auth.h
+index e282d72..8495f9e 100644
+--- a/modules/aaa/mod_auth.h
++++ b/modules/aaa/mod_auth.h
+@@ -47,20 +47,17 @@ extern "C" {
+ #define AUTHN_PREFIX "AUTHENTICATE_"
+ 
+ /** all of the requirements must be met */
++#ifndef SATISFY_ALL
+ #define SATISFY_ALL 0
++#endif
+ /**  any of the requirements must be met */
++#ifndef SATISFY_ANY
+ #define SATISFY_ANY 1
++#endif
+ /** There are no applicable satisfy lines */
++#ifndef SATISFY_NOSPEC
+ #define SATISFY_NOSPEC 2
+-
+-APR_DECLARE_OPTIONAL_FN(int, ap_satisfies, (request_rec *r));
+-
+-/* If your module uses ap_satisfies then you MUST add the line
+- * below to your module for it to work correctly:
+- * APR_OPTIONAL_FN_TYPE(ap_satisfies) *ap_satisfies;
+- * and retrieve the optional function in the optional_fn_retrieve hook.
+- * (See mod_authz_core.c for an example)
+- */
++#endif
+ 
+ typedef enum {
+     AUTH_DENIED,
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index 289f54f..14e69a4 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -711,8 +711,6 @@ static authz_status check_provider_list (request_rec *r, authz_provider_list *cu
+     return auth_result;
+ }
+ 
+-APR_OPTIONAL_FN_TYPE(ap_satisfies) *ap_satisfies;
+-
+ static int authorize_user(request_rec *r)
+ {
+     authz_core_dir_conf *conf = ap_get_module_config(r->per_dir_config,
+@@ -805,17 +803,11 @@ static int authz_some_auth_required(request_rec *r)
+     return req_authz;
+ }
+ 
+-static void ImportAuthzCoreOptFn(void)
+-{
+-    ap_satisfies = APR_RETRIEVE_OPTIONAL_FN(ap_satisfies);
+-}
+-
+ static void register_hooks(apr_pool_t *p)
+ {
+     APR_REGISTER_OPTIONAL_FN(authz_some_auth_required);
+ 
+     ap_hook_auth_checker(authorize_user, NULL, NULL, APR_HOOK_MIDDLE);
+-    ap_hook_optional_fn_retrieve(ImportAuthzCoreOptFn,NULL,NULL,APR_HOOK_MIDDLE);
+ }
+ 
+ module AP_MODULE_DECLARE_DATA authz_core_module =
+diff --git a/modules/aaa/mod_authz_default.c b/modules/aaa/mod_authz_default.c
+index 4f22c46..8a234f9 100644
+--- a/modules/aaa/mod_authz_default.c
++++ b/modules/aaa/mod_authz_default.c
+@@ -52,8 +52,6 @@ static const command_rec authz_default_cmds[] =
+ 
+ module AP_MODULE_DECLARE_DATA authz_default_module;
+ 
+-static APR_OPTIONAL_FN_TYPE(ap_satisfies) *ap_satisfies;
+-
+ static int check_user_access(request_rec *r)
+ {
+     authz_default_config_rec *conf = ap_get_module_config(r->per_dir_config,
+@@ -89,15 +87,9 @@ static int check_user_access(request_rec *r)
+     return HTTP_UNAUTHORIZED;
+ }
+ 
+-static void ImportAuthzDefOptFn(void)
+-{
+-    ap_satisfies = APR_RETRIEVE_OPTIONAL_FN(ap_satisfies);
+-}
+-
+ static void register_hooks(apr_pool_t *p)
+ {
+     ap_hook_auth_checker(check_user_access,NULL,NULL,APR_HOOK_LAST);
+-    ap_hook_optional_fn_retrieve(ImportAuthzDefOptFn,NULL,NULL,APR_HOOK_MIDDLE);
+ }
+ 
+ module AP_MODULE_DECLARE_DATA authz_default_module =
+diff --git a/server/core.c b/server/core.c
+index 918aa0a..46ff144 100644
+--- a/server/core.c
++++ b/server/core.c
+@@ -645,7 +645,8 @@ AP_DECLARE(int) ap_allow_overrides(request_rec *r)
+ }
+ 
+ /*
+- * Optional function coming from mod_ident, used for looking up ident user
++ * Optional function coming from mod_authn_core, used for 
++ * retrieving the type of autorization
+  */
+ static APR_OPTIONAL_FN_TYPE(authn_ap_auth_type) *authn_ap_auth_type;
+ 
+@@ -658,7 +659,8 @@ AP_DECLARE(const char *) ap_auth_type(request_rec *r)
+ }
+ 
+ /*
+- * Optional function coming from mod_ident, used for looking up ident user
++ * Optional function coming from mod_authn_core, used for 
++ * retrieving the authorization realm
+  */
+ static APR_OPTIONAL_FN_TYPE(authn_ap_auth_name) *authn_ap_auth_name;
+ 
+@@ -670,6 +672,20 @@ AP_DECLARE(const char *) ap_auth_name(request_rec *r)
+     return NULL;
+ }
+ 
++/*
++ * Optional function coming from mod_access_compat, used to determine how
++   access control interacts with authentication/authorization
++ */
++static APR_OPTIONAL_FN_TYPE(access_compat_ap_satisfies) *access_compat_ap_satisfies;
++
++AP_DECLARE(int) ap_satisfies(request_rec *r)
++{
++    if (access_compat_ap_satisfies) {
++        return access_compat_ap_satisfies(r);
++    }
++    return SATISFY_NOSPEC;
++}
++
+ AP_DECLARE(const char *) ap_default_type(request_rec *r)
+ {
+     core_dir_config *conf;
+@@ -3646,6 +3662,7 @@ static int core_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *pte
+     authz_ap_some_auth_required = APR_RETRIEVE_OPTIONAL_FN(authz_some_auth_required);
+     authn_ap_auth_type = APR_RETRIEVE_OPTIONAL_FN(authn_ap_auth_type);
+     authn_ap_auth_name = APR_RETRIEVE_OPTIONAL_FN(authn_ap_auth_name);
++    access_compat_ap_satisfies = APR_RETRIEVE_OPTIONAL_FN(access_compat_ap_satisfies);
+ 
+     set_banner(pconf);
+     ap_setup_make_content_type(pconf);
+diff --git a/server/request.c b/server/request.c
+index 3b7e934..821df68 100644
+--- a/server/request.c
++++ b/server/request.c
+@@ -183,18 +183,36 @@ AP_DECLARE(int) ap_process_request_internal(request_rec *r)
+         r->ap_auth_type = r->prev->ap_auth_type;
+     }
+     else {
+-        if ((access_status = ap_run_access_checker(r)) != OK) {
+-            return decl_die(access_status, "check access", r);
+-        }
++        switch (ap_satisfies(r)) {
++        case SATISFY_ALL:
++        case SATISFY_NOSPEC:
++            if ((access_status = ap_run_access_checker(r)) != OK) {
++                return decl_die(access_status, "check access", r);
++            }
+ 
+-        if ((access_status = ap_run_check_user_id(r)) != OK) {
+-            return decl_die(access_status, "check user", r);
+-        }
++            if ((access_status = ap_run_check_user_id(r)) != OK) {
++                return decl_die(access_status, "check user", r);
++            }
++
++            if ((access_status = ap_run_auth_checker(r)) != OK) {
++                return decl_die(access_status, "check authorization", r);
++            }
++            break;
++        case SATISFY_ANY:
++            if ((access_status = ap_run_access_checker(r)) != OK) {
+ 
+-        if ((access_status = ap_run_auth_checker(r)) != OK) {
+-            return decl_die(access_status, "check authorization", r);
++                if ((access_status = ap_run_check_user_id(r)) != OK) {
++                    return decl_die(access_status, "check user", r);
++                }
++
++                if ((access_status = ap_run_auth_checker(r)) != OK) {
++                    return decl_die(access_status, "check authorization", r);
++                }
++            }
++            break;
+         }
+ 
++
+     }
+     /* XXX Must make certain the ap_run_type_checker short circuits mime
+      * in mod-proxy for r->proxyreq && r->parsed_uri.scheme

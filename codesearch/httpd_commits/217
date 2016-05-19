@@ -1,0 +1,226 @@
+commit 9c315beece75da164e7d0b3adac233ec79e51dfe
+Author: Ian Holsman <ianh@apache.org>
+Date:   Thu Dec 27 06:03:13 2001 +0000
+
+    add a 'AuthDBMType' so that users can select what type of DBM they want to
+    use to authenticate users.
+    I think this removes a 'showstopper' (deprecating mod_auth_db)
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@92616 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 323c492..ff889f5 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,5 +1,7 @@
+ Changes with Apache 2.0.30-dev
+ 
++  *) Allow mod_auth_dbm to handle multiple DBM types [Ian Holsman]
++
+   *) Fix matching of vhosts by ip address so we find IPv4
+      vhost address when target address is v4-mapped form of
+      that address.  [Jeff Trawick]
+diff --git a/STATUS b/STATUS
+index 8b59e21..4b0a9a9 100644
+--- a/STATUS
++++ b/STATUS
+@@ -1,5 +1,5 @@
+ APACHE 2.0 STATUS:						-*-text-*-
+-Last modified at [$Date: 2001/12/26 13:20:02 $]
++Last modified at [$Date: 2001/12/27 06:03:13 $]
+ 
+ Release:
+ 
+@@ -87,9 +87,9 @@ RELEASE SHOWSTOPPERS:
+     * Fold mod_auth_db features back into mod_auth_dbm, and depricate it.
+         This can't wait until we have a 2.0-gold release, if folks need
+         to move over to auth_dbm, we can't do that to them after 2.0 gold.
+-      Status: Ian says.. now that apr-util can handle multiple DBM types 
+-              we can probably deprecate it completly by adding a directive 
+-              'AuthDBMType' to mod_auth_dbm.
++      Status: Ian says.. auth_dbm can now handle multiple DBM types,
++	    is this still an issue?
++              
+ 
+     * Convert all instances of the old apr_lock_t type to the new
+       types (once they are fully supported in APR).
+diff --git a/docs/manual/mod/mod_auth_dbm.html b/docs/manual/mod/mod_auth_dbm.html
+index 8d9f88a..e0e09a4 100644
+--- a/docs/manual/mod/mod_auth_dbm.html
++++ b/docs/manual/mod/mod_auth_dbm.html
+@@ -42,6 +42,7 @@
+       <li><a href="#authdbmgroupfile">AuthDBMGroupFile</a></li>
+ 
+       <li><a href="#authdbmuserfile">AuthDBMUserFile</a></li>
++      <li><a href="#authdbmtype">AuthDBMType</a></li>
+ 
+       <li><a
+       href="#authdbmauthoritative">AuthDBMAuthoritative</a></li>
+@@ -162,6 +163,27 @@
+     href="#authdbmgroupfile">AuthDBMGroupFile</a>. 
+     <hr />
+ 
++    <h2><a id="authdbmtype"
++    name="authdbmtype">AuthDBMType</a></h2>
++    <!--%plaintext &lt;?INDEX {\tt AuthDBMType} directive&gt; -->
++    <a href="directive-dict.html#Syntax"
++    rel="Help"><strong>Syntax:</strong></a> AuthDBMType
++    <em>type of DBM being used</em><br />
++     <a href="directive-dict.html#Default"
++    rel="Help"><strong>Default:</strong></a>
++<code>AuthDBMType default</code>(which sets it to the default DBM compiled in)<br />
++
++     <a href="directive-dict.html#Context"
++    rel="Help"><strong>Context:</strong></a> directory,
++    .htaccess<br />
++     <a href="directive-dict.html#Override"
++    rel="Help"><strong>Override:</strong></a> AuthConfig<br />
++     <a href="directive-dict.html#Status"
++    rel="Help"><strong>Status:</strong></a> Extension<br />
++     <a href="directive-dict.html#Module"
++    rel="Help"><strong>Module:</strong></a> mod_auth_dbm 
++<p>Setting this directive allows the user to change the type of DBM file which holds the user data. Current valid values are (SDBM | GDBM | DB) these may not all be available on your system</p>
++	<hr /> 
+     <h2><a id="authdbmauthoritative"
+     name="authdbmauthoritative">AuthDBMAuthoritative</a></h2>
+     <!--%plaintext &lt;?INDEX {\tt AuthDBMAuthoritative} directive&gt; -->
+diff --git a/modules/aaa/mod_auth_dbm.c b/modules/aaa/mod_auth_dbm.c
+index 7490f0a..16d4edf 100644
+--- a/modules/aaa/mod_auth_dbm.c
++++ b/modules/aaa/mod_auth_dbm.c
+@@ -74,13 +74,13 @@
+ 
+ #define APR_WANT_STRFUNC
+ #include "apr_want.h"
++#include "apr_strings.h"
+ 
+ #if defined(AP_AUTH_DBM_USE_APR)
+ #include "apr_dbm.h"
+ #define DBM apr_dbm_t
+ #define datum apr_datum_t
+-#define dbm_open apr_dbm_open
+-#define dbm_fetch apr_dbm_fetch
++
+ #define dbm_close apr_dbm_close
+ #else
+ #include <ndbm.h>
+@@ -112,6 +112,7 @@ typedef struct {
+ 
+     char *auth_dbmpwfile;
+     char *auth_dbmgrpfile;
++    char *auth_dbmtype;
+     int auth_dbmauthoritative;
+ 
+ } dbm_auth_config_rec;
+@@ -122,7 +123,8 @@ static void *create_dbm_auth_dir_config(apr_pool_t *p, char *d)
+ 
+     conf->auth_dbmpwfile = NULL;
+     conf->auth_dbmgrpfile = NULL;
+-    conf->auth_dbmauthoritative = 1;	/* fortress is secure by default */
++    conf->auth_dbmtype ="default";
++    conf->auth_dbmauthoritative = 1;  /* fortress is secure by default */
+ 
+     return conf;
+ }
+@@ -136,6 +138,17 @@ static const char *set_dbm_slot(cmd_parms *cmd, void *offset,
+     return ap_set_file_slot(cmd, offset, f);
+ }
+ 
++static const char *set_dbm_type(cmd_parms *cmd, 
++                                void *dir_config, 
++                                const char *arg)
++{
++    dbm_auth_config_rec *conf = dir_config;
++   
++    conf->auth_dbmtype = apr_pstrdup(cmd->pool ,arg);
++    return NULL;
++}
++
++
+ static const command_rec dbm_auth_cmds[] =
+ {
+     AP_INIT_TAKE1("AuthDBMUserFile", ap_set_file_slot,
+@@ -150,6 +163,11 @@ static const command_rec dbm_auth_cmds[] =
+     AP_INIT_TAKE12("AuthGroupFile", set_dbm_slot,
+      (void *) APR_XtOffsetOf(dbm_auth_config_rec, auth_dbmgrpfile),
+      OR_AUTHCFG, NULL),
++
++    AP_INIT_TAKE1("AuthDBMType", set_dbm_type,
++     NULL,
++     OR_AUTHCFG, "what type of DBM file the user file is"),
++
+     AP_INIT_FLAG("AuthDBMAuthoritative", ap_set_flag_slot,
+      (void *) APR_XtOffsetOf(dbm_auth_config_rec, auth_dbmauthoritative),
+      OR_AUTHCFG, "Set to 'no' to allow access control to be passed along to lower modules, if the UserID is not known in this module"),
+@@ -158,7 +176,10 @@ static const command_rec dbm_auth_cmds[] =
+ 
+ module AP_MODULE_DECLARE_DATA auth_dbm_module;
+ 
+-static char *get_dbm_pw(request_rec *r, char *user, char *auth_dbmpwfile)
++static char *get_dbm_pw(request_rec *r, 
++                        char *user, 
++                        char *auth_dbmpwfile, 
++                        char*dbtype)
+ {
+     DBM *f;
+     datum d, q;
+@@ -174,12 +195,13 @@ static char *get_dbm_pw(request_rec *r, char *user, char *auth_dbmpwfile)
+ #endif
+ 
+ #ifdef AP_AUTH_DBM_USE_APR
+-    if (!(retval = dbm_open(&f, auth_dbmpwfile, APR_DBM_READONLY, APR_OS_DEFAULT, r->pool))) {
++    retval  = apr_dbm_open_ex(&f, dbtype, auth_dbmpwfile, APR_DBM_READONLY, APR_OS_DEFAULT, r->pool);
++    if (retval != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, retval, r,
+-		    "could not open sdbm auth file: %s", auth_dbmpwfile);
+-	return NULL;
++            "could not open dbm (type %s) auth file: %s", dbtype, auth_dbmpwfile);
++        return NULL;
+     }
+-    if (dbm_fetch(f, q, &d) == APR_SUCCESS)
++    if (apr_dbm_fetch(f, q, &d) == APR_SUCCESS)
+         /* sorry for the obscurity ... falls through to the 
+          * if (d.dptr) {  block ...
+          */
+@@ -187,8 +209,8 @@ static char *get_dbm_pw(request_rec *r, char *user, char *auth_dbmpwfile)
+ #else
+     if (!(f = dbm_open(auth_dbmpwfile, O_RDONLY, 0664))) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+-		    "could not open dbm auth file: %s", auth_dbmpwfile);
+-	return NULL;
++            "could not open dbm auth file: %s", auth_dbmpwfile);
++        return NULL;
+     }
+     d = dbm_fetch(f, q);
+ 
+@@ -215,9 +237,9 @@ static char *get_dbm_pw(request_rec *r, char *user, char *auth_dbmpwfile)
+  * mark@telescope.org, 22Sep95
+  */
+ 
+-static char *get_dbm_grp(request_rec *r, char *user, char *auth_dbmgrpfile)
++static char *get_dbm_grp(request_rec *r, char *user, char *auth_dbmgrpfile, char*dbtype)
+ {
+-    char *grp_data = get_dbm_pw(r, user, auth_dbmgrpfile);
++    char *grp_data = get_dbm_pw(r, user, auth_dbmgrpfile,dbtype);
+     char *grp_colon;
+     char *grp_colon2;
+ 
+@@ -248,7 +270,7 @@ static int dbm_authenticate_basic_user(request_rec *r)
+     if (!conf->auth_dbmpwfile)
+ 	return DECLINED;
+ 
+-    if (!(real_pw = get_dbm_pw(r, r->user, conf->auth_dbmpwfile))) {
++    if (!(real_pw = get_dbm_pw(r, r->user, conf->auth_dbmpwfile,conf->auth_dbmtype))) {
+ 	if (!(conf->auth_dbmauthoritative))
+ 	    return DECLINED;
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+@@ -306,7 +328,7 @@ static int dbm_check_auth(request_rec *r)
+ 	    const char *orig_groups, *groups;
+ 	    char *v;
+ 
+-	    if (!(groups = get_dbm_grp(r, user, conf->auth_dbmgrpfile))) {
++        if (!(groups = get_dbm_grp(r, user, conf->auth_dbmgrpfile,conf->auth_dbmtype))) {
+ 		if (!(conf->auth_dbmauthoritative))
+ 		    return DECLINED;
+ 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,

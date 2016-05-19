@@ -1,0 +1,22 @@
+commit 0ed819adbd9e96763f00299a84840bc647ca1b08
+Author: William A. Rowe Jr <wrowe@apache.org>
+Date:   Sat Dec 29 03:34:33 2001 +0000
+
+      Error feedback, PLEASE!
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@92645 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 3c847c9..f74642a 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -314,7 +314,7 @@ static apr_status_t initialize_secret(server_rec *s)
+ 
+     if (status != APR_SUCCESS) {
+         char buf[120];
+-        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_CRIT, 0, s,
++        ap_log_error(APLOG_MARK, APLOG_CRIT, status, s,
+                      "Digest: error generating secret: %s", 
+                      apr_strerror(status, buf, sizeof(buf)));
+         return status;

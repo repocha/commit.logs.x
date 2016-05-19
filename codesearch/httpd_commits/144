@@ -1,0 +1,1604 @@
+commit 2a4d6bbd29208ea947d13680acc77bbec258d68d
+Author: Graham Leggett <minfrin@apache.org>
+Date:   Fri Apr 11 18:41:53 2008 +0000
+
+    Move the KeptBodySize directive, kept_body filters and the
+    ap_parse_request_body function out of the http module and into a
+    new module called mod_request, reducing the size of the core.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@647263 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index d32bcd6..ddd72a9 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,11 @@
+ Changes with Apache 2.3.0
+ [ When backported to 2.2.x, remove entry from this file ]
+ 
++  *) Move the KeptBodySize directive, kept_body filters and the
++     ap_parse_request_body function out of the http module and into a
++     new module called mod_request, reducing the size of the core.
++     [Graham Leggett]
++
+   *) rotatelogs: Log the current file size and error code/description
+      when failing to write to the log file.  [Jeff Trawick]
+ 
+diff --git a/docs/manual/mod/core.xml b/docs/manual/mod/core.xml
+index a9c79eb..d5dfe00 100644
+--- a/docs/manual/mod/core.xml
++++ b/docs/manual/mod/core.xml
+@@ -1563,63 +1563,6 @@ requests on a persistent connection</description>
+ </usage>
+ </directivesynopsis>
+ 
+-<directivesynopsis>
+-<name>KeptBodySize</name>
+-<description>Keep the request body instead of discarding it up to
+-the specified maximum size, for potential use by filters such as
+-mod_include.</description>
+-<syntax>KeptBodySize <var>maximum size in bytes</var></syntax>
+-<default>KeptBodySize 0</default>
+-<contextlist><context>directory</context>
+-</contextlist>
+-
+-<usage>
+-    <p>Under normal circumstances, request handlers such as the
+-    default handler for static files will discard the request body
+-    when it is not needed by the request handler. As a result,
+-    filters such as mod_include are limited to making <code>GET</code> requests
+-    only when including other URLs as subrequests, even if the
+-    original request was a <code>POST</code> request, as the discarded
+-    request body is no longer available once filter processing is
+-    taking place.</p>
+-
+-    <p>When this directive has a value greater than zero, request
+-    handlers that would otherwise discard request bodies will
+-    instead set the request body aside for use by filters up to
+-    the maximum size specified. In the case of the mod_include
+-    filter, an attempt to <code>POST</code> a request to the static
+-    shtml file will cause any subrequests to be <code>POST</code>
+-    requests, instead of <code>GET</code> requests as before.</p>
+-
+-    <p>This feature makes it possible to break up complex web pages and
+-    web applications into small individual components, and combine
+-    the components and the surrounding web page structure together
+-    using <module>mod_include</module>. The components can take the
+-    form of CGI programs, scripted languages, or URLs reverse proxied
+-    into the URL space from another server using
+-    <module>mod_proxy</module>.</p>
+-
+-    <p><strong>Note:</strong> Each request set aside has to be set
+-    aside in temporary RAM until the request is complete. As a result,
+-    care should be taken to ensure sufficient RAM is available on the
+-    server to support the intended load. Use of this directive
+-    should be limited to where needed on targeted parts of your
+-    URL space, and with the lowest possible value that is still big
+-    enough to hold a request body.</p>
+-
+-    <p>If the request size sent by the client exceeds the maximum
+-    size allocated by this directive, the server will return
+-    <code>413 Request Entity Too Large</code>.</p>
+-
+-    <p>Handlers such as <module>mod_cgi</module> that consume request
+-    bodies for their own purposes rather than discard them do not take
+-    this directive into account.</p>
+-
+-</usage>
+-
+-<seealso><a href="mod_include.html">mod_include</a> documentation</seealso>
+-</directivesynopsis>
+-
+ <directivesynopsis type="section">
+ <name>Limit</name>
+ <description>Restrict enclosed access controls to only certain HTTP
+diff --git a/docs/manual/mod/mod_include.xml b/docs/manual/mod/mod_include.xml
+index bdde70d..ca3bb3d 100644
+--- a/docs/manual/mod/mod_include.xml
++++ b/docs/manual/mod/mod_include.xml
+@@ -352,7 +352,7 @@
+       to <code>exec cgi</code> to include the output of CGI programs
+       into an HTML document.</p>
+ 
+-      <p>If the <directive module="core">KeptBodySize</directive>
++      <p>If the <directive module="mod_request">KeptBodySize</directive>
+       directive is correctly configured and valid for this included
+       file, attempts to POST requests to the enclosing HTML document
+       will be passed through to subrequests as POST requests as well.
+diff --git a/docs/manual/mod/mod_request.xml b/docs/manual/mod/mod_request.xml
+new file mode 100644
+index 0000000..088f29c
+--- /dev/null
++++ b/docs/manual/mod/mod_request.xml
+@@ -0,0 +1,83 @@
++<?xml version="1.0"?>
++<!DOCTYPE modulesynopsis SYSTEM "../style/modulesynopsis.dtd">
++<?xml-stylesheet type="text/xsl" href="../style/manual.en.xsl"?>
++<!-- $LastChangedRevision$ -->
++
++<!--
++ Licensed to the Apache Software Foundation (ASF) under one or more
++ contributor license agreements.  See the NOTICE file distributed with
++ this work for additional information regarding copyright ownership.
++ The ASF licenses this file to You under the Apache License, Version 2.0
++ (the "License"); you may not use this file except in compliance with
++ the License.  You may obtain a copy of the License at
++
++     http://www.apache.org/licenses/LICENSE-2.0
++
++ Unless required by applicable law or agreed to in writing, software
++ distributed under the License is distributed on an "AS IS" BASIS,
++ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ See the License for the specific language governing permissions and
++ limitations under the License.
++-->
++
++<modulesynopsis metafile="mod_request_body.xml.meta">
++
++<name>request_body</name>
++<description>Filters to handle and make available HTTP request bodies</description>
++<status>Core</status>
++
++<directivesynopsis>
++<name>KeptBodySize</name>
++<description>Keep the request body instead of discarding it up to
++the specified maximum size, for potential use by filters such as
++mod_include.</description>
++<syntax>KeptBodySize <var>maximum size in bytes</var></syntax>
++<default>KeptBodySize 0</default>
++<contextlist><context>directory</context>
++</contextlist>
++
++<usage>
++    <p>Under normal circumstances, request handlers such as the
++    default handler for static files will discard the request body
++    when it is not needed by the request handler. As a result,
++    filters such as mod_include are limited to making <code>GET</code> requests
++    only when including other URLs as subrequests, even if the
++    original request was a <code>POST</code> request, as the discarded
++    request body is no longer available once filter processing is
++    taking place.</p>
++
++    <p>When this directive has a value greater than zero, request
++    handlers that would otherwise discard request bodies will
++    instead set the request body aside for use by filters up to
++    the maximum size specified. In the case of the mod_include
++    filter, an attempt to <code>POST</code> a request to the static
++    shtml file will cause any subrequests to be <code>POST</code>
++    requests, instead of <code>GET</code> requests as before.</p>
++
++    <p>This feature makes it possible to break up complex web pages and
++    web applications into small individual components, and combine
++    the components and the surrounding web page structure together
++    using <module>mod_include</module>. The components can take the
++    form of CGI programs, scripted languages, or URLs reverse proxied
++    into the URL space from another server using
++    <module>mod_proxy</module>.</p>
++
++    <p><strong>Note:</strong> Each request set aside has to be set
++    aside in temporary RAM until the request is complete. As a result,
++    care should be taken to ensure sufficient RAM is available on the
++    server to support the intended load. Use of this directive
++    should be limited to where needed on targeted parts of your
++    URL space, and with the lowest possible value that is still big
++    enough to hold a request body.</p>
++
++    <p>If the request size sent by the client exceeds the maximum
++    size allocated by this directive, the server will return
++    <code>413 Request Entity Too Large</code>.</p>
++
++</usage>
++
++<seealso><a href="mod_include.html">mod_include</a> documentation</seealso>
++<seealso><a href="mod_auth_form.html">mod_auth_form</a> documentation</seealso>
++</directivesynopsis>
++
++</modulesynopsis>
+diff --git a/include/http_protocol.h b/include/http_protocol.h
+index e85a3d1..e93901e 100644
+--- a/include/http_protocol.h
++++ b/include/http_protocol.h
+@@ -670,54 +670,6 @@ AP_DECLARE(void) ap_finalize_sub_req_protocol(request_rec *sub_r);
+  */
+ AP_DECLARE(void) ap_send_interim_response(request_rec *r, int send_headers);
+ 
+-/**
+- * Structure to store the contents of an HTTP form of the type
+- * application/x-www-form-urlencoded.
+- * 
+- * Currently it contains the name as a char* of maximum length
+- * HUGE_STRING_LEN, and a value in the form of a bucket brigade
+- * of arbitrary length.
+- */
+-typedef struct {
+-    const char *name;
+-    apr_bucket_brigade *value;
+-} ap_form_pair_t;
+-
+-/**
+- * Read the body and parse any form found, which must be of the
+- * type application/x-www-form-urlencoded.
+- *
+- * Name/value pairs are returned in an array, with the names as
+- * strings with a maximum length of HUGE_STRING_LEN, and the
+- * values as bucket brigades. This allows values to be arbitrarily
+- * large.
+- *
+- * All url-encoding is removed from both the names and the values
+- * on the fly. The names are interpreted as strings, while the
+- * values are interpreted as blocks of binary data, that may
+- * contain the 0 character.
+- *
+- * In order to ensure that resource limits are not exceeded, a
+- * maximum size must be provided. If the sum of the lengths of
+- * the names and the values exceed this size, this function
+- * will return HTTP_REQUEST_ENTITY_TOO_LARGE.
+- *
+- * An optional number of parameters can be provided, if the number
+- * of parameters provided exceeds this amount, this function will
+- * return HTTP_REQUEST_ENTITY_TOO_LARGE. If this value is negative,
+- * no limit is imposed, and the number of parameters is in turn
+- * constrained by the size parameter above.
+- * 
+- * This function honours any kept_body configuration, and the
+- * original raw request body will be saved to the kept_body brigade
+- * if so configured, just as ap_discard_request_body does.
+- * 
+- * NOTE: File upload is not yet supported, but can be without change
+- * to the function call.
+- */
+-AP_DECLARE(int) ap_parse_request_form(request_rec * r, apr_array_header_t ** ptr,
+-                                      apr_size_t num, apr_size_t size);
+-
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/include/mod_request.h b/include/mod_request.h
+new file mode 100644
+index 0000000..91ee8db
+--- /dev/null
++++ b/include/mod_request.h
+@@ -0,0 +1,124 @@
++/* Licensed to the Apache Software Foundation (ASF) under one or more
++ * contributor license agreements.  See the NOTICE file distributed with
++ * this work for additional information regarding copyright ownership.
++ * The ASF licenses this file to You under the Apache License, Version 2.0
++ * (the "License"); you may not use this file except in compliance with
++ * the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++
++/**
++ * @file  mod_request.h
++ * @brief mod_request private header file
++ *
++ * @defgroup MOD_REQUEST mod_request
++ * @ingroup  APACHE_MODS
++ * @{
++ */
++
++#ifndef MOD_REQUEST_H
++#define MOD_REQUEST_H
++
++#include "apr.h"
++#include "apr_buckets.h"
++
++#include "httpd.h"
++#include "util_filter.h"
++
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++extern module AP_MODULE_DECLARE_DATA request_module;
++
++#define KEEP_BODY_FILTER "KEEP_BODY"
++#define KEPT_BODY_FILTER "KEPT_BODY"
++
++/**
++ * Core per-directory configuration.
++ */
++typedef struct {
++    apr_off_t keep_body;
++    int keep_body_set;
++} request_dir_conf;
++
++/* Handles for core filters */
++extern AP_DECLARE_DATA ap_filter_rec_t *ap_keep_body_input_filter_handle;
++extern AP_DECLARE_DATA ap_filter_rec_t *ap_kept_body_input_filter_handle;
++
++/* Filter to set aside a kept body on subrequests */
++AP_DECLARE(apr_status_t) ap_keep_body_filter(ap_filter_t *f, apr_bucket_brigade *b,
++                                             ap_input_mode_t mode, apr_read_type_e block,
++                                             apr_off_t readbytes);
++
++/* Filter to insert a kept body on subrequests */
++AP_DECLARE(apr_status_t) ap_kept_body_filter(ap_filter_t *f, apr_bucket_brigade *b,
++                                             ap_input_mode_t mode, apr_read_type_e block,
++                                             apr_off_t readbytes);
++
++/**
++ * Structure to store the contents of an HTTP form of the type
++ * application/x-www-form-urlencoded.
++ * 
++ * Currently it contains the name as a char* of maximum length
++ * HUGE_STRING_LEN, and a value in the form of a bucket brigade
++ * of arbitrary length.
++ */
++typedef struct {
++    const char *name;
++    apr_bucket_brigade *value;
++} ap_form_pair_t;
++
++/**
++ * Read the body and parse any form found, which must be of the
++ * type application/x-www-form-urlencoded.
++ *
++ * Name/value pairs are returned in an array, with the names as
++ * strings with a maximum length of HUGE_STRING_LEN, and the
++ * values as bucket brigades. This allows values to be arbitrarily
++ * large.
++ *
++ * All url-encoding is removed from both the names and the values
++ * on the fly. The names are interpreted as strings, while the
++ * values are interpreted as blocks of binary data, that may
++ * contain the 0 character.
++ *
++ * In order to ensure that resource limits are not exceeded, a
++ * maximum size must be provided. If the sum of the lengths of
++ * the names and the values exceed this size, this function
++ * will return HTTP_REQUEST_ENTITY_TOO_LARGE.
++ *
++ * An optional number of parameters can be provided, if the number
++ * of parameters provided exceeds this amount, this function will
++ * return HTTP_REQUEST_ENTITY_TOO_LARGE. If this value is negative,
++ * no limit is imposed, and the number of parameters is in turn
++ * constrained by the size parameter above.
++ * 
++ * This function honours any kept_body configuration, and the
++ * original raw request body will be saved to the kept_body brigade
++ * if so configured, just as ap_discard_request_body does.
++ * 
++ * NOTE: File upload is not yet supported, but can be without change
++ * to the function call.
++ */
++AP_DECLARE(int) ap_parse_request_form(request_rec * r, apr_array_header_t ** ptr,
++                                      apr_size_t num, apr_size_t size);
++
++APR_DECLARE_OPTIONAL_FN(void, ap_parse_request_form, (request_rec * r, apr_array_header_t ** ptr,
++                                                      apr_size_t num, apr_size_t size));
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif	/* !MOD_REQUEST_H */
++/** @} */
+diff --git a/modules/aaa/mod_auth_form.c b/modules/aaa/mod_auth_form.c
+index cfc81cc..33fad92 100644
+--- a/modules/aaa/mod_auth_form.c
++++ b/modules/aaa/mod_auth_form.c
+@@ -33,6 +33,7 @@
+ 
+ #include "mod_auth.h"
+ #include "mod_session.h"
++#include "mod_request.h"
+ 
+ #define LOG_PREFIX "mod_auth_form: "
+ #define FORM_LOGIN_HANDLER "form-login-handler"
+@@ -45,6 +46,8 @@ static void (*ap_session_get_fn) (request_rec * r, session_rec * z,
+                                   const char *key, const char **value) = NULL;
+ static void (*ap_session_set_fn) (request_rec * r, session_rec * z,
+                                   const char *key, const char *value) = NULL;
++static void (*ap_parse_request_form_fn) (request_rec * r, apr_array_header_t ** ptr,
++                                         apr_size_t num, apr_size_t size) = NULL;
+ 
+ typedef struct {
+     authn_provider_list *providers;
+@@ -176,7 +179,15 @@ static const char *add_authn_provider(cmd_parms * cmd, void *config,
+         ap_session_set_fn = APR_RETRIEVE_OPTIONAL_FN(ap_session_set);
+         if (!ap_session_load_fn || !ap_session_get_fn || !ap_session_set_fn) {
+             return "You must load mod_session to enable the mod_auth_form "
+-                "functions";
++                   "functions";
++        }
++    }
++
++    if (!ap_parse_request_form_fn) {
++        ap_parse_request_form_fn = APR_RETRIEVE_OPTIONAL_FN(ap_parse_request_form);
++        if (!ap_parse_request_form_fn) {
++            return "You must load mod_request to enable the mod_auth_form "
++                   "functions";
+         }
+     }
+ 
+diff --git a/modules/filters/config.m4 b/modules/filters/config.m4
+index 9c1f608..84a3344 100644
+--- a/modules/filters/config.m4
++++ b/modules/filters/config.m4
+@@ -5,6 +5,7 @@ dnl APACHE_MODULE(name, helptext[, objects[, structname[, default[, config]]]])
+ APACHE_MODPATH_INIT(filters)
+ 
+ APACHE_MODULE(ext_filter, external filter module, , , most)
++APACHE_MODULE(request, Request Body Filtering, , , yes)
+ APACHE_MODULE(include, Server Side Includes, , , yes)
+ APACHE_MODULE(filter, Smart Filtering, , , yes)
+ APACHE_MODULE(substitute, response content rewrite-like filtering, , , most)
+diff --git a/modules/filters/mod_request.c b/modules/filters/mod_request.c
+new file mode 100644
+index 0000000..c3026dc
+--- /dev/null
++++ b/modules/filters/mod_request.c
+@@ -0,0 +1,587 @@
++/* Licensed to the Apache Software Foundation (ASF) under one or more
++ * contributor license agreements.  See the NOTICE file distributed with
++ * this work for additional information regarding copyright ownership.
++ * The ASF licenses this file to You under the Apache License, Version 2.0
++ * (the "License"); you may not use this file except in compliance with
++ * the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++/*
++ * mod_request.c --- HTTP routines to set aside or process request bodies.
++ */
++
++#include "apr.h"
++#include "apr_strings.h"
++#include "apr_buckets.h"
++#include "apr_lib.h"
++
++#include "ap_config.h"
++#include "httpd.h"
++#include "http_config.h"
++#include "http_protocol.h"
++#include "http_log.h"           /* For errors detected in basic auth common
++                                 * support code... */
++#include "http_request.h"
++
++#include "mod_request.h"
++
++/* Handles for core filters */
++AP_DECLARE_DATA ap_filter_rec_t *ap_keep_body_input_filter_handle;
++AP_DECLARE_DATA ap_filter_rec_t *ap_kept_body_input_filter_handle;
++
++static apr_status_t bail_out_on_error(apr_bucket_brigade *bb,
++                                      ap_filter_t *f,
++                                      int http_error)
++{
++    apr_bucket *e;
++
++    apr_brigade_cleanup(bb);
++    e = ap_bucket_error_create(http_error,
++                               NULL, f->r->pool,
++                               f->c->bucket_alloc);
++    APR_BRIGADE_INSERT_TAIL(bb, e);
++    e = apr_bucket_eos_create(f->c->bucket_alloc);
++    APR_BRIGADE_INSERT_TAIL(bb, e);
++    return ap_pass_brigade(f->r->output_filters, bb);
++}
++
++typedef struct keep_body_filter_ctx {
++    apr_off_t remaining;
++    apr_off_t keep_body;
++} keep_body_ctx_t;
++
++/**
++ * This is the KEEP_BODY_INPUT filter for HTTP requests, for times when the
++ * body should be set aside for future use by other modules.
++ */
++AP_DECLARE(apr_status_t) ap_keep_body_filter(ap_filter_t *f, apr_bucket_brigade *b,
++                                             ap_input_mode_t mode, apr_read_type_e block,
++                                             apr_off_t readbytes)
++{
++    apr_bucket *e;
++    keep_body_ctx_t *ctx = f->ctx;
++    apr_status_t rv;
++    apr_bucket *bucket;
++    apr_off_t len = 0;
++
++
++    if (!ctx) {
++        const char *lenp;
++        char *endstr = NULL;
++        request_dir_conf *dconf = ap_get_module_config(f->r->per_dir_config,
++                                                       &request_module);
++
++        /* must we step out of the way? */
++        if (!dconf->keep_body || f->r->kept_body) {
++            ap_remove_input_filter(f);
++            return ap_get_brigade(f->next, b, mode, block, readbytes);
++        }
++
++        f->ctx = ctx = apr_pcalloc(f->r->pool, sizeof(*ctx));
++        
++        /* fail fast if the content length exceeds keep body */
++        lenp = apr_table_get(f->r->headers_in, "Content-Length");
++        if (lenp) {
++
++            /* Protects against over/underflow, non-digit chars in the
++             * string (excluding leading space) (the endstr checks)
++             * and a negative number. */
++            if (apr_strtoff(&ctx->remaining, lenp, &endstr, 10)
++                || endstr == lenp || *endstr || ctx->remaining < 0) {
++
++                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, f->r,
++                              "Invalid Content-Length");
++
++                ap_remove_input_filter(f);
++                return bail_out_on_error(b, f, HTTP_REQUEST_ENTITY_TOO_LARGE);
++            }
++
++            /* If we have a limit in effect and we know the C-L ahead of
++             * time, stop it here if it is invalid.
++             */
++            if (dconf->keep_body < ctx->remaining) {
++                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, f->r,
++                          "Requested content-length of %" APR_OFF_T_FMT
++                          " is larger than the configured limit"
++                          " of %" APR_OFF_T_FMT, ctx->remaining, dconf->keep_body);
++                ap_remove_input_filter(f);
++                return bail_out_on_error(b, f, HTTP_REQUEST_ENTITY_TOO_LARGE);
++            }
++
++        }
++
++        f->r->kept_body = apr_brigade_create(f->r->pool, f->r->connection->bucket_alloc);
++        ctx->remaining = dconf->keep_body;
++
++    }
++
++    /* get the brigade from upstream, and read it in to get its length */
++    rv = ap_get_brigade(f->next, b, mode, block, readbytes);
++    if (rv == APR_SUCCESS) {
++        rv = apr_brigade_length(b, 1, &len);
++    }
++        
++    /* does the length take us over the limit? */
++    if (APR_SUCCESS == rv && len > ctx->remaining) {
++        if (f->r->kept_body) {
++            apr_brigade_cleanup(f->r->kept_body);
++            f->r->kept_body = NULL;
++        }
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, f->r,
++                      "Requested content-length of %" APR_OFF_T_FMT
++                      " is larger than the configured limit"
++                      " of %" APR_OFF_T_FMT, len, ctx->keep_body);
++        return bail_out_on_error(b, f, HTTP_REQUEST_ENTITY_TOO_LARGE);
++    }
++    ctx->remaining -= len;
++
++    /* pass any errors downstream */
++    if (rv != APR_SUCCESS) {
++        if (f->r->kept_body) {
++            apr_brigade_cleanup(f->r->kept_body);
++            f->r->kept_body = NULL;
++        }
++        return rv;
++    }
++
++    /* all is well, set aside the buckets */
++    for (bucket = APR_BRIGADE_FIRST(b);
++         bucket != APR_BRIGADE_SENTINEL(b);
++         bucket = APR_BUCKET_NEXT(bucket))
++    {
++        apr_bucket_copy(bucket, &e);
++        APR_BRIGADE_INSERT_TAIL(f->r->kept_body, e);
++    }
++
++    return APR_SUCCESS;
++}
++
++
++typedef struct kept_body_filter_ctx {
++    apr_off_t offset;
++    apr_off_t remaining;
++} kept_body_ctx_t;
++
++/**
++ * Initialisation of filter to handle a kept body on subrequests.
++ * 
++ * If a body is to be reinserted into a subrequest, any chunking will have
++ * been removed from the body during storage. We need to change the request
++ * from Transfer-Encoding: chunked to an explicit Content-Length.
++ */
++static int kept_body_filter_init(ap_filter_t *f) {
++    apr_off_t length = 0;
++    request_rec *r = f->r;
++    apr_bucket_brigade *kept_body = r->kept_body;
++
++    if (kept_body) {
++        apr_table_unset(r->headers_in, "Transfer-Encoding");
++        apr_brigade_length(kept_body, 1, &length);
++        apr_table_set(r->headers_in, "Content-Length", apr_off_t_toa(r->pool, length));
++    }
++
++    return OK;
++}
++
++/**
++ * Filter to handle a kept body on subrequests.
++ * 
++ * If a body has been previously kept by the request, and if a subrequest wants
++ * to re-insert the body into the request, this input filter makes it happen.
++ */
++AP_DECLARE(apr_status_t) ap_kept_body_filter(ap_filter_t *f, apr_bucket_brigade *b,
++                                             ap_input_mode_t mode, apr_read_type_e block,
++                                             apr_off_t readbytes) {
++    request_rec *r = f->r;
++    apr_bucket_brigade *kept_body = r->kept_body;
++    kept_body_ctx_t *ctx = f->ctx;
++    apr_bucket *ec, *e2;
++    apr_status_t rv;
++
++    /* just get out of the way of things we don't want. */
++    if (!kept_body || (mode != AP_MODE_READBYTES && mode != AP_MODE_GETLINE)) {
++        return ap_get_brigade(f->next, b, mode, block, readbytes);
++    }
++
++    /* set up the context if it does not already exist */
++    if (!ctx) {
++        f->ctx = ctx = apr_palloc(f->r->pool, sizeof(*ctx));
++        ctx->offset = 0;
++        apr_brigade_length(kept_body, 1, &ctx->remaining);
++    }
++
++    /* kept_body is finished, send next filter */
++    if (ctx->remaining <= 0) {
++        return ap_get_brigade(f->next, b, mode, block, readbytes);
++    }
++
++    /* send all of the kept_body, but no more */
++    if (readbytes > ctx->remaining) {
++        readbytes = ctx->remaining;
++    }
++
++    /* send part of the kept_body */
++    if ((rv = apr_brigade_partition(kept_body, ctx->offset, &ec)) != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
++                      "apr_brigade_partition() failed on kept_body at %" APR_OFF_T_FMT, ctx->offset);
++        return rv;
++    }
++    if ((rv = apr_brigade_partition(kept_body, ctx->offset + readbytes, &e2)) != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
++                      "apr_brigade_partition() failed on kept_body at %" APR_OFF_T_FMT, ctx->offset + readbytes);
++        return rv;
++    }
++ 
++    do {
++        apr_bucket *foo;
++        const char *str;
++        apr_size_t len;
++
++        if (apr_bucket_copy(ec, &foo) != APR_SUCCESS) {
++            /* As above; this should not fail since the bucket has
++             * a known length, but just to be sure, this takes
++             * care of uncopyable buckets that do somehow manage
++             * to slip through.  */
++            /* XXX: check for failure? */
++            apr_bucket_read(ec, &str, &len, APR_BLOCK_READ);
++            apr_bucket_copy(ec, &foo);
++        }
++        APR_BRIGADE_INSERT_TAIL(b, foo);
++        ec = APR_BUCKET_NEXT(ec);
++    } while (ec != e2);
++
++    ctx->remaining -= readbytes;
++    ctx->offset += readbytes;
++    return APR_SUCCESS;
++
++}
++
++/* form parsing stuff */
++typedef enum {
++    FORM_NORMAL,
++    FORM_AMP,
++    FORM_NAME,
++    FORM_VALUE,
++    FORM_PERCENTA,
++    FORM_PERCENTB,
++    FORM_ABORT
++} ap_form_type_t;
++
++/**
++ * Read the body and parse any form found, which must be of the
++ * type application/x-www-form-urlencoded.
++ *
++ * Name/value pairs are returned in an array, with the names as
++ * strings with a maximum length of HUGE_STRING_LEN, and the
++ * values as bucket brigades. This allows values to be arbitrarily
++ * large.
++ *
++ * All url-encoding is removed from both the names and the values
++ * on the fly. The names are interpreted as strings, while the
++ * values are interpreted as blocks of binary data, that may
++ * contain the 0 character.
++ *
++ * In order to ensure that resource limits are not exceeded, a
++ * maximum size must be provided. If the sum of the lengths of
++ * the names and the values exceed this size, this function
++ * will return HTTP_REQUEST_ENTITY_TOO_LARGE.
++ *
++ * An optional number of parameters can be provided, if the number
++ * of parameters provided exceeds this amount, this function will
++ * return HTTP_REQUEST_ENTITY_TOO_LARGE. If this value is negative,
++ * no limit is imposed, and the number of parameters is in turn
++ * constrained by the size parameter above.
++ * 
++ * This function honours any kept_body configuration, and the
++ * original raw request body will be saved to the kept_body brigade
++ * if so configured, just as ap_discard_request_body does.
++ * 
++ * NOTE: File upload is not yet supported, but can be without change
++ * to the function call.
++ */
++AP_DECLARE(int) ap_parse_request_form(request_rec * r, apr_array_header_t ** ptr,
++                                      apr_size_t num, apr_size_t size)
++{
++    request_dir_conf *dconf;
++    apr_off_t left = 0;
++    apr_bucket_brigade *bb = NULL, *kept_body = NULL;
++    apr_bucket *e;
++    int seen_eos = 0;
++    char buffer[HUGE_STRING_LEN + 1];
++    const char *ct;
++    apr_size_t offset = 0;
++    ap_form_type_t state = FORM_NAME, percent = FORM_NORMAL;
++    ap_form_pair_t *pair = NULL;
++    apr_array_header_t *pairs = apr_array_make(r->pool, 4, sizeof(ap_form_pair_t));
++
++    char hi = 0;
++    char low = 0;
++
++    *ptr = pairs;
++
++    /* sanity check - we only support forms for now */
++    ct = apr_table_get(r->headers_in, "Content-Type");
++    if (!ct || strcmp("application/x-www-form-urlencoded", ct)) {
++        return ap_discard_request_body(r);
++    }
++
++    dconf = ap_get_module_config(r->per_dir_config,
++                                     &request_module);
++    if (dconf->keep_body > 0) {
++        left = dconf->keep_body;
++        kept_body = apr_brigade_create(r->pool, r->connection->bucket_alloc);
++    }
++
++    bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
++    do {
++        apr_bucket *bucket = NULL, *last = NULL;
++
++        int rv = ap_get_brigade(r->input_filters, bb, AP_MODE_READBYTES,
++                                APR_BLOCK_READ, HUGE_STRING_LEN);
++        if (rv != APR_SUCCESS) {
++            apr_brigade_destroy(bb);
++            return (rv == AP_FILTER_ERROR) ? rv : HTTP_BAD_REQUEST;
++        }
++
++        for (bucket = APR_BRIGADE_FIRST(bb);
++             bucket != APR_BRIGADE_SENTINEL(bb);
++             last = bucket, bucket = APR_BUCKET_NEXT(bucket)) {
++            const char *data;
++            apr_size_t len, slide;
++
++            if (last) {
++                apr_bucket_delete(last);
++            }
++            if (APR_BUCKET_IS_EOS(bucket)) {
++                seen_eos = 1;
++                break;
++            }
++            if (bucket->length == 0) {
++                continue;
++            }
++
++            rv = apr_bucket_read(bucket, &data, &len, APR_BLOCK_READ);
++            if (rv != APR_SUCCESS) {
++                apr_brigade_destroy(bb);
++                return HTTP_BAD_REQUEST;
++            }
++
++            slide = len;
++            while (state != FORM_ABORT && slide-- > 0 && size >= 0 && num != 0) {
++                char c = *data++;
++                if ('+' == c) {
++                    c = ' ';
++                }
++                else if ('&' == c) {
++                    state = FORM_AMP;
++                }
++                if ('%' == c) {
++                    percent = FORM_PERCENTA;
++                    continue;
++                }
++                if (FORM_PERCENTA == percent) {
++                    if (c >= 'a') {
++                        hi = c - 'a' + 10;
++                    }
++                    else if (c >= 'A') {
++                        hi = c - 'A' + 10;
++                    }
++                    else if (c >= '0') {
++                        hi = c - '0';
++                    }
++                    hi = hi << 4;
++                    percent = FORM_PERCENTB;
++                    continue;
++                }
++                if (FORM_PERCENTB == percent) {
++                    if (c >= 'a') {
++                        low = c - 'a' + 10;
++                    }
++                    else if (c >= 'A') {
++                        low = c - 'A' + 10;
++                    }
++                    else if (c >= '0') {
++                        low = c - '0';
++                    }
++                    c = low ^ hi;
++                    percent = FORM_NORMAL;
++                }
++                switch (state) {
++                case FORM_AMP:
++                    if (pair) {
++                        const char *tmp = apr_pmemdup(r->pool, buffer, offset);
++                        apr_bucket *b = apr_bucket_pool_create(tmp, offset, r->pool, r->connection->bucket_alloc);
++                        APR_BRIGADE_INSERT_TAIL(pair->value, b);
++                    }
++                    state = FORM_NAME;
++                    pair = NULL;
++                    offset = 0;
++                    num--;
++                    break;
++                case FORM_NAME:
++                    if (offset < HUGE_STRING_LEN) {
++                        if ('=' == c) {
++                            buffer[offset] = 0;
++                            offset = 0;
++                            pair = (ap_form_pair_t *) apr_array_push(pairs);
++                            pair->name = apr_pstrdup(r->pool, buffer);
++                            pair->value = apr_brigade_create(r->pool, r->connection->bucket_alloc);
++                            state = FORM_VALUE;
++                        }
++                        else {
++                            buffer[offset++] = c;
++                            size--;
++                        }
++                    }
++                    else {
++                        state = FORM_ABORT;
++                    }
++                    break;
++                case FORM_VALUE:
++                    if (offset >= HUGE_STRING_LEN) {
++                        const char *tmp = apr_pmemdup(r->pool, buffer, offset);
++                        apr_bucket *b = apr_bucket_pool_create(tmp, offset, r->pool, r->connection->bucket_alloc);
++                        APR_BRIGADE_INSERT_TAIL(pair->value, b);
++                        offset = 0;
++                    }
++                    buffer[offset++] = c;
++                    size--;
++                    break;
++                default:
++                    break;
++                }
++            }
++
++            /* If we have been asked to, keep the data up until the
++             * configured limit. If the limit is exceeded, we return an
++             * HTTP_REQUEST_ENTITY_TOO_LARGE response so the caller is
++             * clear the server couldn't handle their request.
++             */
++            if (kept_body) {
++                if (len <= left) {
++                    apr_bucket_copy(bucket, &e);
++                    APR_BRIGADE_INSERT_TAIL(kept_body, e);
++                    left -= len;
++                }
++                else {
++                    apr_brigade_destroy(bb);
++                    apr_brigade_destroy(kept_body);
++                    return HTTP_REQUEST_ENTITY_TOO_LARGE;
++                }
++            }
++
++        }
++
++        apr_brigade_cleanup(bb);
++    } while (!seen_eos);
++
++    if (FORM_ABORT == state || size < 0 || num == 0) {
++        return HTTP_REQUEST_ENTITY_TOO_LARGE;
++    }
++    else if (FORM_VALUE == state && pair && offset > 0) {
++        const char *tmp = apr_pmemdup(r->pool, buffer, offset);
++        apr_bucket *b = apr_bucket_pool_create(tmp, offset, r->pool, r->connection->bucket_alloc);
++        APR_BRIGADE_INSERT_TAIL(pair->value, b);
++    }
++
++    if (kept_body) {
++        r->kept_body = kept_body;
++    }
++
++    return OK;
++
++}
++
++/**
++ * Fixups hook.
++ * 
++ * Add the KEEP_BODY filter to the request, if the admin wants to keep
++ * the body using the KeptBodySize directive.
++ * 
++ * @param r The request
++ */
++static int request_fixups(request_rec * r)
++{
++    request_dir_conf *conf = ap_get_module_config(r->per_dir_config,
++                                                  &request_module);
++
++    if (conf->keep_body) {
++        ap_add_input_filter_handle(ap_keep_body_input_filter_handle,
++                                   NULL, r, r->connection);
++    }
++
++    return OK;
++
++}
++
++static void *create_request_dir_config(apr_pool_t *p, char *dummy)
++{
++    request_dir_conf *new =
++        (request_dir_conf *) apr_pcalloc(p, sizeof(request_dir_conf));
++
++    new->keep_body_set = 0; /* unset */
++    new->keep_body = 0; /* don't by default */
++
++    return (void *) new;
++}
++
++static void *merge_request_dir_config(apr_pool_t *p, void *basev, void *addv)
++{
++    request_dir_conf *new = (request_dir_conf *) apr_pcalloc(p, sizeof(request_dir_conf));
++    request_dir_conf *add = (request_dir_conf *) addv;
++    request_dir_conf *base = (request_dir_conf *) basev;
++
++    new->keep_body = (add->keep_body_set == 0) ? base->keep_body : add->keep_body;
++    new->keep_body_set = add->keep_body_set || base->keep_body_set;
++
++    return new;
++}
++
++static const char *set_kept_body_size(cmd_parms *cmd, void *dconf,
++                                      const char *arg)
++{
++    request_dir_conf *conf = dconf;
++
++    if (APR_SUCCESS != apr_strtoff(&(conf->keep_body), arg, NULL, 0)
++        || conf->keep_body < 0) {
++        return "KeptBodySize must be a size in bytes, or zero.";
++    }
++    conf->keep_body_set = 1;
++
++    return NULL;
++}
++
++static const command_rec request_cmds[] = {
++    AP_INIT_TAKE1("KeptBodySize", set_kept_body_size, NULL, ACCESS_CONF,
++                  "Maximum size of request bodies kept aside for use by filters"),
++    { NULL }
++};
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_keep_body_input_filter_handle =
++        ap_register_input_filter(KEEP_BODY_FILTER, ap_keep_body_filter,
++                                 NULL, AP_FTYPE_RESOURCE);
++    ap_kept_body_input_filter_handle =
++        ap_register_input_filter(KEPT_BODY_FILTER, ap_kept_body_filter,
++                                 kept_body_filter_init, AP_FTYPE_RESOURCE);
++    ap_hook_fixups(request_fixups, NULL, NULL, APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA request_module = {
++    STANDARD20_MODULE_STUFF,
++    create_request_dir_config, /* create per-directory config structure */
++    merge_request_dir_config,  /* merge per-directory config structures */
++    NULL,                      /* create per-server config structure */
++    NULL,                      /* merge per-server config structures */
++    request_cmds,              /* command apr_table_t */
++    register_hooks             /* register hooks */
++};
+diff --git a/modules/http/http_core.c b/modules/http/http_core.c
+index d96c312..0fd6b75 100644
+--- a/modules/http/http_core.c
++++ b/modules/http/http_core.c
+@@ -36,7 +36,6 @@
+ 
+ /* Handles for core filters */
+ AP_DECLARE_DATA ap_filter_rec_t *ap_http_input_filter_handle;
+-AP_DECLARE_DATA ap_filter_rec_t *ap_kept_body_input_filter_handle;
+ AP_DECLARE_DATA ap_filter_rec_t *ap_http_header_filter_handle;
+ AP_DECLARE_DATA ap_filter_rec_t *ap_chunk_filter_handle;
+ AP_DECLARE_DATA ap_filter_rec_t *ap_http_outerror_filter_handle;
+@@ -89,20 +88,6 @@ static const char *set_keep_alive_max(cmd_parms *cmd, void *dummy,
+     return NULL;
+ }
+ 
+-static const char *set_kept_body_size(cmd_parms *cmd, void *dconf,
+-                                      const char *arg)
+-{
+-    core_dir_conf *conf = dconf;
+-
+-    if (APR_SUCCESS != apr_strtoff(&(conf->keep_body), arg, NULL, 0)
+-        || conf->keep_body < 0) {
+-        return "KeptBodySize must be a size in bytes, or zero.";
+-    }
+-    conf->keep_body_set = 1;
+-
+-    return NULL;
+-}
+-
+ static const command_rec http_cmds[] = {
+     AP_INIT_TAKE1("KeepAliveTimeout", set_keep_alive_timeout, NULL, RSRC_CONF,
+                   "Keep-Alive timeout duration (sec)"),
+@@ -111,8 +96,6 @@ static const command_rec http_cmds[] = {
+                   "or 0 for infinite"),
+     AP_INIT_TAKE1("KeepAlive", set_keep_alive, NULL, RSRC_CONF,
+                   "Whether persistent connections should be On or Off"),
+-    AP_INIT_TAKE1("KeptBodySize", set_kept_body_size, NULL, ACCESS_CONF,
+-                  "Maximum size of request bodies kept aside for use by filters"),
+     { NULL }
+ };
+ 
+@@ -290,9 +273,6 @@ static void register_hooks(apr_pool_t *p)
+     ap_http_input_filter_handle =
+         ap_register_input_filter("HTTP_IN", ap_http_filter,
+                                  NULL, AP_FTYPE_PROTOCOL);
+-    ap_kept_body_input_filter_handle =
+-        ap_register_input_filter("KEPT_BODY", ap_kept_body_filter,
+-                                 ap_kept_body_filter_init, AP_FTYPE_RESOURCE);
+     ap_http_header_filter_handle =
+         ap_register_output_filter("HTTP_HEADER", ap_http_header_filter,
+                                   NULL, AP_FTYPE_PROTOCOL);
+@@ -308,35 +288,12 @@ static void register_hooks(apr_pool_t *p)
+     ap_method_registry_init(p);
+ }
+ 
+-static void *create_core_dir_config(apr_pool_t *p, char *dummy)
+-{
+-    core_dir_conf *new =
+-        (core_dir_conf *) apr_pcalloc(p, sizeof(core_dir_conf));
+-
+-    new->keep_body_set = 0; /* unset */
+-    new->keep_body = 0; /* don't by default */
+-
+-    return (void *) new;
+-}
+-
+-static void *merge_core_dir_config(apr_pool_t *p, void *basev, void *addv)
+-{
+-    core_dir_conf *new = (core_dir_conf *) apr_pcalloc(p, sizeof(core_dir_conf));
+-    core_dir_conf *add = (core_dir_conf *) addv;
+-    core_dir_conf *base = (core_dir_conf *) basev;
+-
+-    new->keep_body = (add->keep_body_set == 0) ? base->keep_body : add->keep_body;
+-    new->keep_body_set = add->keep_body_set || base->keep_body_set;
+-
+-    return new;
+-}
+-
+ module AP_MODULE_DECLARE_DATA http_module = {
+     STANDARD20_MODULE_STUFF,
+-    create_core_dir_config, /* create per-directory config structure */
+-    merge_core_dir_config,  /* merge per-directory config structures */
+-    NULL,                   /* create per-server config structure */
+-    NULL,                   /* merge per-server config structures */
+-    http_cmds,              /* command apr_table_t */
+-    register_hooks          /* register hooks */
++    NULL,              /* create per-directory config structure */
++    NULL,              /* merge per-directory config structures */
++    NULL,              /* create per-server config structure */
++    NULL,              /* merge per-server config structures */
++    http_cmds,         /* command apr_table_t */
++    register_hooks     /* register hooks */
+ };
+diff --git a/modules/http/http_filters.c b/modules/http/http_filters.c
+index 964eba2..7f8b922 100644
+--- a/modules/http/http_filters.c
++++ b/modules/http/http_filters.c
+@@ -57,8 +57,6 @@
+ 
+ #define INVALID_CHAR -2
+ 
+-extern module AP_MODULE_DECLARE_DATA http_module;
+-
+ static long get_chunk_size(char *);
+ 
+ typedef struct http_filter_ctx {
+@@ -1310,11 +1308,8 @@ AP_CORE_DECLARE_NONSTD(apr_status_t) ap_http_header_filter(ap_filter_t *f,
+  */
+ AP_DECLARE(int) ap_discard_request_body(request_rec *r)
+ {
+-    apr_bucket_brigade *bb, *kept_body = NULL;
+-    apr_bucket *e;
++    apr_bucket_brigade *bb;
+     int rv, seen_eos;
+-    core_dir_conf *dconf;
+-    apr_off_t left = 0;
+ 
+     /* Sometimes we'll get in a state where the input handling has
+      * detected an error where we want to drop the connection, so if
+@@ -1328,20 +1323,6 @@ AP_DECLARE(int) ap_discard_request_body(request_rec *r)
+         return OK;
+     }
+ 
+-    /* We may want to save this body away if the administrator has
+-     * asked us to do so for this directory. This allows the body
+-     * to be reexamined by filters such as mod_include, even though
+-     * the main request has no need for this body.
+-     */
+-    if (!r->kept_body) {
+-        dconf = ap_get_module_config(r->per_dir_config,
+-                                     &http_module);
+-        if (dconf->keep_body > 0) {
+-            left = dconf->keep_body;
+-            kept_body = apr_brigade_create(r->pool, r->connection->bucket_alloc);
+-        }
+-    }
+-
+     bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
+     seen_eos = 0;
+     do {
+@@ -1393,33 +1374,10 @@ AP_DECLARE(int) ap_discard_request_body(request_rec *r)
+                 apr_brigade_destroy(bb);
+                 return HTTP_BAD_REQUEST;
+             }
+-
+-            /* If we have been asked to, keep the data up until the
+-             * configured limit. If the limit is exceeded, we return an
+-             * HTTP_REQUEST_ENTITY_TOO_LARGE response so the caller is
+-             * clear the server couldn't handle their request.
+-             */
+-            if (kept_body) {
+-                if (len <= left) {
+-                    apr_bucket_copy(bucket, &e);
+-                    APR_BRIGADE_INSERT_TAIL(kept_body, e);
+-                    left -= len;
+-                }
+-                else {
+-                    apr_brigade_destroy(bb);
+-                    apr_brigade_destroy(kept_body);
+-                    return HTTP_REQUEST_ENTITY_TOO_LARGE;
+-                }
+-            }
+-            
+         }
+         apr_brigade_cleanup(bb);
+     } while (!seen_eos);
+ 
+-    if (kept_body) {
+-        r->kept_body = kept_body;
+-    }
+-
+     return OK;
+ }
+ 
+@@ -1625,339 +1583,3 @@ apr_status_t ap_http_outerror_filter(ap_filter_t *f,
+ 
+     return ap_pass_brigade(f->next,  b);
+ }
+-
+-typedef struct kept_body_filter_ctx {
+-    apr_off_t offset;
+-    apr_off_t remaining;
+-} kept_body_ctx_t;
+-
+-/**
+- * Initialisation of filter to handle a kept body on subrequests.
+- * 
+- * If a body is to be reinserted into a subrequest, any chunking will have
+- * been removed from the body during storage. We need to change the request
+- * from Transfer-Encoding: chunked to an explicit Content-Length.
+- */
+-int ap_kept_body_filter_init(ap_filter_t *f) {
+-    apr_off_t length = 0;
+-    request_rec *r = f->r;
+-    apr_bucket_brigade *kept_body = r->kept_body;
+-
+-    if (kept_body) {
+-        apr_table_unset(r->headers_in, "Transfer-Encoding");
+-        apr_brigade_length(kept_body, 1, &length);
+-        apr_table_set(r->headers_in, "Content-Length", apr_off_t_toa(r->pool, length));
+-    }
+-
+-    return OK;
+-}
+-
+-/**
+- * Filter to handle a kept body on subrequests.
+- * 
+- * If a body has been previously kept by the request, and if a subrequest wants
+- * to re-insert the body into the request, this input filter makes it happen.
+- */
+-apr_status_t ap_kept_body_filter(ap_filter_t *f, apr_bucket_brigade *b,
+-                                 ap_input_mode_t mode, apr_read_type_e block,
+-                                 apr_off_t readbytes) {
+-    request_rec *r = f->r;
+-    apr_bucket_brigade *kept_body = r->kept_body;
+-    kept_body_ctx_t *ctx = f->ctx;
+-    apr_bucket *ec, *e2;
+-    apr_status_t rv;
+-
+-    /* just get out of the way of things we don't want. */
+-    if (!kept_body || (mode != AP_MODE_READBYTES && mode != AP_MODE_GETLINE)) {
+-        return ap_get_brigade(f->next, b, mode, block, readbytes);
+-    }
+-
+-    /* set up the context if it does not already exist */
+-    if (!ctx) {
+-        f->ctx = ctx = apr_palloc(f->r->pool, sizeof(*ctx));
+-        ctx->offset = 0;
+-        apr_brigade_length(kept_body, 1, &ctx->remaining);
+-    }
+-
+-    /* kept_body is finished, send next filter */
+-    if (ctx->remaining <= 0) {
+-        return ap_get_brigade(f->next, b, mode, block, readbytes);
+-    }
+-
+-    /* send all of the kept_body, but no more */
+-    if (readbytes > ctx->remaining) {
+-        readbytes = ctx->remaining;
+-    }
+-
+-    /* send part of the kept_body */
+-    if ((rv = apr_brigade_partition(kept_body, ctx->offset, &ec)) != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
+-                      "apr_brigade_partition() failed on kept_body at %" APR_OFF_T_FMT, ctx->offset);
+-        return rv;
+-    }
+-    if ((rv = apr_brigade_partition(kept_body, ctx->offset + readbytes, &e2)) != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
+-                      "apr_brigade_partition() failed on kept_body at %" APR_OFF_T_FMT, ctx->offset + readbytes);
+-        return rv;
+-    }
+- 
+-    do {
+-        apr_bucket *foo;
+-        const char *str;
+-        apr_size_t len;
+-
+-        if (apr_bucket_copy(ec, &foo) != APR_SUCCESS) {
+-            /* As above; this should not fail since the bucket has
+-             * a known length, but just to be sure, this takes
+-             * care of uncopyable buckets that do somehow manage
+-             * to slip through.  */
+-            /* XXX: check for failure? */
+-            apr_bucket_read(ec, &str, &len, APR_BLOCK_READ);
+-            apr_bucket_copy(ec, &foo);
+-        }
+-        APR_BRIGADE_INSERT_TAIL(b, foo);
+-        ec = APR_BUCKET_NEXT(ec);
+-    } while (ec != e2);
+-
+-    ctx->remaining -= readbytes;
+-    ctx->offset += readbytes;
+-    return APR_SUCCESS;
+-
+-}
+-
+-/* form parsing stuff */
+-typedef enum {
+-    FORM_NORMAL,
+-    FORM_AMP,
+-    FORM_NAME,
+-    FORM_VALUE,
+-    FORM_PERCENTA,
+-    FORM_PERCENTB,
+-    FORM_ABORT
+-} ap_form_type_t;
+-
+-/**
+- * Read the body and parse any form found, which must be of the
+- * type application/x-www-form-urlencoded.
+- *
+- * Name/value pairs are returned in an array, with the names as
+- * strings with a maximum length of HUGE_STRING_LEN, and the
+- * values as bucket brigades. This allows values to be arbitrarily
+- * large.
+- *
+- * All url-encoding is removed from both the names and the values
+- * on the fly. The names are interpreted as strings, while the
+- * values are interpreted as blocks of binary data, that may
+- * contain the 0 character.
+- *
+- * In order to ensure that resource limits are not exceeded, a
+- * maximum size must be provided. If the sum of the lengths of
+- * the names and the values exceed this size, this function
+- * will return HTTP_REQUEST_ENTITY_TOO_LARGE.
+- *
+- * An optional number of parameters can be provided, if the number
+- * of parameters provided exceeds this amount, this function will
+- * return HTTP_REQUEST_ENTITY_TOO_LARGE. If this value is negative,
+- * no limit is imposed, and the number of parameters is in turn
+- * constrained by the size parameter above.
+- * 
+- * This function honours any kept_body configuration, and the
+- * original raw request body will be saved to the kept_body brigade
+- * if so configured, just as ap_discard_request_body does.
+- * 
+- * NOTE: File upload is not yet supported, but can be without change
+- * to the function call.
+- */
+-AP_DECLARE(int) ap_parse_request_form(request_rec * r, apr_array_header_t ** ptr,
+-                                      apr_size_t num, apr_size_t size)
+-{
+-    core_dir_conf *dconf;
+-    apr_off_t left = 0;
+-    apr_bucket_brigade *bb = NULL, *kept_body = NULL;
+-    apr_bucket *e;
+-    int seen_eos = 0;
+-    char buffer[HUGE_STRING_LEN + 1];
+-    const char *ct;
+-    apr_size_t offset = 0;
+-    ap_form_type_t state = FORM_NAME, percent = FORM_NORMAL;
+-    ap_form_pair_t *pair = NULL;
+-    apr_array_header_t *pairs = apr_array_make(r->pool, 4, sizeof(ap_form_pair_t));
+-
+-    char hi = 0;
+-    char low = 0;
+-
+-    *ptr = pairs;
+-
+-    /* sanity check - we only support forms for now */
+-    ct = apr_table_get(r->headers_in, "Content-Type");
+-    if (!ct || strcmp("application/x-www-form-urlencoded", ct)) {
+-        return ap_discard_request_body(r);
+-    }
+-
+-    dconf = ap_get_module_config(r->per_dir_config,
+-                                     &http_module);
+-    if (dconf->keep_body > 0) {
+-        left = dconf->keep_body;
+-        kept_body = apr_brigade_create(r->pool, r->connection->bucket_alloc);
+-    }
+-
+-    bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
+-    do {
+-        apr_bucket *bucket = NULL, *last = NULL;
+-
+-        int rv = ap_get_brigade(r->input_filters, bb, AP_MODE_READBYTES,
+-                                APR_BLOCK_READ, HUGE_STRING_LEN);
+-        if (rv != APR_SUCCESS) {
+-            apr_brigade_destroy(bb);
+-            return (rv == AP_FILTER_ERROR) ? rv : HTTP_BAD_REQUEST;
+-        }
+-
+-        for (bucket = APR_BRIGADE_FIRST(bb);
+-             bucket != APR_BRIGADE_SENTINEL(bb);
+-             last = bucket, bucket = APR_BUCKET_NEXT(bucket)) {
+-            const char *data;
+-            apr_size_t len, slide;
+-
+-            if (last) {
+-                apr_bucket_delete(last);
+-            }
+-            if (APR_BUCKET_IS_EOS(bucket)) {
+-                seen_eos = 1;
+-                break;
+-            }
+-            if (bucket->length == 0) {
+-                continue;
+-            }
+-
+-            rv = apr_bucket_read(bucket, &data, &len, APR_BLOCK_READ);
+-            if (rv != APR_SUCCESS) {
+-                apr_brigade_destroy(bb);
+-                return HTTP_BAD_REQUEST;
+-            }
+-
+-            slide = len;
+-            while (state != FORM_ABORT && slide-- > 0 && size >= 0 && num != 0) {
+-                char c = *data++;
+-                if ('+' == c) {
+-                    c = ' ';
+-                }
+-                else if ('&' == c) {
+-                    state = FORM_AMP;
+-                }
+-                if ('%' == c) {
+-                    percent = FORM_PERCENTA;
+-                    continue;
+-                }
+-                if (FORM_PERCENTA == percent) {
+-                    if (c >= 'a') {
+-                        hi = c - 'a' + 10;
+-                    }
+-                    else if (c >= 'A') {
+-                        hi = c - 'A' + 10;
+-                    }
+-                    else if (c >= '0') {
+-                        hi = c - '0';
+-                    }
+-                    hi = hi << 4;
+-                    percent = FORM_PERCENTB;
+-                    continue;
+-                }
+-                if (FORM_PERCENTB == percent) {
+-                    if (c >= 'a') {
+-                        low = c - 'a' + 10;
+-                    }
+-                    else if (c >= 'A') {
+-                        low = c - 'A' + 10;
+-                    }
+-                    else if (c >= '0') {
+-                        low = c - '0';
+-                    }
+-                    c = low ^ hi;
+-                    percent = FORM_NORMAL;
+-                }
+-                switch (state) {
+-                case FORM_AMP:
+-                    if (pair) {
+-                        const char *tmp = apr_pmemdup(r->pool, buffer, offset);
+-                        apr_bucket *b = apr_bucket_pool_create(tmp, offset, r->pool, r->connection->bucket_alloc);
+-                        APR_BRIGADE_INSERT_TAIL(pair->value, b);
+-                    }
+-                    state = FORM_NAME;
+-                    pair = NULL;
+-                    offset = 0;
+-                    num--;
+-                    break;
+-                case FORM_NAME:
+-                    if (offset < HUGE_STRING_LEN) {
+-                        if ('=' == c) {
+-                            buffer[offset] = 0;
+-                            offset = 0;
+-                            pair = (ap_form_pair_t *) apr_array_push(pairs);
+-                            pair->name = apr_pstrdup(r->pool, buffer);
+-                            pair->value = apr_brigade_create(r->pool, r->connection->bucket_alloc);
+-                            state = FORM_VALUE;
+-                        }
+-                        else {
+-                            buffer[offset++] = c;
+-                            size--;
+-                        }
+-                    }
+-                    else {
+-                        state = FORM_ABORT;
+-                    }
+-                    break;
+-                case FORM_VALUE:
+-                    if (offset >= HUGE_STRING_LEN) {
+-                        const char *tmp = apr_pmemdup(r->pool, buffer, offset);
+-                        apr_bucket *b = apr_bucket_pool_create(tmp, offset, r->pool, r->connection->bucket_alloc);
+-                        APR_BRIGADE_INSERT_TAIL(pair->value, b);
+-                        offset = 0;
+-                    }
+-                    buffer[offset++] = c;
+-                    size--;
+-                    break;
+-                default:
+-                    break;
+-                }
+-            }
+-
+-            /* If we have been asked to, keep the data up until the
+-             * configured limit. If the limit is exceeded, we return an
+-             * HTTP_REQUEST_ENTITY_TOO_LARGE response so the caller is
+-             * clear the server couldn't handle their request.
+-             */
+-            if (kept_body) {
+-                if (len <= left) {
+-                    apr_bucket_copy(bucket, &e);
+-                    APR_BRIGADE_INSERT_TAIL(kept_body, e);
+-                    left -= len;
+-                }
+-                else {
+-                    apr_brigade_destroy(bb);
+-                    apr_brigade_destroy(kept_body);
+-                    return HTTP_REQUEST_ENTITY_TOO_LARGE;
+-                }
+-            }
+-
+-        }
+-
+-        apr_brigade_cleanup(bb);
+-    } while (!seen_eos);
+-
+-    if (FORM_ABORT == state || size < 0 || num == 0) {
+-        return HTTP_REQUEST_ENTITY_TOO_LARGE;
+-    }
+-    else if (FORM_VALUE == state && pair && offset > 0) {
+-        const char *tmp = apr_pmemdup(r->pool, buffer, offset);
+-        apr_bucket *b = apr_bucket_pool_create(tmp, offset, r->pool, r->connection->bucket_alloc);
+-        APR_BRIGADE_INSERT_TAIL(pair->value, b);
+-    }
+-
+-    if (kept_body) {
+-        r->kept_body = kept_body;
+-    }
+-
+-    return OK;
+-
+-}
+-
+diff --git a/modules/http/mod_core.h b/modules/http/mod_core.h
+index 59d076a..f7b363d 100644
+--- a/modules/http/mod_core.h
++++ b/modules/http/mod_core.h
+@@ -38,17 +38,8 @@
+ extern "C" {
+ #endif
+ 
+-/**
+- * Core per-directory configuration.
+- */
+-typedef struct {
+-    apr_off_t keep_body;
+-    int keep_body_set;
+-} core_dir_conf;
+-
+ /* Handles for core filters */
+ extern AP_DECLARE_DATA ap_filter_rec_t *ap_http_input_filter_handle;
+-extern AP_DECLARE_DATA ap_filter_rec_t *ap_kept_body_input_filter_handle;
+ extern AP_DECLARE_DATA ap_filter_rec_t *ap_http_header_filter_handle;
+ extern AP_DECLARE_DATA ap_filter_rec_t *ap_chunk_filter_handle;
+ extern AP_DECLARE_DATA ap_filter_rec_t *ap_http_outerror_filter_handle;
+@@ -61,14 +52,6 @@ apr_status_t ap_http_filter(ap_filter_t *f, apr_bucket_brigade *b,
+                             ap_input_mode_t mode, apr_read_type_e block,
+                             apr_off_t readbytes);
+ 
+-/* Filter to handle a kept body on subrequests */
+-apr_status_t ap_kept_body_filter(ap_filter_t *f, apr_bucket_brigade *b,
+-                                 ap_input_mode_t mode, apr_read_type_e block,
+-                                 apr_off_t readbytes);
+-
+-/* Initialisation of filter to handle a kept body on subrequests */
+-int ap_kept_body_filter_init(ap_filter_t *f);
+-
+ /* HTTP/1.1 chunked transfer encoding filter. */
+ apr_status_t ap_http_chunk_filter(ap_filter_t *f, apr_bucket_brigade *b);
+ 
+diff --git a/server/request.c b/server/request.c
+index 6602da2..1c58a39 100644
+--- a/server/request.c
++++ b/server/request.c
+@@ -45,6 +45,7 @@
+ #include "util_charset.h"
+ #include "util_script.h"
+ #include "ap_expr.h"
++#include "mod_request.h"
+ 
+ #include "mod_core.h"
+ 
+@@ -1648,8 +1649,8 @@ static request_rec *make_sub_request(const request_rec *r,
+      * Add the KEPT_BODY filter, which will insert any body marked to be
+      * kept for the use of a subrequest, into the subrequest.
+      */
+-    ap_add_input_filter_handle(ap_kept_body_input_filter_handle,
+-                               NULL, rnew, rnew->connection);
++    ap_add_input_filter(KEPT_BODY_FILTER,
++                        NULL, rnew, rnew->connection);
+ 
+     return rnew;
+ }

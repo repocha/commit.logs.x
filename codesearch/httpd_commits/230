@@ -1,0 +1,191 @@
+commit 1a2437e8a975921e51c83778f7d39bb003a2f7a3
+Author: Doug MacEachern <dougm@apache.org>
+Date:   Mon Feb 19 02:06:58 2001 +0000
+
+    rename miss: s/apr_clear_pool/apr_pool_clear/g
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@88232 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth.c b/modules/aaa/mod_auth.c
+index 84779fe..d96d2f2 100644
+--- a/modules/aaa/mod_auth.c
++++ b/modules/aaa/mod_auth.c
+@@ -173,7 +173,7 @@ static apr_table_t *groups_for_user(apr_pool_t *p, char *user, char *grpfile)
+ 	if ((l[0] == '#') || (!l[0]))
+ 	    continue;
+ 	ll = l;
+-	apr_clear_pool(sp);
++	apr_pool_clear(sp);
+ 
+ 	group_name = ap_getword(sp, &ll, ':');
+ 
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 8c95d33..3413270 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -1795,7 +1795,7 @@ static apr_table_t *groups_for_user(request_rec *r, const char *user,
+ 	if ((l[0] == '#') || (!l[0]))
+ 	    continue;
+ 	ll = l;
+-	apr_clear_pool(sp);
++	apr_pool_clear(sp);
+ 
+ 	group_name = ap_getword(sp, &ll, ':');
+ 
+diff --git a/modules/generators/mod_autoindex.c b/modules/generators/mod_autoindex.c
+index 6b8eb5c..600ade8 100644
+--- a/modules/generators/mod_autoindex.c
++++ b/modules/generators/mod_autoindex.c
+@@ -1373,7 +1373,7 @@ static void output_directories(struct ent **ar, int n,
+ 	char *anchor, *t, *t2;
+ 	int nwidth;
+ 
+-	apr_clear_pool(scratch);
++	apr_pool_clear(scratch);
+ 
+ 	if (is_parent(ar[x]->name)) {
+ 	    t = ap_make_full_path(scratch, name, "../");
+diff --git a/modules/test/mod_autoindex.c b/modules/test/mod_autoindex.c
+index 903eca0..bc0be1e 100644
+--- a/modules/test/mod_autoindex.c
++++ b/modules/test/mod_autoindex.c
+@@ -1372,7 +1372,7 @@ static void output_directories(struct ent **ar, int n,
+ 	char *anchor, *t, *t2;
+ 	int nwidth;
+ 
+-	apr_clear_pool(scratch);
++	apr_pool_clear(scratch);
+ 
+ 	if (is_parent(ar[x]->name)) {
+ 	    t = ap_make_full_path(scratch, name, "../");
+diff --git a/server/main.c b/server/main.c
+index 2edc59f..74f79f5 100644
+--- a/server/main.c
++++ b/server/main.c
+@@ -392,14 +392,14 @@ int main(int argc, const char * const argv[])
+ 	ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL, "Syntax OK\n");
+ 	destroy_and_exit_process(process, 0);
+     }
+-    apr_clear_pool(plog);
++    apr_pool_clear(plog);
+     ap_run_open_logs(pconf, plog, ptemp, server_conf);
+     ap_post_config_hook(pconf, plog, ptemp, server_conf);
+     apr_pool_destroy(ptemp);
+ 
+     for (;;) {
+ 	apr_hook_deregister_all();
+-	apr_clear_pool(pconf);
++	apr_pool_clear(pconf);
+         for (mod = ap_prelinked_modules; *mod != NULL; mod++) {
+             ap_register_hooks(*mod, pconf);
+         }
+@@ -418,7 +418,7 @@ int main(int argc, const char * const argv[])
+         ap_fixup_virtual_hosts(pconf, server_conf);
+         ap_fini_vhost_config(pconf, server_conf);
+         apr_sort_hooks();
+-	apr_clear_pool(plog);
++	apr_pool_clear(plog);
+ 	ap_run_open_logs(pconf, plog, ptemp, server_conf);
+ 	ap_post_config_hook(pconf, plog, ptemp, server_conf);
+ 	apr_pool_destroy(ptemp);
+diff --git a/server/mpm/beos/beos.c b/server/mpm/beos/beos.c
+index bf85355..8394598 100644
+--- a/server/mpm/beos/beos.c
++++ b/server/mpm/beos/beos.c
+@@ -428,7 +428,7 @@ static int32 worker_thread(void * dummy)
+             apr_lock_release(accept_mutex);
+             break;
+         }
+-        apr_clear_pool(ptrans);
++        apr_pool_clear(ptrans);
+     }
+ 
+     ap_update_child_status(0, child_slot, SERVER_DEAD, (request_rec*)NULL);
+diff --git a/server/mpm/experimental/perchild/perchild.c b/server/mpm/experimental/perchild/perchild.c
+index bce0bbb..a7773af 100644
+--- a/server/mpm/experimental/perchild/perchild.c
++++ b/server/mpm/experimental/perchild/perchild.c
+@@ -734,7 +734,7 @@ static void *worker_thread(void *arg)
+             pthread_mutex_unlock(&idle_thread_count_mutex);
+ 	    break;
+ 	}
+-        apr_clear_pool(ptrans);
++        apr_pool_clear(ptrans);
+     }
+ 
+     pthread_mutex_lock(&thread_pool_parent_mutex);
+diff --git a/server/mpm/perchild/perchild.c b/server/mpm/perchild/perchild.c
+index bce0bbb..a7773af 100644
+--- a/server/mpm/perchild/perchild.c
++++ b/server/mpm/perchild/perchild.c
+@@ -734,7 +734,7 @@ static void *worker_thread(void *arg)
+             pthread_mutex_unlock(&idle_thread_count_mutex);
+ 	    break;
+ 	}
+-        apr_clear_pool(ptrans);
++        apr_pool_clear(ptrans);
+     }
+ 
+     pthread_mutex_lock(&thread_pool_parent_mutex);
+diff --git a/server/mpm/prefork/prefork.c b/server/mpm/prefork/prefork.c
+index e8d1469..3631aa3 100644
+--- a/server/mpm/prefork/prefork.c
++++ b/server/mpm/prefork/prefork.c
+@@ -571,7 +571,7 @@ static void child_main(int child_num_arg)
+ 
+ 	current_conn = NULL;
+ 
+-	apr_clear_pool(ptrans);
++	apr_pool_clear(ptrans);
+ 
+ 	if ((ap_max_requests_per_child > 0
+ 	     && requests_this_child++ >= ap_max_requests_per_child)) {
+diff --git a/server/mpm/spmt_os2/spmt_os2.c b/server/mpm/spmt_os2/spmt_os2.c
+index 0842432..309fb80 100644
+--- a/server/mpm/spmt_os2/spmt_os2.c
++++ b/server/mpm/spmt_os2/spmt_os2.c
+@@ -551,7 +551,7 @@ static void thread_main(void *thread_num_arg)
+ 
+ 	current_conn = NULL;
+ 
+-	apr_clear_pool(ptrans);
++	apr_pool_clear(ptrans);
+ 
+ 	if ((ap_max_requests_per_child > 0
+ 	     && requests_this_child++ >= ap_max_requests_per_child)) {
+diff --git a/server/mpm/threaded/threaded.c b/server/mpm/threaded/threaded.c
+index 90a2371..efe59ce 100644
+--- a/server/mpm/threaded/threaded.c
++++ b/server/mpm/threaded/threaded.c
+@@ -563,7 +563,7 @@ static void * worker_thread(void * dummy)
+             }
+             break;
+         }
+-        apr_clear_pool(ptrans);
++        apr_pool_clear(ptrans);
+     }
+ 
+     apr_pool_destroy(tpool);
+diff --git a/server/mpm/winnt/mpm_winnt.c b/server/mpm/winnt/mpm_winnt.c
+index 0a15498..c5d829d 100644
+--- a/server/mpm/winnt/mpm_winnt.c
++++ b/server/mpm/winnt/mpm_winnt.c
+@@ -743,7 +743,7 @@ static PCOMP_CONTEXT win9x_get_connection(PCOMP_CONTEXT context)
+     
+ 
+     while (1) {
+-        apr_clear_pool(context->ptrans);        
++        apr_pool_clear(context->ptrans);        
+         context->accept_socket = remove_job();
+         if (context->accept_socket == -1) {
+             return NULL;
+@@ -892,7 +892,7 @@ static apr_inline apr_status_t reset_acceptex_context(PCOMP_CONTEXT context)
+     int rc, i;
+ 
+     /* reset the buffer pools */
+-    apr_clear_pool(context->ptrans);
++    apr_pool_clear(context->ptrans);
+     context->sock = NULL;
+ 
+     /* recreate and initialize the accept socket if it is not being reused */

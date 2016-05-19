@@ -1,0 +1,120 @@
+commit 021722d9b8691888ba7d417d66415db623c46700
+Author: Justin Erenkrantz <jerenkrantz@apache.org>
+Date:   Tue Feb 5 22:41:18 2002 +0000
+
+    Remove all non-portable DBM calls in mod_auth_dbm and rely only on the
+    apr-util DBM code.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@93260 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/config.m4 b/modules/aaa/config.m4
+index d83ef28..525e79d 100644
+--- a/modules/aaa/config.m4
++++ b/modules/aaa/config.m4
+@@ -7,23 +7,7 @@ APACHE_MODPATH_INIT(aaa)
+ APACHE_MODULE(access, host-based access control, , , yes)
+ APACHE_MODULE(auth, user-based access control, , , yes)
+ APACHE_MODULE(auth_anon, anonymous user access, , , most)
+-APACHE_MODULE(auth_dbm, DBM-based access databases, , , most, [
+-  AC_SEARCH_LIBS(dbm_open,[c db1],,enable_auth_dbm=no)
+-  dnl Glibc 2.1's ndbm.h includes <db.h> in ndbm.h.  So, we need to find
+-  dnl where db.h lives.  (glibc 2.2 includes <db1/db.h>.)
+-  AC_TRY_COMPILE([#include "ndbm.h"], [dbm_open("/dev/null", 0, 0)],
+-                 ap_good_db_path="yes", ap_good_db_path="no")
+-  if test "$ap_good_db_path" = "no"; then
+-    ap_old_cppflags=$CPPFLAGS
+-    CPPFLAGS="$CPPFLAGS -I/usr/include/db1"
+-    AC_TRY_COMPILE([#include "ndbm.h"], [dbm_open("/dev/null", 0, 0)],
+-                 ap_good_db_path="yes", ap_good_db_path="no")
+-    if test "$ap_good_db_path" = "no"; then
+-      CPPFLAGS=$ap_old_cppflags
+-      enable_auth_dbm=no
+-    fi
+-  fi
+-])
++APACHE_MODULE(auth_dbm, DBM-based access databases, , , most)
+ 
+ APACHE_MODULE(auth_digest, RFC2617 Digest authentication, , , most, [
+   ap_old_cppflags=$CPPFLAGS
+diff --git a/modules/aaa/mod_auth_dbm.c b/modules/aaa/mod_auth_dbm.c
+index 4cc06b7..c5a6abd 100644
+--- a/modules/aaa/mod_auth_dbm.c
++++ b/modules/aaa/mod_auth_dbm.c
+@@ -75,16 +75,7 @@
+ #define APR_WANT_STRFUNC
+ #include "apr_want.h"
+ #include "apr_strings.h"
+-
+-#if defined(AP_AUTH_DBM_USE_APR)
+ #include "apr_dbm.h"
+-#define DBM apr_dbm_t
+-#define datum apr_datum_t
+-
+-#define dbm_close apr_dbm_close
+-#else
+-#include <ndbm.h>
+-#endif
+ 
+ #include "httpd.h"
+ #include "http_config.h"
+@@ -160,14 +151,12 @@ module AP_MODULE_DECLARE_DATA auth_dbm_module;
+ static char *get_dbm_pw(request_rec *r, 
+                         char *user, 
+                         char *auth_dbmpwfile, 
+-                        char*dbtype)
++                        char *dbtype)
+ {
+-    DBM *f;
+-    datum d, q;
++    apr_dbm_t *f;
++    apr_datum_t d, q;
+     char *pw = NULL;
+-#ifdef AP_AUTH_DBM_USE_APR
+     apr_status_t retval;
+-#endif
+     q.dptr = user;
+ #ifndef NETSCAPE_DBM_COMPAT
+     q.dsize = strlen(q.dptr);
+@@ -175,37 +164,21 @@ static char *get_dbm_pw(request_rec *r,
+     q.dsize = strlen(q.dptr) + 1;
+ #endif
+ 
+-#ifdef AP_AUTH_DBM_USE_APR
+-    retval  = apr_dbm_open_ex(&f, dbtype, auth_dbmpwfile, APR_DBM_READONLY, 
+-                              APR_OS_DEFAULT, r->pool);
++    retval = apr_dbm_open_ex(&f, dbtype, auth_dbmpwfile, APR_DBM_READONLY, 
++                             APR_OS_DEFAULT, r->pool);
+     if (retval != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, retval, r,
+                       "could not open dbm (type %s) auth file: %s", dbtype, 
+                       auth_dbmpwfile);
+         return NULL;
+     }
+-    if (apr_dbm_fetch(f, q, &d) == APR_SUCCESS)
+-        /* sorry for the obscurity ... falls through to the 
+-         * if (d.dptr) {  block ...
+-         */
+-
+-#else
+-    if (!(f = dbm_open(auth_dbmpwfile, O_RDONLY, 0664))) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
+-            "could not open dbm auth file: %s", auth_dbmpwfile);
+-        return NULL;
+-    }
+-    d = dbm_fetch(f, q);
+-
+-#endif
+-
+-    if (d.dptr) {
++    if (apr_dbm_fetch(f, q, &d) == APR_SUCCESS && d.dptr) {
+         pw = apr_palloc(r->pool, d.dsize + 1);
+         strncpy(pw, d.dptr, d.dsize);
+         pw[d.dsize] = '\0'; /* Terminate the string */
+     }
+ 
+-    dbm_close(f);
++    apr_dbm_close(f);
+     return pw;
+ }
+ 

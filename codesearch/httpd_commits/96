@@ -1,0 +1,26 @@
+commit c514d3ac76e0eda204d061ca3bb6f43b7045d3a5
+Author: Jim Jagielski <jim@apache.org>
+Date:   Thu Mar 10 16:52:42 2011 +0000
+
+    Fix brokeness... Thx Rüdiger Plüm
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1080276 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authn_socache.c b/modules/aaa/mod_authn_socache.c
+index 1ec76e8..4d7cfd8 100644
+--- a/modules/aaa/mod_authn_socache.c
++++ b/modules/aaa/mod_authn_socache.c
+@@ -126,11 +126,12 @@ static int authn_cache_post_config(apr_pool_t *pconf, apr_pool_t *plog,
+ }
+ static void authn_cache_child_init(apr_pool_t *p, server_rec *s)
+ {
+-    const char *lock = apr_global_mutex_lockfile(authn_cache_mutex);
++    const char *lock;
+     apr_status_t rv;
+     if (!configured) {
+         return;       /* don't waste the overhead of creating mutex & cache */
+     }
++    lock = apr_global_mutex_lockfile(authn_cache_mutex);
+     rv = apr_global_mutex_child_init(&authn_cache_mutex, lock, p);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,

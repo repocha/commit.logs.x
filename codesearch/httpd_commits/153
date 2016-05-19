@@ -1,0 +1,42 @@
+commit 836b34493e61b1199ab4693f3419cfd9c3548711
+Author: Jeff Trawick <trawick@apache.org>
+Date:   Tue Apr 17 14:36:12 2007 +0000
+
+    log the uri for some access-denied paths when r->filename is
+    unset
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@529626 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_access_compat.c b/modules/aaa/mod_access_compat.c
+index a685643..38d341a 100644
+--- a/modules/aaa/mod_access_compat.c
++++ b/modules/aaa/mod_access_compat.c
+@@ -363,8 +363,9 @@ static int check_dir_access(request_rec *r)
+ 
+     if (ret == HTTP_FORBIDDEN) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "client denied by server configuration: %s",
+-                      r->filename); 
++                      "client denied by server configuration: %s%s",
++                      r->filename ? "" : "uri ",
++                      r->filename ? r->filename : r->uri);
+     }
+ 
+     return ret;
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index 11d6beb..289f54f 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -746,8 +746,9 @@ static int authorize_user(request_rec *r)
+                 if (!note || (ap_satisfies(r) != SATISFY_ANY) || (note[0] == 'N')) {
+                     if (r->ap_auth_type == NULL) {
+                         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                                      "client denied by server configuration: %s",
+-                                      r->filename); 
++                                      "client denied by server configuration: %s%s",
++                                      r->filename ? "" : "uri ",
++                                      r->filename ? r->filename : r->uri);
+                         return_code = HTTP_FORBIDDEN;
+                     }
+                     else {

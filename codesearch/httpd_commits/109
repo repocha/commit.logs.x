@@ -1,0 +1,698 @@
+commit cf6185388887e2dae6d8329ebbbcafdedf12cbdf
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Wed Jul 14 19:59:31 2010 +0000
+
+    The approach for allowing authorization by user or IP introduced in r956387,
+    etc. causes problems because the authentication module calls
+    note_*_auth_failure if authentication fails. This is inappropriate if access is
+    later allowed because of the IP.
+    
+    So, instead of calling the auth_checker hook even if authentication failed, we
+    introduce a new access_checker_ex hook that runs between the access_checker and
+    the check_user_id hooks. If an access_checker_ex functions returns OK, the
+    request will be allowed without authentication.
+    
+    To make use of this, change mod_authz_core to walk the require blocks in the
+    access_checker_ex phase and deny/allow the request if the authz result does not
+    depend on an authenticated user. To distinguish a real AUTHZ_DENIED from an
+    authz provider from an authz provider needing an authenticated user, the latter
+    must return the new AUTHZ_DENIED_NO_USER code.
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@964156 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/docs/manual/developer/new_api_2_4.xml b/docs/manual/developer/new_api_2_4.xml
+index aeddb91..5a3fe70 100644
+--- a/docs/manual/developer/new_api_2_4.xml
++++ b/docs/manual/developer/new_api_2_4.xml
+@@ -133,9 +133,13 @@
+       <li>New EOR bucket type</li>
+       <li>New function ap_process_async_request</li>
+       <li>New flags AP_AUTH_INTERNAL_PER_CONF and AP_AUTH_INTERNAL_PER_URI</li>
+-      <li>New functions ap_hook_check_access, ap_hook_check_authn, ap_hook_check_authz which accept AP_AUTH_INTERNAL_PER_* flags</li>
+-      <li>DEPRECATED direct use of ap_hook_access_checker, ap_hook_check_user_id, ap_hook_auth_checker</li>
+-      <li>The auth_checker hook may be called with r-&gt;user == NULL</li>
++      <li>New access_checker_ex hook to apply additional access control and/or
++          bypass authentication.</li>
++      <li>New functions ap_hook_check_access_ex, ap_hook_check_access,
++          ap_hook_check_authn, ap_hook_check_authz which accept
++          AP_AUTH_INTERNAL_PER_* flags</li>
++      <li>DEPRECATED direct use of ap_hook_access_checker, access_checker_ex,
++          ap_hook_check_user_id, ap_hook_auth_checker</li>
+     </ul>
+     <p>When possible, registering all access control hooks (including
+        authentication and authorization hooks) using AP_AUTH_INTERNAL_PER_CONF
+diff --git a/include/ap_mmn.h b/include/ap_mmn.h
+index 6243837..76491c5 100644
+--- a/include/ap_mmn.h
++++ b/include/ap_mmn.h
+@@ -235,14 +235,17 @@
+  * 20100701.0 (2.3.7-dev)  re-order struct members to improve alignment
+  * 20100701.1 (2.3.7-dev)  add note_auth_failure hook
+  * 20100701.2 (2.3.7-dev)  add ap_proxy_*_wid() functions
++ * 20100714.0 (2.3.7-dev)  add access_checker_ex hook, add AUTHZ_DENIED_NO_USER
++ *                         to authz_status, call authz providers twice to allow
++ *                         authz without authenticated user
+  */
+ 
+ #define MODULE_MAGIC_COOKIE 0x41503234UL /* "AP24" */
+ 
+ #ifndef MODULE_MAGIC_NUMBER_MAJOR
+-#define MODULE_MAGIC_NUMBER_MAJOR 20100701
++#define MODULE_MAGIC_NUMBER_MAJOR 20100714
+ #endif
+-#define MODULE_MAGIC_NUMBER_MINOR 2                     /* 0...n */
++#define MODULE_MAGIC_NUMBER_MINOR 0                     /* 0...n */
+ 
+ /**
+  * Determine if the server's current MODULE_MAGIC_NUMBER is at least a
+diff --git a/include/http_request.h b/include/http_request.h
+index df1825c..5f14ceb 100644
+--- a/include/http_request.h
++++ b/include/http_request.h
+@@ -420,6 +420,20 @@ AP_DECLARE_HOOK(int,type_checker,(request_rec *r))
+ AP_DECLARE_HOOK(int,access_checker,(request_rec *r))
+ 
+ /**
++ * This hook is used to apply additional access control and/or bypass
++ * authentication for this resource. It runs *before* a user is authenticated,
++ * but after the auth_checker hook.
++ * This hook should be registered with ap_hook_check_access_ex().
++ *
++ * @param r the current request
++ * @return OK (allow acces), DECLINED (let later modules decide),
++ *         or HTTP_... (deny access)
++ * @ingroup hooks
++ * @see ap_hook_check_access_ex
++ */
++AP_DECLARE_HOOK(int,access_checker_ex,(request_rec *r))
++
++/**
+  * This hook is used to check to see if the resource being requested
+  * is available for the authenticated user (r->user and r->ap_auth_type).
+  * It runs after the access_checker and check_user_id hooks. Note that
+@@ -453,6 +467,25 @@ AP_DECLARE(void) ap_hook_check_access(ap_HOOK_access_checker_t *pf,
+                                       int nOrder, int type);
+ 
+ /**
++ * Register a hook function that will apply additional access control 
++ * and/or bypass authentication for the current request.
++ * @param pf An access_checker_ex hook function
++ * @param aszPre A NULL-terminated array of strings that name modules whose
++ *               hooks should precede this one
++ * @param aszSucc A NULL-terminated array of strings that name modules whose
++ *                hooks should succeed this one
++ * @param nOrder An integer determining order before honouring aszPre and
++ *               aszSucc (for example, HOOK_MIDDLE)
++ * @param type Internal request processing mode, either
++ *             AP_AUTH_INTERNAL_PER_URI or AP_AUTH_INTERNAL_PER_CONF
++ */
++AP_DECLARE(void) ap_hook_check_access_ex(ap_HOOK_access_checker_ex_t *pf,
++                                         const char * const *aszPre,
++                                         const char * const *aszSucc,
++                                         int nOrder, int type);
++
++
++/**
+  * Register a hook function that will analyze the request headers,
+  * authenticate the user, and set the user information in the request record.
+  * @param pf A check_user_id hook function
+diff --git a/include/mod_auth.h b/include/mod_auth.h
+index 7c05a50..69cab09 100644
+--- a/include/mod_auth.h
++++ b/include/mod_auth.h
+@@ -73,7 +73,8 @@ typedef enum {
+     AUTHZ_DENIED,
+     AUTHZ_GRANTED,
+     AUTHZ_NEUTRAL,
+-    AUTHZ_GENERAL_ERROR
++    AUTHZ_GENERAL_ERROR,
++    AUTHZ_DENIED_NO_USER,      /* denied because r->user == NULL */
+ } authz_status;
+ 
+ typedef struct {
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 2444e4b..1966556 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -616,6 +616,10 @@ static authz_status ldapuser_check_authorization(request_rec *r,
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+ 
++    if (!r->user) {
++        return AUTHZ_DENIED_NO_USER;
++    }
++
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+     }
+@@ -638,12 +642,6 @@ static authz_status ldapuser_check_authorization(request_rec *r,
+      * and populated with the userid and DN of the account in LDAP
+      */
+ 
+-    /* Check that we have a userid to start with */
+-    if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
+-    }
+ 
+     if (!strlen(r->user)) {
+         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+@@ -755,6 +753,10 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+     struct mod_auth_ldap_groupattr_entry_t *ent;
+     int i;
+ 
++    if (!r->user) {
++        return AUTHZ_DENIED_NO_USER;
++    }
++
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+     }
+@@ -813,13 +815,6 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+      * and populated with the userid and DN of the account in LDAP
+      */
+ 
+-    /* Check that we have a userid to start with */
+-    if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
+-    }
+-
+     if (!strlen(r->user)) {
+         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+             "ldap authorize: Userid is blank, AuthType=%s",
+@@ -971,6 +966,10 @@ static authz_status ldapdn_check_authorization(request_rec *r,
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+ 
++    if (!r->user) {
++        return AUTHZ_DENIED_NO_USER;
++    }
++
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+     }
+@@ -993,13 +992,6 @@ static authz_status ldapdn_check_authorization(request_rec *r,
+      * and populated with the userid and DN of the account in LDAP
+      */
+ 
+-    /* Check that we have a userid to start with */
+-    if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
+-    }
+-
+     if (!strlen(r->user)) {
+         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+             "ldap authorize: Userid is blank, AuthType=%s",
+@@ -1083,6 +1075,10 @@ static authz_status ldapattribute_check_authorization(request_rec *r,
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+ 
++    if (!r->user) {
++        return AUTHZ_DENIED_NO_USER;
++    }
++
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+     }
+@@ -1105,13 +1101,6 @@ static authz_status ldapattribute_check_authorization(request_rec *r,
+      * and populated with the userid and DN of the account in LDAP
+      */
+ 
+-    /* Check that we have a userid to start with */
+-    if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
+-    }
+-
+     if (!strlen(r->user)) {
+         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+             "ldap authorize: Userid is blank, AuthType=%s",
+@@ -1199,6 +1188,10 @@ static authz_status ldapfilter_check_authorization(request_rec *r,
+     char filtbuf[FILTER_LENGTH];
+     const char *dn = NULL;
+ 
++    if (!r->user) {
++        return AUTHZ_DENIED_NO_USER;
++    }
++
+     if (!sec->have_ldap_url) {
+         return AUTHZ_DENIED;
+     }
+@@ -1221,13 +1214,6 @@ static authz_status ldapfilter_check_authorization(request_rec *r,
+      * and populated with the userid and DN of the account in LDAP
+      */
+ 
+-    /* Check that we have a userid to start with */
+-    if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
+-    }
+-
+     if (!strlen(r->user)) {
+         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+             "ldap authorize: Userid is blank, AuthType=%s",
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index f682a3e..8899514 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -302,7 +302,9 @@ static const char* format_authz_result(authz_status result)
+             ? "denied"
+             : ((result == AUTHZ_GRANTED)
+                ? "granted"
+-               : "neutral"));
++               : ((result == AUTHZ_DENIED_NO_USER)
++                  ? "denied (no authenticated user)"
++                  : "neutral")));
+ }
+ 
+ static const char* format_authz_command(apr_pool_t *p,
+@@ -687,7 +689,20 @@ static authz_status apply_authz_sections(request_rec *r,
+             }
+ 
+             if (child_result != AUTHZ_NEUTRAL) {
+-                auth_result = child_result;
++                /*
++                 * Handling of AUTHZ_DENIED/AUTHZ_DENIED_NO_USER: Return
++                 * AUTHZ_DENIED_NO_USER if providing a user may change the
++                 * result, AUTHZ_DENIED otherwise.
++                 */
++                if (!(section->op == AUTHZ_LOGIC_AND
++                      && auth_result == AUTHZ_DENIED
++                      && child_result == AUTHZ_DENIED_NO_USER)
++                    && !(section->op == AUTHZ_LOGIC_OR
++                         && auth_result == AUTHZ_DENIED_NO_USER
++                         && child_result == AUTHZ_DENIED) )
++                {
++                    auth_result = child_result;
++                }
+ 
+                 if ((section->op == AUTHZ_LOGIC_AND
+                      && child_result == AUTHZ_DENIED)
+@@ -705,7 +720,8 @@ static authz_status apply_authz_sections(request_rec *r,
+         if (auth_result == AUTHZ_GRANTED) {
+             auth_result = AUTHZ_DENIED;
+         }
+-        else if (auth_result == AUTHZ_DENIED) {
++        else if (auth_result == AUTHZ_DENIED ||
++                 auth_result == AUTHZ_DENIED_NO_USER) {
+             /* For negated directives, if the original result was denied
+              * then the new result is neutral since we can not grant
+              * access simply because authorization was not rejected.
+@@ -722,7 +738,7 @@ static authz_status apply_authz_sections(request_rec *r,
+     return auth_result;
+ }
+ 
+-static int authorize_user(request_rec *r)
++static int authorize_user_core(request_rec *r, int after_authn)
+ {
+     authz_core_dir_conf *conf;
+     authz_status auth_result;
+@@ -753,8 +769,31 @@ static int authorize_user(request_rec *r)
+     if (auth_result == AUTHZ_GRANTED) {
+         return OK;
+     }
++    else if (auth_result == AUTHZ_DENIED_NO_USER) {
++        if (after_authn) {
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_SUCCESS, r,
++                          "authorization failure (no authenticated user): %s",
++                          r->uri);
++            /*
++             * If we're returning 401 to an authenticated user, tell them to
++             * try again. If unauthenticated, note_auth_failure has already
++             * been called during auth.
++             */
++            if (r->user)
++                ap_note_auth_failure(r);
++
++            return HTTP_UNAUTHORIZED;
++        }
++        else {
++            /*
++             * We need a user before we can decide what to do.
++             * Get out of the way and proceed with authentication.
++             */
++            return DECLINED;
++        }
++    }
+     else if (auth_result == AUTHZ_DENIED || auth_result == AUTHZ_NEUTRAL) {
+-        if (ap_auth_type(r) == NULL) {
++        if (!after_authn || ap_auth_type(r) == NULL) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_SUCCESS, r,
+                           "client denied by server configuration: %s%s",
+                           r->filename ? "" : "uri ",
+@@ -763,12 +802,18 @@ static int authorize_user(request_rec *r)
+             return HTTP_FORBIDDEN;
+         }
+         else {
++            /* XXX: maybe we want to return FORBIDDEN here, too??? */
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_SUCCESS, r,
+                           "user %s: authorization failure for \"%s\": ",
+                           r->user, r->uri);
+ 
+-            /* If we're returning 403, tell them to try again. */
+-            ap_note_auth_failure(r);
++            /*
++             * If we're returning 401 to an authenticated user, tell them to
++             * try again. If unauthenticated, note_auth_failure has already
++             * been called during auth.
++             */
++            if (r->user)
++                ap_note_auth_failure(r);
+ 
+             return HTTP_UNAUTHORIZED;
+         }
+@@ -781,6 +826,16 @@ static int authorize_user(request_rec *r)
+     }
+ }
+ 
++static int authorize_userless(request_rec *r)
++{
++    return authorize_user_core(r, 0);
++}
++
++static int authorize_user(request_rec *r)
++{
++    return authorize_user_core(r, 1);
++}
++
+ static int authz_some_auth_required(request_rec *r)
+ {
+     authz_core_dir_conf *conf;
+@@ -803,6 +858,8 @@ static void register_hooks(apr_pool_t *p)
+     ap_hook_check_config(authz_core_check_config, NULL, NULL, APR_HOOK_MIDDLE);
+     ap_hook_check_authz(authorize_user, NULL, NULL, APR_HOOK_LAST,
+                         AP_AUTH_INTERNAL_PER_CONF);
++    ap_hook_check_access_ex(authorize_userless, NULL, NULL, APR_HOOK_LAST,
++                            AP_AUTH_INTERNAL_PER_CONF);
+ }
+ 
+ AP_DECLARE_MODULE(authz_core) =
+diff --git a/modules/aaa/mod_authz_dbd.c b/modules/aaa/mod_authz_dbd.c
+index 01e3687..50fcc95 100644
+--- a/modules/aaa/mod_authz_dbd.c
++++ b/modules/aaa/mod_authz_dbd.c
+@@ -254,9 +254,7 @@ static authz_status dbdgroup_check_authorization(request_rec *r,
+                                               &authz_dbd_module);
+ 
+     if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     if (groups == NULL) {
+@@ -287,9 +285,7 @@ static authz_status dbdlogin_check_authorization(request_rec *r,
+                                               &authz_dbd_module);
+ 
+     if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     return (authz_dbd_login(r, cfg, "login") == OK ? AUTHZ_GRANTED : AUTHZ_DENIED);
+@@ -302,9 +298,7 @@ static authz_status dbdlogout_check_authorization(request_rec *r,
+                                               &authz_dbd_module);
+ 
+     if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     return (authz_dbd_login(r, cfg, "logout") == OK ? AUTHZ_GRANTED : AUTHZ_DENIED);
+diff --git a/modules/aaa/mod_authz_dbm.c b/modules/aaa/mod_authz_dbm.c
+index b87682c..2908eee 100644
+--- a/modules/aaa/mod_authz_dbm.c
++++ b/modules/aaa/mod_authz_dbm.c
+@@ -144,9 +144,7 @@ static authz_status dbmgroup_check_authorization(request_rec *r,
+     char *v;
+ 
+     if (!user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     if (!conf->grpfile) {
+@@ -216,9 +214,7 @@ static authz_status dbmfilegroup_check_authorization(request_rec *r,
+     char *v;
+ 
+     if (!user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     if (!conf->grpfile) {
+diff --git a/modules/aaa/mod_authz_groupfile.c b/modules/aaa/mod_authz_groupfile.c
+index b3c2635..0ddf9ad 100644
+--- a/modules/aaa/mod_authz_groupfile.c
++++ b/modules/aaa/mod_authz_groupfile.c
+@@ -148,9 +148,7 @@ static authz_status group_check_authorization(request_rec *r,
+     apr_status_t status;
+ 
+     if (!user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     /* If there is no group file - then we are not
+@@ -209,9 +207,7 @@ static authz_status filegroup_check_authorization(request_rec *r,
+     const char *filegroup = NULL;
+ 
+     if (!user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     /* If there is no group file - then we are not
+diff --git a/modules/aaa/mod_authz_host.c b/modules/aaa/mod_authz_host.c
+index b8a875b..f556b66 100644
+--- a/modules/aaa/mod_authz_host.c
++++ b/modules/aaa/mod_authz_host.c
+@@ -104,7 +104,7 @@ static authz_status env_check_authorization(request_rec *r, const char *require_
+         }
+     }
+ 
+-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                   "access to %s failed, reason: env variable list does not meet "
+                   "'require'ments for user '%s' to be allowed access",
+                   r->uri, r->user);
+@@ -162,7 +162,7 @@ static authz_status ip_check_authorization(request_rec *r, const char *require_l
+         }
+     }
+ 
+-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                   "access to %s failed, reason: ip address list does not meet "
+                   "'require'ments for user '%s' to be allowed access",
+                   r->uri, r->user);
+@@ -197,7 +197,7 @@ static authz_status host_check_authorization(request_rec *r, const char *require
+             }
+         }
+ 
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                       "access to %s failed, reason: host name list does not meet "
+                       "'require'ments for user '%s' to be allowed access",
+                       r->uri, r->user);
+diff --git a/modules/aaa/mod_authz_owner.c b/modules/aaa/mod_authz_owner.c
+index 0ab122b..45cf5e2 100644
+--- a/modules/aaa/mod_authz_owner.c
++++ b/modules/aaa/mod_authz_owner.c
+@@ -55,9 +55,7 @@ static authz_status fileowner_check_authorization(request_rec *r,
+     apr_finfo_t finfo;
+ 
+     if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     if (!r->filename) {
+diff --git a/modules/aaa/mod_authz_user.c b/modules/aaa/mod_authz_user.c
+index d1c76b4..7e536e0 100644
+--- a/modules/aaa/mod_authz_user.c
++++ b/modules/aaa/mod_authz_user.c
+@@ -51,9 +51,7 @@ static authz_status user_check_authorization(request_rec *r,
+     const char *t, *w;
+ 
+     if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     t = require_args;
+@@ -74,9 +72,7 @@ static authz_status user_check_authorization(request_rec *r,
+ static authz_status validuser_check_authorization(request_rec *r, const char *require_line)
+ {
+     if (!r->user) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "access to %s failed, reason: no authenticated user", r->uri);
+-        return AUTHZ_DENIED;
++        return AUTHZ_DENIED_NO_USER;
+     }
+ 
+     return AUTHZ_GRANTED;
+diff --git a/server/request.c b/server/request.c
+index 880f0ef..d842a47 100644
+--- a/server/request.c
++++ b/server/request.c
+@@ -63,6 +63,7 @@ APR_HOOK_STRUCT(
+     APR_HOOK_LINK(fixups)
+     APR_HOOK_LINK(type_checker)
+     APR_HOOK_LINK(access_checker)
++    APR_HOOK_LINK(access_checker_ex)
+     APR_HOOK_LINK(auth_checker)
+     APR_HOOK_LINK(insert_filter)
+     APR_HOOK_LINK(create_request)
+@@ -80,6 +81,8 @@ AP_IMPLEMENT_HOOK_RUN_FIRST(int,type_checker,
+                             (request_rec *r), (r), DECLINED)
+ AP_IMPLEMENT_HOOK_RUN_ALL(int,access_checker,
+                           (request_rec *r), (r), OK, DECLINED)
++AP_IMPLEMENT_HOOK_RUN_FIRST(int,access_checker_ex,
++                          (request_rec *r), (r), DECLINED)
+ AP_IMPLEMENT_HOOK_RUN_FIRST(int,auth_checker,
+                             (request_rec *r), (r), DECLINED)
+ AP_IMPLEMENT_HOOK_VOID(insert_filter, (request_rec *r), (r))
+@@ -205,54 +208,57 @@ AP_DECLARE(int) ap_process_request_internal(request_rec *r)
+         case SATISFY_ALL:
+         case SATISFY_NOSPEC:
+             if ((access_status = ap_run_access_checker(r)) != OK) {
+-                return decl_die(access_status, "check access", r);
++                return decl_die(access_status,
++                                "check access (with Satisfy All)", r);
+             }
+ 
+-            if ((access_status = ap_run_check_user_id(r)) != OK) {
+-                if (access_status == HTTP_UNAUTHORIZED) {
+-                    r->user = NULL;
+-                    ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r,
+-                                  "authn failed with HTTP_UNAUTHORIZED, "
+-                                  "trying authz without user");
+-                }
+-                else {
++            access_status = ap_run_access_checker_ex(r);
++            if (access_status == OK) {
++                ap_log_rerror(APLOG_MARK, APLOG_TRACE3, 0, r,
++                              "request authorized without authentication by "
++                              "access_checker_autoritative hook: %s", r->uri);
++            }
++            else if (access_status != DECLINED) {
++                return decl_die(access_status, "check access", r);
++            }
++            else {
++                if ((access_status = ap_run_check_user_id(r)) != OK) {
+                     return decl_die(access_status, "check user", r);
+                 }
+-            }
+-
+-            if ((access_status = ap_run_auth_checker(r)) != OK) {
+-                return decl_die(access_status, "check authorization", r);
++                if ((access_status = ap_run_auth_checker(r)) != OK) {
++                    return decl_die(access_status, "check authorization", r);
++                }
+             }
+             break;
+         case SATISFY_ANY:
+-            if ((access_status = ap_run_access_checker(r)) != OK) {
++            if ((access_status = ap_run_access_checker(r)) == OK) {
++                ap_log_rerror(APLOG_MARK, APLOG_TRACE3, 0, r,
++                              "request authorized without authentication by "
++                              "access_checker hook and 'Satisfy any': %s",
++                              r->uri);
++                break;
++            }
+ 
++            access_status = ap_run_access_checker_ex(r);
++            if (access_status == OK) {
++                ap_log_rerror(APLOG_MARK, APLOG_TRACE3, 0, r,
++                              "request authorized without authentication by "
++                              "access_checker_autoritative hook: %s", r->uri);
++            }
++            else if (access_status != DECLINED) {
++                return decl_die(access_status, "check access", r);
++            }
++            else {
+                 if ((access_status = ap_run_check_user_id(r)) != OK) {
+-                    if (access_status == HTTP_UNAUTHORIZED) {
+-                        r->user = NULL;
+-                        ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r,
+-                                      "authn failed with HTTP_UNAUTHORIZED, "
+-                                      "trying authz without user");
+-                    }
+-                    else {
+-                        return decl_die(access_status, "check user", r);
+-                    }
++                    return decl_die(access_status, "check user", r);
+                 }
+ 
+                 if ((access_status = ap_run_auth_checker(r)) != OK) {
+                     return decl_die(access_status, "check authorization", r);
+                 }
+             }
+-            else {
+-                    ap_log_rerror(APLOG_MARK, APLOG_TRACE3, 0, r,
+-                        "request authorized without authentication by "
+-                        "access_checker hook and 'Satisfy any': %s",
+-                        r->uri);
+-            }
+             break;
+         }
+-
+-
+     }
+     /* XXX Must make certain the ap_run_type_checker short circuits mime
+      * in mod-proxy for r->proxyreq && r->parsed_uri.scheme
+@@ -1734,6 +1740,9 @@ AP_DECLARE(void) ap_setup_auth_internal(apr_pool_t *ptemp)
+     if (_hooks.link_access_checker) {
+         total_auth_hooks += _hooks.link_access_checker->nelts;
+     }
++    if (_hooks.link_access_checker_ex) {
++        total_auth_hooks += _hooks.link_access_checker_ex->nelts;
++    }
+     if (_hooks.link_check_user_id) {
+         total_auth_hooks += _hooks.link_check_user_id->nelts;
+     }
+@@ -1786,6 +1795,18 @@ AP_DECLARE(void) ap_hook_check_access(ap_HOOK_access_checker_t *pf,
+     ap_hook_access_checker(pf, aszPre, aszSucc, nOrder);
+ }
+ 
++AP_DECLARE(void) ap_hook_check_access_ex(ap_HOOK_access_checker_ex_t *pf,
++                                      const char * const *aszPre,
++                                      const char * const *aszSucc,
++                                      int nOrder, int type)
++{
++    if ((type & AP_AUTH_INTERNAL_MASK) == AP_AUTH_INTERNAL_PER_CONF) {
++        ++auth_internal_per_conf_hooks;
++    }
++
++    ap_hook_access_checker_ex(pf, aszPre, aszSucc, nOrder);
++}
++
+ AP_DECLARE(void) ap_hook_check_authn(ap_HOOK_check_user_id_t *pf,
+                                      const char * const *aszPre,
+                                      const char * const *aszSucc,

@@ -1,0 +1,112 @@
+commit 8d3f0125769316026290bb32378b5ce19f6d2f30
+Author: Geoffrey Young <geoff@apache.org>
+Date:   Sat Feb 21 00:53:18 2004 +0000
+
+    minor mod_auth_basic and mod_auth_digest sync.  mod_auth_basic
+    now populates r->user with the (possibly unauthenticated) user,
+    and mod_auth_digest returns 500 when a provider returns
+    AUTH_GENERAL_ERROR
+    Reviewed by:	justin
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@102719 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index efec259..8ac9be0 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,12 @@ Changes with Apache 2.1.0-dev
+ 
+   [Remove entries to the current 2.0 section below, when backported]
+ 
++  *) minor mod_auth_basic and mod_auth_digest sync.  mod_auth_basic
++     now populates r->user with the (possibly unauthenticated) user,
++     and mod_auth_digest returns 500 when a provider returns
++     AUTH_GENERAL_ERROR.
++     [Geoffrey Young]
++
+   *) fix "Expected </Foo>> but saw </Foo>" errors in nested,
+      argumentless containers.
+      ["Philippe M. Chiasson" <gozer cpan.org>]
+diff --git a/modules/aaa/mod_auth_basic.c b/modules/aaa/mod_auth_basic.c
+index 8be9d31..346f711 100644
+--- a/modules/aaa/mod_auth_basic.c
++++ b/modules/aaa/mod_auth_basic.c
+@@ -176,6 +176,9 @@ static int get_basic_auth(request_rec *r, const char **user,
+     *user = ap_getword_nulls(r->pool, (const char**)&decoded_line, ':');
+     *pw = decoded_line;
+ 
++    /* set the user, even though the user is unauthenticated at this point */
++    r->user = (char *) *user;
++
+     return OK;
+ }
+ 
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index b9d963a..e213113 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -1328,8 +1328,8 @@ static void note_digest_auth_failure(request_rec *r,
+  * Authorization header verification code
+  */
+ 
+-static const char *get_hash(request_rec *r, const char *user,
+-                            digest_config_rec *conf)
++static authn_status get_hash(request_rec *r, const char *user,
++                             digest_config_rec *conf)
+ {
+     authn_status auth_result;
+     char *password;
+@@ -1374,12 +1374,11 @@ static const char *get_hash(request_rec *r, const char *user,
+         current_provider = current_provider->next;
+     } while (current_provider);
+ 
+-    if (auth_result != AUTH_USER_FOUND) {
+-        return NULL;
+-    }
+-    else {
+-        return password;
++    if (auth_result == AUTH_USER_FOUND) {
++        conf->ha1 = password;
+     }
++
++    return auth_result;
+ }
+ 
+ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+@@ -1593,6 +1592,7 @@ static int authenticate_digest_user(request_rec *r)
+     request_rec       *mainreq;
+     const char        *t;
+     int                res;
++    authn_status       return_code;
+ 
+     /* do we require Digest auth for this URI? */
+ 
+@@ -1738,14 +1738,25 @@ static int authenticate_digest_user(request_rec *r)
+         return HTTP_UNAUTHORIZED;
+     }
+ 
+-    if (!(conf->ha1 = get_hash(r, r->user, conf))) {
++    return_code = get_hash(r, r->user, conf);
++
++    if (return_code == AUTH_USER_NOT_FOUND) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                       "Digest: user `%s' in realm `%s' not found: %s",
+                       r->user, conf->realm, r->uri);
+         note_digest_auth_failure(r, conf, resp, 0);
+         return HTTP_UNAUTHORIZED;
+     }
+-
++    else if (return_code == AUTH_USER_FOUND) {
++        /* we have a password, so continue */
++    }
++    else {
++        /* AUTH_GENERAL_ERROR (or worse)
++         * We'll assume that the module has already said what its error
++         * was in the logs.
++         */
++        return HTTP_INTERNAL_SERVER_ERROR;
++    }
+     
+     if (resp->message_qop == NULL) {
+         /* old (rfc-2069) style digest */

@@ -1,0 +1,40 @@
+commit d5287868011262a1683e21e0e705367ac7c948a4
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sat Feb 12 15:52:17 2011 +0000
+
+    Log something nicer than "Internal error: pcfg_openfile() called
+    with NULL filename" if no password file is configured
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1070096 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authn_file.c b/modules/aaa/mod_authn_file.c
+index a50b47d..90c5d26 100644
+--- a/modules/aaa/mod_authn_file.c
++++ b/modules/aaa/mod_authn_file.c
+@@ -75,6 +75,12 @@ static authn_status check_password(request_rec *r, const char *user,
+     apr_status_t status;
+     char *file_password = NULL;
+ 
++    if (!conf->pwfile) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "AuthUserFile not specified in the configuration");
++        return AUTH_GENERAL_ERROR;
++    }
++
+     status = ap_pcfg_openfile(&f, r->pool, conf->pwfile);
+ 
+     if (status != APR_SUCCESS) {
+@@ -124,6 +130,12 @@ static authn_status get_realm_hash(request_rec *r, const char *user,
+     apr_status_t status;
+     char *file_hash = NULL;
+ 
++    if (!conf->pwfile) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "AuthUserFile not specified in the configuration");
++        return AUTH_GENERAL_ERROR;
++    }
++
+     status = ap_pcfg_openfile(&f, r->pool, conf->pwfile);
+ 
+     if (status != APR_SUCCESS) {

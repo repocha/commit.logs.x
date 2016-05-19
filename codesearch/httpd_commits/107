@@ -1,0 +1,560 @@
+commit 0bd6416e95180a6c65c303ae904ed5669b48d931
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sat Sep 25 12:01:14 2010 +0000
+
+    Move all, env, and method authz providers from mod_authz_host to mod_authz_core
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1001200 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/docs/manual/mod/mod_authz_core.xml b/docs/manual/mod/mod_authz_core.xml
+index 8fd37fd..29afa25 100644
+--- a/docs/manual/mod/mod_authz_core.xml
++++ b/docs/manual/mod/mod_authz_core.xml
+@@ -151,6 +151,89 @@
+     </example>
+ </section>
+ 
++<section id="requiredirectives"><title>The Require Directives</title>
++
++  <p><module>mod_authz_core</module> provides some generic authorization
++  providers which can be used with the
++  <directive module="mod_authz_core">Require</directive> directive.</p>
++
++  <section id="reqenv"><title>Require env</title>
++
++    <p>The <code>env</code> provider allows access to the server
++    to be controlled based on the existence of an <a
++    href="../env.html">environment variable</a>. When <code>Require 
++    env <var>env-variable</var></code> is specified, then the request is
++    allowed access if the environment variable <var>env-variable</var>
++    exists. The server provides the ability to set environment
++    variables in a flexible way based on characteristics of the client
++    request using the directives provided by
++    <module>mod_setenvif</module>. Therefore, this directive can be
++    used to allow access based on such factors as the clients
++    <code>User-Agent</code> (browser type), <code>Referer</code>, or
++    other HTTP request header fields.</p>
++    
++    <example><title>Example:</title>
++      SetEnvIf User-Agent ^KnockKnock/2\.0 let_me_in<br />
++      &lt;Directory /docroot&gt;<br />
++      <indent>
++        Require env let_me_in<br />
++      </indent>
++      &lt;/Directory&gt;
++    </example>
++    
++    <p>In this case, browsers with a user-agent string beginning
++    with <code>KnockKnock/2.0</code> will be allowed access, and all
++    others will be denied.</p>
++
++  </section>
++
++  <section id="reqall"><title>Require all</title>
++
++    <p>The <code>all</code> provider mimics the functionality the
++    was previously provided by the 'Allow from all' and 'Deny from all'
++    directives.  This provider can take one of two arguments which are 
++    'granted' or 'denied'.  The following examples will grant or deny 
++    access to all requests.</p>
++
++    <example>
++    Require all granted<br />
++    </example>
++
++    <example>
++    Require all denied<br />
++    </example>
++
++  </section>
++
++  <section id="reqmethod"><title>Require method</title>
++
++    <p>The <code>method</code> provider allows to use the HTTP method in
++    authorization decisions. The GET and HEAD methods are treated as
++    equivalent. The TRACE method is not available to this provider,
++    use <directive module="core">TraceEnable</directive> instead.</p>
++
++    <p>The following example will only allow GET, HEAD, POST, and OPTIONS
++    requests:</p>
++
++    <example>
++        Require method GET POST OPTIONS<br />
++    </example>
++
++    <p>The following example will allow GET, HEAD, POST, and OPTIONS
++    requests without authentication, and require a valid user for all other
++    methods:</p>
++
++    <example>
++        &lt;RequireAny&gt;<br />
++        &nbsp;Require method GET POST OPTIONS<br />
++        &nbsp;Require valid-user<br />
++        &lt;/RequireAny&gt;<br />
++    </example>
++
++  </section>
++
++</section>
++
+ <directivesynopsis>
+ <name>Require</name>
+ <description>Tests whether an authenticated user is authorized by
+@@ -164,9 +247,28 @@ an authorization provider.</description>
+ <usage>
+     <p>This directive tests whether an authenticated user is authorized
+     according to a particular authorization provider and the specified
+-    restrictions.  Some of the allowed syntaxes provided by
+-    <module>mod_authz_user</module> and
+-    <module>mod_authz_groupfile</module> are:</p>
++    restrictions. <module>mod_authz_core</module> provides the following
++    generic authorization providers:</p>
++
++    <dl>
++      <dt><code>Require all granted</code></dt>
++      <dd>Access is allowed unconditionally.</dd>
++
++      <dt><code>Require all denied</code></dt>
++      <dd>Access is denied unconditionally.</dd>
++
++      <dt><code>Require env <var>env-var</var> [<var>env-var</var>]
++      ...</code></dt>
++      <dd>Access is allowed only if one of the given environment variables is
++          set.</dd>
++
++      <dt><code>Require method <var>http-method</var> [<var>http-method</var>]
++      ...</code></dt>
++      <dd>Access is allowed only for the given HTTP methods.</dd>
++    </dl>
++
++    <p>Some of the allowed syntaxes provided by <module>mod_authz_user</module>
++       and <module>mod_authz_groupfile</module> are:</p>
+ 
+     <dl>
+       <dt><code>Require user <var>userid</var> [<var>userid</var>]
+@@ -187,8 +289,8 @@ an authorization provider.</description>
+     <module>mod_authz_host</module>, and
+     <module>mod_authz_owner</module>.</p>
+ 
+-    <p>For a complete authentication and authorization configuration, 
+-    <directive>Require</directive> must be accompanied by
++    <p>In most cases, for a complete authentication and authorization
++    configuration, <directive>Require</directive> must be accompanied by
+     <directive module="mod_authn_core">AuthName</directive>, <directive
+     module="mod_authn_core">AuthType</directive> and 
+     <directive module="mod_auth_basic">AuthBasicProvider</directive> or
+diff --git a/docs/manual/mod/mod_authz_host.xml b/docs/manual/mod/mod_authz_host.xml
+index 84e1f05..1126215 100644
+--- a/docs/manual/mod/mod_authz_host.xml
++++ b/docs/manual/mod/mod_authz_host.xml
+@@ -39,9 +39,7 @@ address)</description>
+     or <directive module="core" type="section">Location</directive> section
+     as well as <code><a href="core.html#accessfilename">.htaccess</a>
+     </code> files to control access to particular parts of the server.
+-    Access can be controlled based on the client hostname, IP address, or
+-    other characteristics of the client request, as captured in <a
+-    href="../env.html">environment variables</a>.</p>
++    Access can be controlled based on the client hostname or IP address.</p>
+ 
+     <p>In general, access restriction directives apply to all
+     access methods (<code>GET</code>, <code>PUT</code>,
+@@ -60,45 +58,13 @@ address)</description>
+     <p>Apache's <directive module="mod_authz_core">Require</directive> 
+     directive is used during the authorization phase to ensure that a user is allowed or
+     denied access to a resource.  mod_authz_host extends the 
+-    authorization types with <code>env</code>, <code>ip</code>, 
+-    <code>host</code> and <code>all</code>.  Other authorization types may also be 
++    authorization types with <code>ip</code> and <code>host</code>.
++    Other authorization types may also be 
+     used but may require that additional authorization modules be loaded.</p>
+ 
+     <p>These authorization providers affect which hosts can
+     access an area of the server. Access can be controlled by
+-    hostname, IP Address, IP Address range, or by other
+-    characteristics of the client request captured in environment
+-    variables.</p>
+-
+-<section id="reqenv"><title>Require env</title>
+-
+-    <p>The <code>env</code> provider allows access to the server
+-    to be controlled based on the existence of an <a
+-    href="../env.html">environment variable</a>. When <code>Require 
+-    env <var>env-variable</var></code> is specified, then the request is
+-    allowed access if the environment variable <var>env-variable</var>
+-    exists. The server provides the ability to set environment
+-    variables in a flexible way based on characteristics of the client
+-    request using the directives provided by
+-    <module>mod_setenvif</module>. Therefore, this directive can be
+-    used to allow access based on such factors as the clients
+-    <code>User-Agent</code> (browser type), <code>Referer</code>, or
+-    other HTTP request header fields.</p>
+-    
+-    <example><title>Example:</title>
+-      SetEnvIf User-Agent ^KnockKnock/2\.0 let_me_in<br />
+-      &lt;Directory /docroot&gt;<br />
+-      <indent>
+-        Require env let_me_in<br />
+-      </indent>
+-      &lt;/Directory&gt;
+-    </example>
+-    
+-    <p>In this case, browsers with a user-agent string beginning
+-    with <code>KnockKnock/2.0</code> will be allowed access, and all
+-    others will be denied.</p>
+-
+-</section>
++    hostname, IP Address, or IP Address range.</p>
+ 
+ <section id="reqip"><title>Require ip</title>
+ 
+@@ -184,52 +150,6 @@ address)</description>
+ 
+ </section>
+ 
+-<section id="reqall"><title>Require all</title>
+-
+-    <p>The <code>all</code> provider mimics the functionality the
+-    was previously provided by the 'Allow from all' and 'Deny from all'
+-    directives.  This provider can take one of two arguments which are 
+-    'granted' or 'denied'.  The following examples will grant or deny 
+-    access to all requests.</p>
+-
+-    <example>
+-    Require all granted<br />
+-    </example>
+-
+-    <example>
+-    Require all denied<br />
+-    </example>
+-
+-</section>
+-
+-<section id="reqmethod"><title>Require method</title>
+-
+-    <p>The <code>method</code> provider allows to use the HTTP method in
+-    authorization decisions. The GET and HEAD methods are treated as
+-    equivalent. The TRACE method is not available to this provider,
+-    use <directive module="core">TraceEnable</directive> instead.</p>
+-
+-    <p>The following example will only allow GET, HEAD, POST, and OPTIONS
+-    requests:</p>
+-
+-    <example>
+-        Require method GET POST OPTIONS<br />
+-    </example>
+-
+-    <p>The following example will allow GET, HEAD, POST, and OPTIONS
+-    requests without authentication, and require a valid user for all other
+-    methods:</p>
+-
+-    <example>
+-        &lt;RequireAny&gt;<br />
+-        &nbsp;Require method GET POST OPTIONS<br />
+-        &nbsp;Require valid-user<br />
+-        &lt;/RequireAny&gt;<br />
+-    </example>
+-
+-</section>
+-
+-
+ </section>
+ 
+ 
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index be85879..aec854b 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -863,6 +863,127 @@ static int authz_some_auth_required(request_rec *r)
+     return 0;
+ }
+ 
++/*
++ * env authz provider
++ */
++
++static authz_status env_check_authorization(request_rec *r,
++                                            const char *require_line,
++                                            const void *parsed_require_line)
++{
++    const char *t, *w;
++
++    /* The 'env' provider will allow the configuration to specify a list of
++        env variables to check rather than a single variable.  This is different
++        from the previous host based syntax. */
++    t = require_line;
++    while ((w = ap_getword_conf(r->pool, &t)) && w[0]) {
++        if (apr_table_get(r->subprocess_env, w)) {
++            return AUTHZ_GRANTED;
++        }
++    }
++
++    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
++                  "access to %s failed, reason: env variable list does not meet "
++                  "'require'ments for user '%s' to be allowed access",
++                  r->uri, r->user);
++
++    return AUTHZ_DENIED;
++}
++
++static const authz_provider authz_env_provider =
++{
++    &env_check_authorization,
++    NULL,
++};
++
++
++/*
++ * all authz provider
++ */
++
++static authz_status all_check_authorization(request_rec *r,
++                                            const char *require_line,
++                                            const void *parsed_require_line)
++{
++    if (parsed_require_line) {
++        return AUTHZ_GRANTED;
++    }
++    return AUTHZ_DENIED;
++}
++
++static const char *all_parse_config(cmd_parms *cmd, const char *require_line,
++                                    const void **parsed_require_line)
++{
++    /*
++     * If the argument to the 'all' provider is 'granted' then just let 
++     * everybody in. This would be equivalent to the previous syntax of
++     * 'allow from all'. If the argument is 'denied' we reject everbody,
++     * which is equivalent to 'deny from all'.
++     */
++    if (strcasecmp(require_line, "granted") == 0) {
++        *parsed_require_line = (void *)1;
++        return NULL;
++    }
++    else if (strcasecmp(require_line, "denied") == 0) {
++        /* *parsed_require_line is already NULL */
++        return NULL;
++    }
++    else {
++        return "Argument for 'Require all' must be 'granted' or 'denied'";
++    }
++}
++
++static const authz_provider authz_all_provider =
++{
++    &all_check_authorization,
++    &all_parse_config,
++};
++
++
++/*
++ * method authz provider
++ */
++
++static authz_status method_check_authorization(request_rec *r,
++                                               const char *require_line,
++                                               const void *parsed_require_line)
++{
++    const apr_int64_t *allowed = parsed_require_line;
++    if (*allowed & (AP_METHOD_BIT << r->method_number))
++        return AUTHZ_GRANTED;
++    else
++        return AUTHZ_DENIED;
++}
++
++static const char *method_parse_config(cmd_parms *cmd, const char *require_line,
++                                       const void **parsed_require_line)
++{
++    const char *w, *t;
++    apr_int64_t *allowed = apr_pcalloc(cmd->pool, sizeof(apr_int64_t));
++
++    t = require_line;
++
++    while ((w = ap_getword_conf(cmd->temp_pool, &t)) && w[0]) {
++        int m = ap_method_number_of(w);
++        if (m == M_INVALID) {
++            return apr_pstrcat(cmd->pool, "Invalid Method '", w, "'", NULL);
++        }
++
++        *allowed |= (AP_METHOD_BIT << m);
++    }
++
++    *parsed_require_line = allowed;
++    return NULL;
++}
++
++static const authz_provider authz_method_provider =
++{
++    &method_check_authorization,
++    &method_parse_config,
++};
++
++
+ static void register_hooks(apr_pool_t *p)
+ {
+     APR_REGISTER_OPTIONAL_FN(authz_some_auth_required);
+@@ -873,6 +994,16 @@ static void register_hooks(apr_pool_t *p)
+                         AP_AUTH_INTERNAL_PER_CONF);
+     ap_hook_check_access_ex(authorize_userless, NULL, NULL, APR_HOOK_LAST,
+                             AP_AUTH_INTERNAL_PER_CONF);
++
++    ap_register_auth_provider(p, AUTHZ_PROVIDER_GROUP, "env",
++                              AUTHZ_PROVIDER_VERSION,
++                              &authz_env_provider, AP_AUTH_INTERNAL_PER_CONF);
++    ap_register_auth_provider(p, AUTHZ_PROVIDER_GROUP, "all",
++                              AUTHZ_PROVIDER_VERSION,
++                              &authz_all_provider, AP_AUTH_INTERNAL_PER_CONF);
++    ap_register_auth_provider(p, AUTHZ_PROVIDER_GROUP, "method",
++                              AUTHZ_PROVIDER_VERSION,
++                              &authz_method_provider, AP_AUTH_INTERNAL_PER_CONF);
+ }
+ 
+ AP_DECLARE_MODULE(authz_core) =
+diff --git a/modules/aaa/mod_authz_host.c b/modules/aaa/mod_authz_host.c
+index b9d99d0..6d0be22 100644
+--- a/modules/aaa/mod_authz_host.c
++++ b/modules/aaa/mod_authz_host.c
+@@ -90,30 +90,6 @@ static int in_domain(const char *domain, const char *what)
+     }
+ }
+ 
+-static authz_status env_check_authorization(request_rec *r,
+-                                            const char *require_line,
+-                                            const void *parsed_require_line)
+-{
+-    const char *t, *w;
+-
+-    /* The 'env' provider will allow the configuration to specify a list of
+-        env variables to check rather than a single variable.  This is different
+-        from the previous host based syntax. */
+-    t = require_line;
+-    while ((w = ap_getword_conf(r->pool, &t)) && w[0]) {
+-        if (apr_table_get(r->subprocess_env, w)) {
+-            return AUTHZ_GRANTED;
+-        }
+-    }
+-
+-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                  "access to %s failed, reason: env variable list does not meet "
+-                  "'require'ments for user '%s' to be allowed access",
+-                  r->uri, r->user);
+-
+-    return AUTHZ_DENIED;
+-}
+-
+ static authz_status ip_check_authorization(request_rec *r,
+                                            const char *require_line,
+                                            const void *parsed_require_line)
+@@ -212,76 +188,6 @@ static authz_status host_check_authorization(request_rec *r,
+     return AUTHZ_DENIED;
+ }
+ 
+-static authz_status all_check_authorization(request_rec *r,
+-                                            const char *require_line,
+-                                            const void *parsed_require_line)
+-{
+-    if (parsed_require_line) {
+-        return AUTHZ_GRANTED;
+-    }
+-    return AUTHZ_DENIED;
+-}
+-
+-static const char *all_parse_config(cmd_parms *cmd, const char *require_line,
+-                                    const void **parsed_require_line)
+-{
+-    /*
+-     * If the argument to the 'all' provider is 'granted' then just let 
+-     * everybody in. This would be equivalent to the previous syntax of
+-     * 'allow from all'. If the argument is 'denied' we reject everbody,
+-     * which is equivalent to 'deny from all'.
+-     */
+-    if (strcasecmp(require_line, "granted") == 0) {
+-        *parsed_require_line = (void *)1;
+-        return NULL;
+-    }
+-    else if (strcasecmp(require_line, "denied") == 0) {
+-        /* *parsed_require_line is already NULL */
+-        return NULL;
+-    }
+-    else {
+-        return "Argument for 'Require all' must be 'granted' or 'denied'";
+-    }
+-}
+-
+-static authz_status method_check_authorization(request_rec *r,
+-                                               const char *require_line,
+-                                               const void *parsed_require_line)
+-{
+-    const apr_int64_t *allowed = parsed_require_line;
+-    if (*allowed & (AP_METHOD_BIT << r->method_number))
+-        return AUTHZ_GRANTED;
+-    else
+-        return AUTHZ_DENIED;
+-}
+-
+-static const char *method_parse_config(cmd_parms *cmd, const char *require_line,
+-                                       const void **parsed_require_line)
+-{
+-    const char *w, *t;
+-    apr_int64_t *allowed = apr_pcalloc(cmd->pool, sizeof(apr_int64_t));
+-
+-    t = require_line;
+-
+-    while ((w = ap_getword_conf(cmd->temp_pool, &t)) && w[0]) {
+-        int m = ap_method_number_of(w);
+-        if (m == M_INVALID) {
+-            return apr_pstrcat(cmd->pool, "Invalid Method '", w, "'", NULL);
+-        }
+-
+-        *allowed |= (AP_METHOD_BIT << m);
+-    }
+-
+-    *parsed_require_line = allowed;
+-    return NULL;
+-}
+-
+-static const authz_provider authz_env_provider =
+-{
+-    &env_check_authorization,
+-    NULL,
+-};
+-
+ static const authz_provider authz_ip_provider =
+ {
+     &ip_check_authorization,
+@@ -294,35 +200,15 @@ static const authz_provider authz_host_provider =
+     NULL,
+ };
+ 
+-static const authz_provider authz_all_provider =
+-{
+-    &all_check_authorization,
+-    &all_parse_config,
+-};
+-
+-static const authz_provider authz_method_provider =
+-{
+-    &method_check_authorization,
+-    &method_parse_config,
+-};
+ 
+ static void register_hooks(apr_pool_t *p)
+ {
+-    ap_register_auth_provider(p, AUTHZ_PROVIDER_GROUP, "env",
+-                              AUTHZ_PROVIDER_VERSION,
+-                              &authz_env_provider, AP_AUTH_INTERNAL_PER_CONF);
+     ap_register_auth_provider(p, AUTHZ_PROVIDER_GROUP, "ip",
+                               AUTHZ_PROVIDER_VERSION,
+                               &authz_ip_provider, AP_AUTH_INTERNAL_PER_CONF);
+     ap_register_auth_provider(p, AUTHZ_PROVIDER_GROUP, "host",
+                               AUTHZ_PROVIDER_VERSION,
+                               &authz_host_provider, AP_AUTH_INTERNAL_PER_CONF);
+-    ap_register_auth_provider(p, AUTHZ_PROVIDER_GROUP, "all",
+-                              AUTHZ_PROVIDER_VERSION,
+-                              &authz_all_provider, AP_AUTH_INTERNAL_PER_CONF);
+-    ap_register_auth_provider(p, AUTHZ_PROVIDER_GROUP, "method",
+-                              AUTHZ_PROVIDER_VERSION,
+-                              &authz_method_provider, AP_AUTH_INTERNAL_PER_CONF);
+ }
+ 
+ AP_DECLARE_MODULE(authz_host) =

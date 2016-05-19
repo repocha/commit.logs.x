@@ -1,0 +1,140 @@
+commit 1998ce172c6e46eaa57054fb6b2d8112fd3b6d8f
+Author: Graham Leggett <minfrin@apache.org>
+Date:   Mon Dec 30 09:59:58 2013 +0000
+
+    mod_authnz_groupfile: Support the expression parser within the require directives.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1554175 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 8b38b36..97359ef 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,6 +1,9 @@
+                                                          -*- coding: utf-8 -*-
+ Changes with Apache 2.5.0
+ 
++  *) mod_authnz_groupfile: Support the expression parser within the require
++     directives. [Graham Leggett]
++
+   *) mod_authnz_dbm: Support the expression parser within the require
+      directives. [Graham Leggett]
+ 
+diff --git a/docs/log-message-tags/next-number b/docs/log-message-tags/next-number
+index 3d23d59..697eb4b 100644
+--- a/docs/log-message-tags/next-number
++++ b/docs/log-message-tags/next-number
+@@ -1 +1 @@
+-2592
++2593
+diff --git a/docs/manual/mod/mod_authz_groupfile.xml b/docs/manual/mod/mod_authz_groupfile.xml
+index e8cd825..c45941c 100644
+--- a/docs/manual/mod/mod_authz_groupfile.xml
++++ b/docs/manual/mod/mod_authz_groupfile.xml
+@@ -37,6 +37,41 @@
+ 
+ <seealso><directive module="mod_authz_core">Require</directive></seealso>
+ 
++<section id="requiredirectives"><title>The Require Directives</title>
++
++    <p>Apache's <directive module="mod_authz_core">Require</directive>
++    directives are used during the authorization phase to ensure that
++    a user is allowed to access a resource.  mod_authz_groupfile extends the
++    authorization types with <code>group</code> and <code>group-file</code>.
++    </p>
++
++    <p>Since v2.5.0, <a href="../expr.html">expressions</a> are supported
++    within the groupfile require directives.</p>
++
++<section id="reqgroup"><title>Require group</title>
++
++    <p>This directive specifies group membership that is required for the
++    user to gain access.</p>
++
++    <highlight language="config">
++      Require group admin
++    </highlight>
++
++</section>
++
++<section id="reqfilegroup"><title>Require file-group</title>
++
++    <p>When this directive is specified, the user must be a member of the group
++    assigned to the file being accessed.</p>
++
++    <highlight language="config">
++      Require file-group
++    </highlight>
++
++</section>
++
++</section>
++
+ <directivesynopsis>
+ <name>AuthGroupFile</name>
+ <description>Sets the name of a text file containing the list
+diff --git a/modules/aaa/mod_authz_groupfile.c b/modules/aaa/mod_authz_groupfile.c
+index 12510df..45aee3b 100644
+--- a/modules/aaa/mod_authz_groupfile.c
++++ b/modules/aaa/mod_authz_groupfile.c
+@@ -138,6 +138,11 @@ static authz_status group_check_authorization(request_rec *r,
+     authz_groupfile_config_rec *conf = ap_get_module_config(r->per_dir_config,
+             &authz_groupfile_module);
+     char *user = r->user;
++
++    const char *err = NULL;
++    const ap_expr_info_t *expr = parsed_require_args;
++    const char *require;
++
+     const char *t, *w;
+     apr_table_t *grpstatus = NULL;
+     apr_status_t status;
+@@ -174,7 +179,15 @@ static authz_status group_check_authorization(request_rec *r,
+         return AUTHZ_DENIED;
+     }
+ 
+-    t = require_args;
++    require = ap_expr_str_exec(r, expr, &err);
++    if (err) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(02592)
++                      "authz_groupfile authorize: require group: Can't "
++                      "evaluate require expression: %s", err);
++        return AUTHZ_DENIED;
++    }
++
++    t = require;
+     while ((w = ap_getword_conf(r->pool, &t)) && w[0]) {
+         if (apr_table_get(grpstatus, w)) {
+             return AUTHZ_GRANTED;
+@@ -256,10 +269,29 @@ static authz_status filegroup_check_authorization(request_rec *r,
+     return AUTHZ_DENIED;
+ }
+ 
++static const char *groupfile_parse_config(cmd_parms *cmd, const char *require_line,
++                                          const void **parsed_require_line)
++{
++    const char *expr_err = NULL;
++    ap_expr_info_t *expr = apr_pcalloc(cmd->pool, sizeof(*expr));
++
++    expr = ap_expr_parse_cmd(cmd, require_line, AP_EXPR_FLAG_STRING_RESULT,
++            &expr_err, NULL);
++
++    if (expr_err)
++        return apr_pstrcat(cmd->temp_pool,
++                           "Cannot parse expression in require line: ",
++                           expr_err, NULL);
++
++    *parsed_require_line = expr;
++
++    return NULL;
++}
++
+ static const authz_provider authz_group_provider =
+ {
+     &group_check_authorization,
+-    NULL,
++    groupfile_parse_config,
+ };
+ 
+ static const authz_provider authz_filegroup_provider =

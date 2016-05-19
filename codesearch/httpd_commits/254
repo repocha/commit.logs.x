@@ -1,0 +1,526 @@
+commit 7f64990fdc906388fcd175dc9d839d35256b444a
+Author: Ryan Bloom <rbb@apache.org>
+Date:   Mon Jun 12 21:47:17 2000 +0000
+
+    Clean up a big chunk of ap_config.h.  This basically stops ap_config.h from
+    including any files.  Because of this change, other files must include
+    their own headers.  I also cleaned up a couple of other bugs in some
+    modules because I had to compile them all.
+    
+    I expect this to break multiple platforms, but this will be fixed over time.
+    The massive configure cleanup is almost done.  I will go through the files
+    one more time after this commit.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@85553 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/STATUS b/STATUS
+index 50359a2..023cd95 100644
+--- a/STATUS
++++ b/STATUS
+@@ -1,5 +1,5 @@
+ Apache 2.0 STATUS:
+-Last modified at [$Date: 2000/06/12 17:28:48 $]
++Last modified at [$Date: 2000/06/12 21:46:35 $]
+ 
+ Release:
+ 
+@@ -31,10 +31,6 @@ RELEASE SHOWSTOPPERS:
+           to -ldl which is wrong).
+         Status:
+ 
+-      - reduce number of configuration items, which in turn reduces the
+-          amount of stuff in ap_config_auto.h.in
+-        Status: Ryan +1 (working on it), Greg +1
+-
+     * suEXEC doesn't work
+         Status: Manoj has posted an patch to fix this.
+         <19991103003605.A20612@samosa.mindspring.com>
+diff --git a/include/ap_config.h b/include/ap_config.h
+index 852ede7..dd64c4a 100644
+--- a/include/ap_config.h
++++ b/include/ap_config.h
+@@ -104,48 +104,6 @@ extern "C" {
+ #include <string.h>
+ #endif
+ 
+-#ifdef HAVE_SYS_TYPES_H
+-#include <sys/types.h>
+-#endif
+-
+-#ifdef HAVE_UNISTD_H
+-#include <unistd.h>
+-#endif
+-
+-#ifdef HAVE_SYS_TIME_H
+-#include <sys/time.h>
+-#endif
+-
+-#ifdef HAVE_SYS_RESOURCE_H
+-#include <sys/resource.h>
+-#endif
+-
+-#ifdef HAVE_NETDB_H
+-#include <netdb.h>
+-#endif
+-
+-/* The next three are for inet_*() */
+-
+-#ifdef HAVE_SYS_SOCKET_H
+-#include <sys/socket.h>
+-#endif
+-
+-#ifdef HAVE_NETINET_IN_H
+-#include <netinet/in.h>
+-#endif
+-
+-#ifdef HAVE_ARPA_INET_H
+-#include <arpa/inet.h>
+-#endif
+-
+-#ifdef HAVE_PWD_H    /* XXX - For getpw*. This should be moved to unixd */
+-#include <pwd.h>
+-#endif
+-
+-#ifdef HAVE_GRP_H    /* XXX - For getgr*. This should be moved to unixd */
+-#include <grp.h>
+-#endif
+-
+ /* ap_ versions of ctype macros to make sure they deal with 8-bit chars */
+ #include "ap_ctype.h"
+ 
+@@ -166,29 +124,6 @@ extern "C" {
+ #define ap_sigwait(a,b) sigwait((a),(b))
+ #endif
+ 
+-/* So that we can use inline on some critical functions, and use
+- * GNUC attributes (such as to get -Wall warnings for printf-like
+- * functions).  Only do this in gcc 2.7 or later ... it may work
+- * on earlier stuff, but why chance it.
+- *
+- * We've since discovered that the gcc shipped with NeXT systems
+- * as "cc" is completely broken.  It claims to be __GNUC__ and so
+- * on, but it doesn't implement half of the things that __GNUC__
+- * means.  In particular it's missing inline and the __attribute__
+- * stuff.  So we hack around it.  PR#1613. -djg
+- */
+-#if !defined(__GNUC__) || __GNUC__ < 2 || \
+-    (__GNUC__ == 2 && __GNUC_MINOR__ < 7) ||\
+-    defined(NEXT)
+-#define ap_inline
+-#define __attribute__(__x)
+-#define ENUM_BITFIELD(e,n,w)  signed int n : w
+-#else
+-#define ap_inline __inline__
+-#define USE_GNU_INLINE
+-#define ENUM_BITFIELD(e,n,w)  e n : w
+-#endif
+-
+ /* EAGAIN apparently isn't defined on some systems */
+ #if !defined(HAVE_EAGAIN) && !defined(EAGAIN)
+ #define EAGAIN EWOULDBLOCK
+@@ -216,19 +151,10 @@ extern "C" {
+ #endif
+ 
+ #ifdef SCO5
+-/* XXX - What's this for */
+-#define SecureWare
+-
+-/* Although SCO 5 defines these in <strings.h> (note the "s") they don't have
+-   consts. Sigh. */
+-extern int strcasecmp(const char *, const char *);
+-extern int strncasecmp(const char *, const char *, unsigned);
+-#endif /* SCO5 */
+-
+-/* If APR has OTHER_CHILD logic, use reliable piped logs.
++/* This allows Apache to run from a startup script on a SCO box in high
++ * security (C2) mode.  
+  */
+-#if (APR_HAS_OTHER_CHILD)
+-#define HAVE_RELIABLE_PIPED_LOGS TRUE
++#define SecureWare
+ #endif
+ 
+ /* XXX - The PHP4 comments say -D_HPUX_SOURCE is obsolete. */
+@@ -251,6 +177,12 @@ extern int strncasecmp(const char *, const char *, unsigned);
+ #define USE_MEM_BASED_SCOREBOARD
+ #endif
+ 
++/* If APR has OTHER_CHILD logic, use reliable piped logs.
++ */
++#if (APR_HAS_OTHER_CHILD)
++#define HAVE_RELIABLE_PIPED_LOGS TRUE
++#endif
++
+ #if defined(CHARSET_EBCDIC) && !defined(APACHE_XLATE)
+ #define APACHE_XLATE
+ #endif
+diff --git a/modules/aaa/mod_access.c b/modules/aaa/mod_access.c
+index 78c669f..f1f77b4 100644
+--- a/modules/aaa/mod_access.c
++++ b/modules/aaa/mod_access.c
+@@ -73,6 +73,14 @@
+ #ifdef HAVE_STRING_H
+ #include <string.h>
+ #endif
++#ifdef HAVE_NETINET_IN_H
++#include <netinet/in.h>
++#endif
++
++#ifdef HAVE_ARPA_INET_H
++#include <arpa/inet.h>
++#endif
++
+ 
+ enum allowdeny_type {
+     T_ENV,
+diff --git a/modules/aaa/mod_auth_db.c b/modules/aaa/mod_auth_db.c
+index 1d325f9..c0fb311 100644
+--- a/modules/aaa/mod_auth_db.c
++++ b/modules/aaa/mod_auth_db.c
+@@ -99,6 +99,7 @@
+ #include "http_core.h"
+ #include "http_log.h"
+ #include "http_protocol.h"
++#include "http_request.h"  /* for ap_hook_(check_user_id | auth_check) */
+ #ifdef HAVE_DB_H
+ #include <db.h>
+ #endif
+@@ -319,10 +320,10 @@ static int db_authenticate_basic_user(request_rec *r)
+     invalid_pw = ap_validate_password(sent_pw, real_pw);
+ 
+     if (invalid_pw != APR_SUCCESS) {
+-        char buf[120]
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+-		      "DB user %s: authentication failure for \"%s\": %s",
+-		      r->user, r->uri, ap_strerror(invalid_pw, buf, sizeof(buf)));
++		      "DB user %s: authentication failure for \"%s\": "
++                      "Password Mismatch",
++		      r->user, r->uri);
+ 	ap_note_basic_auth_failure(r);
+ 	return AUTH_REQUIRED;
+     }
+diff --git a/modules/aaa/mod_auth_dbm.c b/modules/aaa/mod_auth_dbm.c
+index d9e304b..20317f9 100644
+--- a/modules/aaa/mod_auth_dbm.c
++++ b/modules/aaa/mod_auth_dbm.c
+@@ -75,6 +75,7 @@
+ #include "http_core.h"
+ #include "http_log.h"
+ #include "http_protocol.h"
++#include "http_request.h"   /* for ap_hook_(check_user_id | auth_checker)*/
+ #if defined(__GLIBC__) && defined(__GLIBC_MINOR__) \
+     && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1
+ #include <db1/ndbm.h>
+@@ -239,8 +240,9 @@ static int dbm_authenticate_basic_user(request_rec *r)
+     invalid_pw = ap_validate_password(sent_pw, real_pw);
+     if (invalid_pw != APR_SUCCESS) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+-		      "DBM user %s: authentication failure for \"%s\": %s",
+-		      r->user, r->uri, invalid_pw);
++		      "DBM user %s: authentication failure for \"%s\": "
++                      "Password Mismatch",
++		      r->user, r->uri);
+ 	ap_note_basic_auth_failure(r);
+ 	return AUTH_REQUIRED;
+     }
+diff --git a/modules/generators/mod_cgid.c b/modules/generators/mod_cgid.c
+index 231230b..0d8cecf 100644
+--- a/modules/generators/mod_cgid.c
++++ b/modules/generators/mod_cgid.c
+@@ -90,6 +90,8 @@
+ #include "ap_mpm.h"
+ #include "iol_socket.h"
+ #include "unixd.h"
++#include <sys/stat.h>
++#include <sys/socket.h> /* for sockaddr_un */
+ #include <sys/un.h> /* for sockaddr_un */
+ #include <sys/types.h>
+ #include <sys/stat.h>
+diff --git a/modules/http/http_core.c b/modules/http/http_core.c
+index ea5617a..56de44e 100644
+--- a/modules/http/http_core.c
++++ b/modules/http/http_core.c
+@@ -73,6 +73,7 @@
+ #include "http_connection.h"
+ #include "util_ebcdic.h"
+ #include "mpm.h"
++#include <netdb.h>
+ 
+ /* Allow Apache to use ap_mmap */
+ #ifdef USE_MMAP_FILES
+diff --git a/modules/http/http_protocol.c b/modules/http/http_protocol.c
+index 0432817..ba47c9b 100644
+--- a/modules/http/http_protocol.c
++++ b/modules/http/http_protocol.c
+@@ -78,6 +78,7 @@
+ #include "util_charset.h"
+ #include "mpm_status.h"
+ #include <stdarg.h>
++#include <unistd.h>
+ 
+ AP_HOOK_STRUCT(
+ 	    AP_HOOK_LINK(post_read_request)
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 0727189..02c5530 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -176,6 +176,7 @@
+ #include "http_core.h"          /* For REMOTE_NAME */
+ #include "http_log.h"
+ #include "http_protocol.h"
++#include <unistd.h>
+ #ifdef HAVE_LIMITS_H
+ #include <limits.h>
+ #endif
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 1c6c0a1..22c4192 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -111,6 +111,15 @@
+ #include <sys/uio.h>
+ #endif
+ #endif
++#ifdef HAVE_PWD_H
++#include <pwd.h>
++#endif
++#ifdef HAVE_GRP_H
++#include <grp.h>
++#endif
++#ifdef HAVE_UNISTD_H
++#include <unistd.h>
++#endif
+ 
+ /*
+ ** +-------------------------------------------------------+
+diff --git a/modules/mappers/mod_rewrite.h b/modules/mappers/mod_rewrite.h
+index a233ebc..f6b6690 100644
+--- a/modules/mappers/mod_rewrite.h
++++ b/modules/mappers/mod_rewrite.h
+@@ -450,7 +450,7 @@ static void   store_cache_string(cache *c, char *res, cacheentry *ce);
+ static char  *subst_prefix_path(request_rec *r, char *input, char *match,
+                                 char *subst);
+ static int    parseargline(char *str, char **a1, char **a2, char **a3);
+-static int    prefix_stat(const char *path, struct stat *sb);
++static int    prefix_stat(const char *path, ap_finfo_t *sb);
+ static void   add_env_variable(request_rec *r, char *s);
+ 
+     /* Lexicographic Comparison */
+diff --git a/modules/mappers/mod_vhost_alias.c b/modules/mappers/mod_vhost_alias.c
+index c5d3783..9d6a258 100644
+--- a/modules/mappers/mod_vhost_alias.c
++++ b/modules/mappers/mod_vhost_alias.c
+@@ -75,9 +75,11 @@
+  * both written by James Grinter <jrg@blodwen.demon.co.uk>.
+  */
+ 
++#include "ap_hooks.h"
+ #include "httpd.h"
+ #include "http_config.h"
+ #include "http_core.h"
++#include "http_request.h"  /* for ap_hook_translate_name */
+ 
+ 
+ module MODULE_VAR_EXPORT vhost_alias_module;
+diff --git a/modules/metadata/mod_mime_magic.c b/modules/metadata/mod_mime_magic.c
+index 29d28fb..892b226 100644
+--- a/modules/metadata/mod_mime_magic.c
++++ b/modules/metadata/mod_mime_magic.c
+@@ -132,6 +132,8 @@
+ #include "http_log.h"
+ #include "http_protocol.h"
+ #include "util_script.h"
++#include <sys/stat.h>
++#include <unistd.h>
+ #ifdef HAVE_UTIME_H
+ #include <utime.h>
+ #endif
+@@ -2155,7 +2157,6 @@ static int uncompress_child(struct uncompress_parms *parm, ap_pool_t *cntxt,
+     ap_pool_t *child_context = cntxt;
+     ap_procattr_t *procattr;
+     ap_proc_t *procnew = NULL;
+-    ap_file_t *file = NULL;
+     ap_iol *iol;
+ 
+     env = ap_create_environment(child_context, r->subprocess_env);
+@@ -2179,7 +2180,7 @@ static int uncompress_child(struct uncompress_parms *parm, ap_pool_t *cntxt,
+             close(STDERR_FILENO);
+         }
+ 
+-        rc = ap_create_process(&procnew, compr[parm->method].argv[0],
++        rc = ap_create_process(procnew, compr[parm->method].argv[0],
+                                new_argv, env, procattr, child_context);
+ 
+         if (rc != APR_SUCCESS) {
+@@ -2191,8 +2192,7 @@ static int uncompress_child(struct uncompress_parms *parm, ap_pool_t *cntxt,
+         else {
+             ap_note_subprocess(child_context, procnew, kill_after_timeout);
+             /* Fill in BUFF structure for parents pipe to child's stdout */
+-            ap_get_childout(&file, procnew);
+-            iol = ap_create_file_iol(file);
++            iol = ap_create_file_iol(procnew->out);
+             if (!iol)
+                 return APR_EBADF;
+             if (script_in) {
+diff --git a/modules/metadata/mod_unique_id.c b/modules/metadata/mod_unique_id.c
+index b2d42fc..bce1c56 100644
+--- a/modules/metadata/mod_unique_id.c
++++ b/modules/metadata/mod_unique_id.c
+@@ -66,6 +66,12 @@
+ #include "httpd.h"
+ #include "http_config.h"
+ #include "http_log.h"
++#include "http_protocol.h"  /* for ap_hook_post_read_request */
++
++#include <netdb.h>
++#include <unistd.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
+ 
+ typedef struct {
+     unsigned int stamp;
+diff --git a/os/unix/unixd.c b/os/unix/unixd.c
+index 5a933a8..6757862 100644
+--- a/os/unix/unixd.c
++++ b/os/unix/unixd.c
+@@ -65,6 +65,8 @@
+ #include <pwd.h>
+ #include <sys/resource.h>
+ #include <sys/resource.h>
++#include <unistd.h>
++#include <grp.h>
+ 
+ unixd_config_rec unixd_config;
+ 
+diff --git a/server/connection.c b/server/connection.c
+index 1967107..7c9e0e6 100644
+--- a/server/connection.c
++++ b/server/connection.c
+@@ -67,6 +67,9 @@
+ #include "http_config.h"
+ #include "http_vhost.h"
+ 
++#include <netinet/in.h>
++#include <arpa/inet.h>
++
+ AP_HOOK_STRUCT(
+ 	    AP_HOOK_LINK(pre_connection)
+ 	    AP_HOOK_LINK(process_connection)
+diff --git a/server/mpm/dexter/dexter.c b/server/mpm/dexter/dexter.c
+index 9e33083..29a8a08 100644
+--- a/server/mpm/dexter/dexter.c
++++ b/server/mpm/dexter/dexter.c
+@@ -76,7 +76,9 @@
+ #include "mpm.h"
+ #include "scoreboard.h"
+ 
++#include <unistd.h>
+ #include <poll.h>
++#include <sys/socket.h>
+ #ifdef HAVE_NETINET_TCP_H
+ #include <netinet/tcp.h>
+ #endif
+diff --git a/server/mpm/mpmt_pthread/mpmt_pthread.c b/server/mpm/mpmt_pthread/mpmt_pthread.c
+index 40935bc..a23df67 100644
+--- a/server/mpm/mpmt_pthread/mpmt_pthread.c
++++ b/server/mpm/mpmt_pthread/mpmt_pthread.c
+@@ -78,6 +78,7 @@
+ #ifdef HAVE_NETINET_TCP_H
+ #include <netinet/tcp.h>
+ #endif
++#include <sys/socket.h> 
+ #include <sys/wait.h> 
+ #include <pthread.h>
+ #include <signal.h>
+diff --git a/server/mpm/prefork/prefork.c b/server/mpm/prefork/prefork.c
+index 7e21d6c..d1aeaef 100644
+--- a/server/mpm/prefork/prefork.c
++++ b/server/mpm/prefork/prefork.c
+@@ -108,6 +108,8 @@
+ #include <sys/times.h>
+ #include <sys/types.h>
+ #include <sys/wait.h>
++#include <sys/socket.h>
++#include <unistd.h>
+ 
+ #ifdef HAVE_NETINET_TCP_H
+ #include <netinet/tcp.h>	/* for TCP_NODELAY */
+diff --git a/server/util.c b/server/util.c
+index 0ae566a..57cd73f 100644
+--- a/server/util.c
++++ b/server/util.c
+@@ -80,12 +80,18 @@
+ #include "http_config.h"
+ #include "util_ebcdic.h"
+ 
+-#if defined(SUNOS4)
+-/* stdio.h has been read in ap_config.h already. Add missing prototypes here: */
+-extern int fgetc(FILE *);
+-extern char *fgets(char *s, int, FILE*);
+-extern int fclose(FILE *);
++#include <stdio.h>
++#include <unistd.h>
++#include <netinet/in.h>
++#include <netdb.h>
++#include <arpa/inet.h>
++#ifdef HAVE_PWD_H
++#include <pwd.h>
+ #endif
++#ifdef HAVE_GRP_H
++#include <grp.h>
++#endif
++
+ 
+ /* A bunch of functions in util.c scan strings looking for certain characters.
+  * To make that more efficient we encode a lookup table.  The test_char_table
+diff --git a/server/util_uri.c b/server/util_uri.c
+index 07da60f..79630e3 100644
+--- a/server/util_uri.c
++++ b/server/util_uri.c
+@@ -66,6 +66,7 @@
+ #include "http_log.h"
+ #include "util_uri.h"
+ #include <string.h>
++#include <netdb.h>
+ 
+ /* Some WWW schemes and their default ports; this is basically /etc/services */
+ /* This will become global when the protocol abstraction comes */
+diff --git a/server/vhost.c b/server/vhost.c
+index 8e1158c..291a5b7 100644
+--- a/server/vhost.c
++++ b/server/vhost.c
+@@ -70,6 +70,10 @@
+ #include "http_protocol.h"
+ #include "http_core.h"
+ 
++#include <arpa/inet.h>
++#include <netinet/in.h>
++#include <netdb.h>
++
+ /*
+  * After all the definitions there's an explanation of how it's all put
+  * together.
+diff --git a/support/logresolve.c b/support/logresolve.c
+index c9f8ca2..78aa64a 100644
+--- a/support/logresolve.c
++++ b/support/logresolve.c
+@@ -42,6 +42,7 @@
+ #include "ap_config.h"
+ #include <ctype.h>
+ #include <stdio.h>
++#include <netdb.h>
+ 
+ #if !defined(MPE) && !defined(BEOS) && !defined(WIN32)
+ #include <arpa/inet.h>
+diff --git a/support/rotatelogs.c b/support/rotatelogs.c
+index 404aca8..6d1b926 100644
+--- a/support/rotatelogs.c
++++ b/support/rotatelogs.c
+@@ -67,6 +67,7 @@
+ #include <fcntl.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <unistd.h>
+ 
+ #define BUFSIZE		65536
+ 

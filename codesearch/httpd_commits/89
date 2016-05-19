@@ -1,0 +1,617 @@
+commit 3cf1e534d49f6b711d6fef616cd13620c9a76073
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sat Jul 2 07:45:00 2011 +0000
+
+    Add string valued expressions to ap_expr, do some API cleanup
+    
+    - add possibility to have expressions that evaluate to a string and not to
+      a boolean value
+    - modify ap_expr_parse_cmd() interface to support this and make it more
+      convenient to use in general
+    - rename AP_EXPR_FLAGS_* to AP_EXPR_FLAG_* for consistency
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1142164 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/ap_expr.h b/include/ap_expr.h
+index 3366f9c..409c7ac 100644
+--- a/include/ap_expr.h
++++ b/include/ap_expr.h
+@@ -47,23 +47,25 @@ typedef struct {
+     const char *filename;
+     /** The line number where the expression has been defined (for logging). */
+     unsigned int line_number;
+-    /** Flags relevant for the expression, see AP_EXPR_FLAGS_* */
++    /** Flags relevant for the expression, see AP_EXPR_FLAG_* */
+     unsigned int flags;
+-    /** The module that is used for loglevel configuration (XXX put into eval_ctx?) */
++    /** The module that is used for loglevel configuration */
+     int module_index;
+ } ap_expr_info_t;
+ 
+ /** Use ssl_expr compatibility mode (changes the meaning of the comparison
+  * operators)
+  */
+-#define AP_EXPR_FLAGS_SSL_EXPR_COMPAT       1
++#define AP_EXPR_FLAG_SSL_EXPR_COMPAT       1
+ /** Don't add siginificant request headers to the Vary response header */
+-#define AP_EXPR_FLAGS_DONT_VARY             2
++#define AP_EXPR_FLAG_DONT_VARY             2
+ /** Don't allow functions/vars that bypass the current request's access
+  *  restrictions or would otherwise leak confidential information.
+  *  Used by e.g. mod_include.
+  */
+-#define AP_EXPR_FLAGS_RESTRICTED            4
++#define AP_EXPR_FLAG_RESTRICTED            4
++/** Expression evaluates to a string, not to a bool */
++#define AP_EXPR_FLAG_STRING_RESULT         8
+ 
+ 
+ /**
+@@ -74,7 +76,7 @@ typedef struct {
+  * @return > 0 if expression evaluates to true, == 0 if false, < 0 on error
+  * @note err will be set to NULL on success, or to an error message on error
+  * @note request headers used during evaluation will be added to the Vary:
+- *       response header, unless ::AP_EXPR_FLAGS_DONT_VARY is set.
++ *       response header, unless ::AP_EXPR_FLAG_DONT_VARY is set.
+  */
+ AP_DECLARE(int) ap_expr_exec(request_rec *r, const ap_expr_info_t *expr,
+                              const char **err);
+@@ -93,7 +95,7 @@ AP_DECLARE(int) ap_expr_exec(request_rec *r, const ap_expr_info_t *expr,
+  *       available to ap_expr_exec_re and to use ap_expr_exec_re's matches
+  *       later on.
+  * @note request headers used during evaluation will be added to the Vary:
+- *       response header, unless ::AP_EXPR_FLAGS_DONT_VARY is set.
++ *       response header, unless ::AP_EXPR_FLAG_DONT_VARY is set.
+  */
+ AP_DECLARE(int) ap_expr_exec_re(request_rec *r, const ap_expr_info_t *expr,
+                                 apr_size_t nmatch, ap_regmatch_t *pmatch,
+@@ -124,6 +126,8 @@ typedef struct {
+      * interested in this information.
+      */
+     const char **vary_this;
++    /** where to store the result string */
++    const char **result_string;
+     /** Arbitrary context data provided by the caller for custom functions */
+     void *data;
+ } ap_expr_eval_ctx_t;
+@@ -140,6 +144,44 @@ typedef struct {
+ AP_DECLARE(int) ap_expr_exec_ctx(ap_expr_eval_ctx_t *ctx);
+ 
+ /**
++ * Evaluate a parse tree of a string valued expression
++ * @param r The current request
++ * @param expr The expression to be evaluated
++ * @param err Where an error message should be stored
++ * @return The result string, NULL on error
++ * @note err will be set to NULL on success, or to an error message on error
++ * @note request headers used during evaluation will be added to the Vary:
++ *       response header, unless ::AP_EXPR_FLAG_DONT_VARY is set.
++ */
++AP_DECLARE(const char *) ap_expr_str_exec(request_rec *r,
++                                          const ap_expr_info_t *expr,
++                                          const char **err);
++
++/**
++ * Evaluate a parse tree of a string valued expression
++ * @param r The current request
++ * @param expr The expression to be evaluated
++ * @param nmatch size of the regex match vector pmatch
++ * @param pmatch information about regex matches
++ * @param source the string that pmatch applies to
++ * @param err Where an error message should be stored
++ * @return The result string, NULL on error
++ * @note err will be set to NULL on success, or to an error message on error
++ * @note nmatch/pmatch/source can be used both to make previous matches
++ *       available to ap_expr_exec_re and to use ap_expr_exec_re's matches
++ *       later on.
++ * @note request headers used during evaluation will be added to the Vary:
++ *       response header, unless ::AP_EXPR_FLAG_DONT_VARY is set.
++ */
++AP_DECLARE(const char *) ap_expr_str_exec_re(request_rec *r,
++                                             const ap_expr_info_t *expr,
++                                             apr_size_t nmatch,
++                                             ap_regmatch_t *pmatch,
++                                             const char **source,
++                                             const char **err);
++
++
++/**
+  * The parser can be extended with variable lookup, functions, and
+  * and operators.
+  *
+@@ -274,16 +316,27 @@ AP_DECLARE(const char *) ap_expr_parse(apr_pool_t *pool, apr_pool_t *ptemp,
+  * uses info from cmd_parms to fill in most of it.
+  * @param cmd The cmd_parms struct
+  * @param expr The expression string to parse
++ * @param flags The flags to use, see AP_EXPR_FLAG_*
+  * @param err Set to NULL on success, error message on error
+  * @param lookup_fn The lookup function used to lookup vars, functions, and
+  *        operators
++ * @param module_index The module_index to set for the expression
+  * @return The parsed expression
++ * @note Usually ap_expr_parse_cmd() should be used
+  */
+-AP_DECLARE(ap_expr_info_t *) ap_expr_parse_cmd(const cmd_parms *cmd,
+-                                               const char *expr,
+-                                               const char **err,
+-                                               ap_expr_lookup_fn_t *lookup_fn);
++AP_DECLARE(ap_expr_info_t *) ap_expr_parse_cmd_mi(const cmd_parms *cmd,
++                                                  const char *expr,
++                                                  unsigned int flags,
++                                                  const char **err,
++                                                  ap_expr_lookup_fn_t *lookup_fn,
++                                                  int module_index);
+ 
++/**
++ * Convenience wrapper for ap_expr_parse_cmd_mi() that sets
++ * module_index = APLOG_MODULE_INDEX
++ */
++#define ap_expr_parse_cmd(cmd, expr, flags, err, lookup_fn) \
++        ap_expr_parse_cmd_mi(cmd, expr, flags, err, lookup_fn, APLOG_MODULE_INDEX)
+ 
+  /**
+   * Internal initialisation of ap_expr (for httpd internal use)
+diff --git a/include/ap_mmn.h b/include/ap_mmn.h
+index 8e7865a..8bba124 100644
+--- a/include/ap_mmn.h
++++ b/include/ap_mmn.h
+@@ -337,14 +337,17 @@
+  *                         add ap_start_lingering_close(),
+  *                         add conn_state_e:CONN_STATE_LINGER_NORMAL and CONN_STATE_LINGER_SHORT
+  * 20110619.1 (2.3.13-dev) add ap_str_toupper()
++ * 20110702.0 (2.3.13-dev) make ap_expr_parse_cmd() macro wrapper for new
++ *                         ap_expr_parse_cmd_mi() function, add ap_expr_str_*() functions,
++ *                         rename AP_EXPR_FLAGS_* -> AP_EXPR_FLAG_*
+  */
+ 
+ #define MODULE_MAGIC_COOKIE 0x41503234UL /* "AP24" */
+ 
+ #ifndef MODULE_MAGIC_NUMBER_MAJOR
+-#define MODULE_MAGIC_NUMBER_MAJOR 20110619
++#define MODULE_MAGIC_NUMBER_MAJOR 20110702
+ #endif
+-#define MODULE_MAGIC_NUMBER_MINOR 1                    /* 0...n */
++#define MODULE_MAGIC_NUMBER_MINOR 0                    /* 0...n */
+ 
+ /**
+  * Determine if the server's current MODULE_MAGIC_NUMBER is at least a
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index 4a8be33..c81eb8e 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -1034,12 +1034,12 @@ static const char *expr_parse_config(cmd_parms *cmd, const char *require_line,
+                                      const void **parsed_require_line)
+ {
+     const char *expr_err = NULL;
+-    ap_expr_info_t *expr = ap_expr_parse_cmd(cmd, require_line, &expr_err, NULL);
++    ap_expr_info_t *expr = ap_expr_parse_cmd(cmd, require_line, 0, &expr_err,
++                                             NULL);
+ 
+     if (expr_err)
+         return "Cannot parse expression in require line";
+ 
+-    expr->module_index = APLOG_MODULE_INDEX;
+     *parsed_require_line = expr;
+ 
+     return NULL;
+diff --git a/modules/filters/mod_filter.c b/modules/filters/mod_filter.c
+index 5dd3943..8dbbf8c 100644
+--- a/modules/filters/mod_filter.c
++++ b/modules/filters/mod_filter.c
+@@ -427,20 +427,17 @@ static const char *filter_provider(cmd_parms *cmd, void *CFG,
+     if (!provider_frec) {
+         return apr_psprintf(cmd->pool, "Unknown filter provider %s", pname);
+     }
+-    node = ap_expr_parse_cmd(cmd, expr, &err, NULL);
++    node = ap_expr_parse_cmd(cmd, expr, 0, &err, NULL);
+     if (err) {
+         return apr_pstrcat(cmd->pool,
+                            "Error parsing FilterProvider expression:", err,
+                            NULL);
+     }
+-    node->module_index = APLOG_MODULE_INDEX;
+-
+     provider = apr_palloc(cmd->pool, sizeof(ap_filter_provider_t));
+     provider->expr = node;
+     provider->frec = provider_frec;
+     provider->next = frec->providers;
+     frec->providers = provider;
+-
+     return NULL;
+ }
+ static const char *filter_chain(cmd_parms *cmd, void *CFG, const char *arg)
+diff --git a/modules/filters/mod_include.c b/modules/filters/mod_include.c
+index 981838d..f4cf283 100644
+--- a/modules/filters/mod_include.c
++++ b/modules/filters/mod_include.c
+@@ -1597,7 +1597,7 @@ static int parse_ap_expr(include_ctx_t *ctx, const char *expr, int *was_error)
+     expr_info.filename = ctx->r->filename;
+     expr_info.line_number = 0;
+     expr_info.module_index = APLOG_MODULE_INDEX;
+-    expr_info.flags = AP_EXPR_FLAGS_RESTRICTED;
++    expr_info.flags = AP_EXPR_FLAG_RESTRICTED;
+     err = ap_expr_parse(ctx->r->pool, ctx->r->pool, &expr_info, expr,
+                         include_expr_lookup);
+     if (err) {
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 9e83e66..6218bd1 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -1254,12 +1254,11 @@ static const char *add_custom_log(cmd_parms *cmd, void *dummy, const char *fn,
+             const char *err;
+             if ((envclause[5] == '\0'))
+                 return "missing condition";
+-            cls->condition_expr = ap_expr_parse_cmd(cmd, &envclause[5], &err,
+-                                                    NULL);
++            cls->condition_expr = ap_expr_parse_cmd(cmd, &envclause[5],
++                                                    AP_EXPR_FLAG_DONT_VARY,
++                                                    &err, NULL);
+             if (err)
+                 return err;
+-            cls->condition_expr->module_index = APLOG_MODULE_INDEX;
+-            cls->condition_expr->flags |= AP_EXPR_FLAGS_DONT_VARY;
+         }
+         else {
+             return "error in condition clause";
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index cd14687..4536339 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -3322,13 +3322,12 @@ static const char *cmd_rewritecond(cmd_parms *cmd, void *in_dconf,
+         newcond->regexp  = regexp;
+     }
+     else if (newcond->ptype == CONDPAT_AP_EXPR) {
+-        newcond->expr = ap_expr_parse_cmd(cmd, a2, &err, NULL);
++        unsigned int flags = newcond->flags & CONDFLAG_NOVARY ?
++                             AP_EXPR_FLAG_DONT_VARY : 0;
++        newcond->expr = ap_expr_parse_cmd(cmd, a2, flags, &err, NULL);
+         if (err)
+             return apr_psprintf(cmd->pool, "RewriteCond: cannot compile "
+                                 "expression \"%s\": %s", a2, err);
+-        newcond->expr->module_index = rewrite_module.module_index;
+-        if (newcond->flags & CONDFLAG_NOVARY)
+-            newcond->expr->flags |= AP_EXPR_FLAGS_DONT_VARY;
+     }
+ 
+     return NULL;
+diff --git a/modules/metadata/mod_headers.c b/modules/metadata/mod_headers.c
+index 40fe34e..b82281e 100644
+--- a/modules/metadata/mod_headers.c
++++ b/modules/metadata/mod_headers.c
+@@ -492,13 +492,12 @@ static APR_INLINE const char *header_inout_cmd(cmd_parms *cmd,
+         }
+         else {
+             const char *err = NULL;
+-            expr = ap_expr_parse_cmd(cmd, envclause, &err, NULL);
++            expr = ap_expr_parse_cmd(cmd, envclause, 0, &err, NULL);
+             if (err) {
+                 return apr_pstrcat(cmd->pool,
+                                    "Can't parse envclause/expression: ", err,
+                                    NULL);
+             }
+-            expr->module_index = APLOG_MODULE_INDEX;
+         }
+     }
+ 
+diff --git a/modules/metadata/mod_setenvif.c b/modules/metadata/mod_setenvif.c
+index 53f78b4..4232580 100644
+--- a/modules/metadata/mod_setenvif.c
++++ b/modules/metadata/mod_setenvif.c
+@@ -477,11 +477,10 @@ static const char *add_setenvifexpr(cmd_parms *cmd, void *mconfig,
+     new->regex = NULL;
+     new->pattern = NULL;
+     new->preg = NULL;
+-    new->expr = ap_expr_parse_cmd(cmd, expr, &err, NULL);
++    new->expr = ap_expr_parse_cmd(cmd, expr, 0, &err, NULL);
+     if (err)
+         return apr_psprintf(cmd->pool, "Could not parse expression \"%s\": %s",
+                             expr, err);
+-    new->expr->module_index = setenvif_module.module_index;
+ 
+     return add_envvars(cmd, args, new);
+ }
+diff --git a/modules/ssl/ssl_engine_config.c b/modules/ssl/ssl_engine_config.c
+index 6042bac..20c2e8f 100644
+--- a/modules/ssl/ssl_engine_config.c
++++ b/modules/ssl/ssl_engine_config.c
+@@ -1160,7 +1160,7 @@ const char *ssl_cmd_SSLRequire(cmd_parms *cmd,
+     ssl_require_t *require;
+     const char *errstring;
+ 
+-    info->flags = AP_EXPR_FLAGS_SSL_EXPR_COMPAT;
++    info->flags = AP_EXPR_FLAG_SSL_EXPR_COMPAT;
+     info->filename = cmd->directive->filename;
+     info->line_number = cmd->directive->line_num;
+     info->module_index = APLOG_MODULE_INDEX;
+diff --git a/server/core.c b/server/core.c
+index d416266..c2b6464 100644
+--- a/server/core.c
++++ b/server/core.c
+@@ -2285,11 +2285,10 @@ static const char *ifsection(cmd_parms *cmd, void *mconfig, const char *arg)
+         if (!arg[0])
+             return missing_container_arg(cmd);
+         condition = ap_getword_conf(cmd->pool, &arg);
+-        conf->condition = ap_expr_parse_cmd(cmd, condition, &expr_err, NULL);
++        conf->condition = ap_expr_parse_cmd(cmd, condition, 0, &expr_err, NULL);
+         if (expr_err)
+             return apr_psprintf(cmd->pool, "Cannot parse condition clause: %s",
+                                 expr_err);
+-        conf->condition->module_index = APLOG_MODULE_INDEX;
+     }
+ 
+     errmsg = ap_walk_config(cmd->directive->first_child, cmd, new_if_conf);
+diff --git a/server/util_expr_eval.c b/server/util_expr_eval.c
+index 64ab71c..53bd1cc 100644
+--- a/server/util_expr_eval.c
++++ b/server/util_expr_eval.c
+@@ -316,6 +316,7 @@ AP_DECLARE(const char *) ap_expr_parse(apr_pool_t *pool, apr_pool_t *ptemp,
+     ctx.scan_buf[0] = '\0';
+     ctx.scan_ptr    = ctx.scan_buf;
+     ctx.lookup_fn   = lookup_fn ? lookup_fn : ap_expr_lookup_default;
++    ctx.at_start    = 1;
+ 
+ 
+     /*
+@@ -353,14 +354,18 @@ AP_DECLARE(const char *) ap_expr_parse(apr_pool_t *pool, apr_pool_t *ptemp,
+     return NULL;
+ }
+ 
+-AP_DECLARE(ap_expr_info_t*) ap_expr_parse_cmd(const cmd_parms *cmd,
+-                                              const char *expr,
+-                                              const char **err,
+-                                              ap_expr_lookup_fn_t *lookup_fn)
++AP_DECLARE(ap_expr_info_t*) ap_expr_parse_cmd_mi(const cmd_parms *cmd,
++                                                 const char *expr,
++                                                 unsigned int flags,
++                                                 const char **err,
++                                                 ap_expr_lookup_fn_t *lookup_fn,
++                                                 int module_index)
+ {
+     ap_expr_info_t *info = apr_pcalloc(cmd->pool, sizeof(ap_expr_info_t));
+     info->filename = cmd->directive->filename;
+     info->line_number = cmd->directive->line_num;
++    info->flags = flags;
++    info->module_index = module_index;
+     *err = ap_expr_parse(cmd->pool, cmd->temp_pool, info, expr, lookup_fn);
+ 
+     if (*err)
+@@ -677,7 +682,7 @@ static int ap_expr_eval(ap_expr_eval_ctx_t *ctx, const ap_expr_t *node)
+     case op_BinaryOpCall:
+         return ap_expr_eval_binary_op(ctx, e1, e2);
+     case op_Comp:
+-        if (ctx->info->flags & AP_EXPR_FLAGS_SSL_EXPR_COMPAT)
++        if (ctx->info->flags & AP_EXPR_FLAG_SSL_EXPR_COMPAT)
+             return ssl_expr_eval_comp(ctx, e1);
+         else
+             return ap_expr_eval_comp(ctx, e1);
+@@ -710,22 +715,39 @@ AP_DECLARE(int) ap_expr_exec_ctx(ap_expr_eval_ctx_t *ctx)
+     }
+ 
+     *ctx->err = NULL;
+-    rc = ap_expr_eval(ctx, ctx->info->root_node);
+-    if (*ctx->err != NULL) {
+-        ap_log_rerror(LOG_MARK(ctx->info), APLOG_ERR, 0, ctx->r,
+-                      "Evaluation of expression from %s:%d failed: %s",
+-                      ctx->info->filename, ctx->info->line_number, *ctx->err);
+-        return -1;
+-    } else {
+-        rc = rc ? 1 : 0;
+-        ap_log_rerror(LOG_MARK(ctx->info), APLOG_TRACE4, 0, ctx->r,
+-                      "Evaluation of expression from %s:%d gave: %d",
+-                      ctx->info->filename, ctx->info->line_number, rc);
++    if (ctx->info->flags & AP_EXPR_FLAG_STRING_RESULT) {
++        *ctx->result_string = ap_expr_eval_word(ctx, ctx->info->root_node);
++        if (*ctx->err != NULL) {
++            ap_log_rerror(LOG_MARK(ctx->info), APLOG_ERR, 0, ctx->r,
++                          "Evaluation of expression from %s:%d failed: %s",
++                          ctx->info->filename, ctx->info->line_number, *ctx->err);
++            return -1;
++        } else {
++            ap_log_rerror(LOG_MARK(ctx->info), APLOG_TRACE4, 0, ctx->r,
++                          "Evaluation of string expression from %s:%d gave: %s",
++                          ctx->info->filename, ctx->info->line_number,
++                          *ctx->result_string);
++            return 1;
++	}
++    }
++    else {
++        rc = ap_expr_eval(ctx, ctx->info->root_node);
++        if (*ctx->err != NULL) {
++            ap_log_rerror(LOG_MARK(ctx->info), APLOG_ERR, 0, ctx->r,
++                          "Evaluation of expression from %s:%d failed: %s",
++                          ctx->info->filename, ctx->info->line_number, *ctx->err);
++            return -1;
++        } else {
++            rc = rc ? 1 : 0;
++            ap_log_rerror(LOG_MARK(ctx->info), APLOG_TRACE4, 0, ctx->r,
++                          "Evaluation of expression from %s:%d gave: %d",
++                          ctx->info->filename, ctx->info->line_number, rc);
+ 
+-        if (*ctx->vary_this)
+-            apr_table_merge(ctx->r->headers_out, "Vary", *ctx->vary_this);
++            if (ctx->vary_this && *ctx->vary_this)
++                apr_table_merge(ctx->r->headers_out, "Vary", *ctx->vary_this);
+ 
+-        return rc;
++            return rc;
++        }
+     }
+ }
+ 
+@@ -734,10 +756,12 @@ AP_DECLARE(int) ap_expr_exec_re(request_rec *r, const ap_expr_info_t *info,
+                                 const char **source, const char **err)
+ {
+     ap_expr_eval_ctx_t ctx;
+-    int dont_vary = (info->flags & AP_EXPR_FLAGS_DONT_VARY);
++    int dont_vary = (info->flags & AP_EXPR_FLAG_DONT_VARY);
+     const char *tmp_source = NULL, *vary_this = NULL;
+     ap_regmatch_t tmp_pmatch[10];
+ 
++    AP_DEBUG_ASSERT((info->flags & AP_EXPR_FLAG_STRING_RESULT) == 0);
++
+     ctx.r = r;
+     ctx.c = r->connection;
+     ctx.s = r->server;
+@@ -759,6 +783,65 @@ AP_DECLARE(int) ap_expr_exec_re(request_rec *r, const ap_expr_info_t *info,
+     return ap_expr_exec_ctx(&ctx);
+ }
+ 
++AP_DECLARE(const char *) ap_expr_str_exec_re(request_rec *r,
++                                             const ap_expr_info_t *info,
++                                             apr_size_t nmatch,
++                                             ap_regmatch_t *pmatch,
++                                             const char **source,
++                                             const char **err)
++{
++    ap_expr_eval_ctx_t ctx;
++    int dont_vary, rc;
++    const char *tmp_source = NULL, *vary_this = NULL;
++    ap_regmatch_t tmp_pmatch[10];
++    const char *result;
++
++    AP_DEBUG_ASSERT(info->flags & AP_EXPR_FLAG_STRING_RESULT);
++
++    if (info->root_node->node_op == op_String) {
++        /* short-cut for constant strings */
++        *err = NULL;
++        return (const char *)info->root_node->node_arg1;
++    }
++
++    dont_vary = (info->flags & AP_EXPR_FLAG_DONT_VARY);
++
++    ctx.r = r;
++    ctx.c = r->connection;
++    ctx.s = r->server;
++    ctx.p = r->pool;
++    ctx.err  = err;
++    ctx.info = info;
++    ctx.re_nmatch = nmatch;
++    ctx.re_pmatch = pmatch;
++    ctx.re_source = source;
++    ctx.vary_this = dont_vary ? NULL : &vary_this;
++    ctx.data = NULL;
++    ctx.result_string = &result;
++
++    if (!pmatch) {
++        ctx.re_nmatch = 10;
++        ctx.re_pmatch = tmp_pmatch;
++        ctx.re_source = &tmp_source;
++    }
++
++    rc = ap_expr_exec_ctx(&ctx);
++    if (rc > 0)
++        return result;
++    else if (rc < 0)
++        return NULL;
++    else
++        ap_assert(0);
++}
++
++AP_DECLARE(const char *) ap_expr_str_exec(request_rec *r,
++                                          const ap_expr_info_t *info,
++                                          const char **err)
++{
++    return ap_expr_str_exec_re(r, info, 0, NULL, NULL, err);
++}
++
++
+ static void add_vary(ap_expr_eval_ctx_t *ctx, const char *name)
+ {
+     if (!ctx->vary_this)
+@@ -1459,7 +1542,7 @@ static int core_expr_lookup(ap_expr_lookup_parms *parms)
+             }
+             while (prov->func) {
+                 if (strcasecmp(prov->name, parms->name) == 0) {
+-                    if ((parms->flags & AP_EXPR_FLAGS_RESTRICTED)
++                    if ((parms->flags & AP_EXPR_FLAG_RESTRICTED)
+                         && prov->restricted) {
+                         *parms->err =
+                             apr_psprintf(parms->ptemp,
+diff --git a/server/util_expr_parse.y b/server/util_expr_parse.y
+index 6ea15ed..59dea8a 100644
+--- a/server/util_expr_parse.y
++++ b/server/util_expr_parse.y
+@@ -41,6 +41,9 @@
+ %token  T_TRUE
+ %token  T_FALSE
+ 
++%token  T_EXPR_BOOL
++%token  T_EXPR_STRING
++
+ %token  <cpVal> T_ERROR
+ 
+ %token  <cpVal> T_DIGIT
+@@ -106,7 +109,8 @@ int ap_expr_yylex(YYSTYPE *lvalp, void *scanner);
+ 
+ %%
+ 
+-root      : expr                         { ctx->expr = $1; }
++root      : T_EXPR_BOOL   expr           { ctx->expr = $2; }
++          | T_EXPR_STRING string         { ctx->expr = $2; }
+           | T_ERROR                      { YYABORT; }
+           ;
+ 
+diff --git a/server/util_expr_private.h b/server/util_expr_private.h
+index 4e229c6..4d7f6b4 100644
+--- a/server/util_expr_private.h
++++ b/server/util_expr_private.h
+@@ -89,6 +89,7 @@ typedef struct {
+     char              *scan_ptr;
+     char               scan_buf[MAX_STRING_LEN];
+     char               scan_del;
++    int                at_start;
+ 
+     /* pools for result and temporary usage */
+     apr_pool_t        *pool;
+diff --git a/server/util_expr_scan.l b/server/util_expr_scan.l
+index e47c0e4..607af14 100644
+--- a/server/util_expr_scan.l
++++ b/server/util_expr_scan.l
+@@ -75,6 +75,22 @@
+   char *regex_ptr = NULL;
+   char  regex_del = '\0';
+ 
++%{
++ /*
++  * Set initial state for string expressions
++  */
++  if (yyextra->at_start) {
++    yyextra->at_start = 0;
++    if (yyextra->flags & AP_EXPR_FLAG_STRING_RESULT) {
++        BEGIN(str);
++        return T_EXPR_STRING;
++    }
++    else {
++        return T_EXPR_BOOL;
++    }
++  }
++%}
++
+  /*
+   * Whitespaces
+   */
+@@ -116,9 +132,22 @@
+ <str,var,vararg>\n {
+     PERROR("Unterminated string or variable");
+ }
+-<str,var,vararg><<EOF>> {
++<var,vararg><<EOF>> {
+     PERROR("Unterminated string or variable");
+ }
++<str><<EOF>> {
++    if (!(yyextra->flags & AP_EXPR_FLAG_STRING_RESULT)) {
++        PERROR("Unterminated string or variable");
++    }
++    else {
++        *str_ptr = '\0';
++        yylval->cpVal = apr_pstrdup(yyextra->pool, str_buf);
++        str_ptr = str_buf;
++        BEGIN(INITIAL);
++        return T_STRING;
++    }
++}
++
+ <str,vararg>\\[0-7]{1,3} {
+     int result;
+ 

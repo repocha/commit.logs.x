@@ -1,0 +1,3260 @@
+commit af14f6f65f2ed31a8f8fe80936eef9efe0de53ea
+Author: William A. Rowe Jr <wrowe@apache.org>
+Date:   Sun Aug 6 06:07:53 2000 +0000
+
+      Remaining cleanup of ap_ -> apr_ and AP_ -> APR_ transformation...
+      see src/lib/apr/apr_compat.h for most details.
+      Also a few minor nits to get Win32 to build.
+    
+    PR:
+    Obtained from:
+    Submitted by:
+    Reviewed by:
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@86008 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/ApacheCore.def b/ApacheCore.def
+index d472426..e1ca63f 100644
+--- a/ApacheCore.def
++++ b/ApacheCore.def
+@@ -139,9 +139,9 @@ EXPORTS
+ ;	ap_kill_cleanups_for_socket   @132
+ 	;ap_kill_timeout   @133
+ 	ap_log_assert   @134
+-	ap_log_error_old   @135
+-	ap_log_reason   @136
+-	ap_log_unixerr   @137
++;	ap_log_error_old   @135
++;	ap_log_reason   @136
++;	ap_log_unixerr   @137
+ ;	ap_make_array   @138
+ 	ap_make_dirstr   @139
+ 	ap_make_dirstr_parent   @140
+@@ -279,7 +279,7 @@ EXPORTS
+ 	ap_limit_section   @272
+ 	ap_loaded_modules   @273
+ 	ap_log_error   @274
+-	ap_log_printf   @275
++;	ap_log_printf   @275
+ 	ap_log_rerror   @276
+ ;	ap_month_snames  @277
+ ;	ap_null_cleanup   @278
+diff --git a/ApacheCore.dsp b/ApacheCore.dsp
+index 470f4b6..1624f66 100644
+--- a/ApacheCore.dsp
++++ b/ApacheCore.dsp
+@@ -26,7 +26,6 @@ CFG=ApacheCore - Win32 Debug
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+-RSC=rc.exe
+ 
+ !IF  "$(CFG)" == "ApacheCore - Win32 Release"
+ 
+@@ -40,10 +39,11 @@ RSC=rc.exe
+ # PROP Output_Dir "LibR"
+ # PROP Intermediate_Dir "LibR"
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /I ".\modules\mpm\winnt" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
++RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
++# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
++# ADD CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /I ".\modules\mpm\winnt" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+@@ -64,10 +64,11 @@ LIB32=link.exe -lib
+ # PROP Intermediate_Dir "LibD"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /I ".\modules\mpm\winnt" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
++RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
++# ADD BASE CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /I ".\modules\mpm\winnt" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+@@ -370,10 +371,22 @@ SOURCE=.\modules\standard\mod_mime.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\modules\mpm\winnt\mpm.h
++# End Source File
++# Begin Source File
++
++SOURCE=.\include\mpm_common.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\modules\mpm\winnt\mpm_default.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\include\mpm_status.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\modules\mpm\winnt\mpm_winnt.h
+ # End Source File
+ # Begin Source File
+@@ -390,10 +403,18 @@ SOURCE=.\include\util_cfgtree.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\include\util_charset.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\include\util_date.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\include\util_ebcdic.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\include\util_md5.h
+ # End Source File
+ # Begin Source File
+diff --git a/InstallBin.dsp b/InstallBin.dsp
+index b100eb8..1547c48 100644
+--- a/InstallBin.dsp
++++ b/InstallBin.dsp
+@@ -58,7 +58,7 @@ CFG=InstallBin - Win32 Debug
+ # PROP Use_Debug_Libraries 1
+ # PROP Output_Dir "Debug"
+ # PROP Intermediate_Dir "Debug"
+-# PROP Cmd_Line "NMAKE /f makefile.win INSTDIR=.. SHORT=D LONG=Debug _install"
++# PROP Cmd_Line "NMAKE /f makefile.win INSTDIR=e:\apache\apache-2.0 SHORT=D LONG=Debug _install"
+ # PROP Rebuild_Opt ""
+ # PROP Target_File "..\Apache.exe"
+ # PROP Bsc_Name ".\apache.bsc"
+diff --git a/httpd.dsp b/httpd.dsp
+index 470f4b6..1624f66 100644
+--- a/httpd.dsp
++++ b/httpd.dsp
+@@ -26,7 +26,6 @@ CFG=ApacheCore - Win32 Debug
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+-RSC=rc.exe
+ 
+ !IF  "$(CFG)" == "ApacheCore - Win32 Release"
+ 
+@@ -40,10 +39,11 @@ RSC=rc.exe
+ # PROP Output_Dir "LibR"
+ # PROP Intermediate_Dir "LibR"
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /I ".\modules\mpm\winnt" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
++RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
++# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
++# ADD CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /I ".\modules\mpm\winnt" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+@@ -64,10 +64,11 @@ LIB32=link.exe -lib
+ # PROP Intermediate_Dir "LibD"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /I ".\modules\mpm\winnt" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
++RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
++# ADD BASE CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /I ".\modules\mpm\winnt" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "API_EXPORT_SYMBOLS" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+@@ -370,10 +371,22 @@ SOURCE=.\modules\standard\mod_mime.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\modules\mpm\winnt\mpm.h
++# End Source File
++# Begin Source File
++
++SOURCE=.\include\mpm_common.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\modules\mpm\winnt\mpm_default.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\include\mpm_status.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\modules\mpm\winnt\mpm_winnt.h
+ # End Source File
+ # Begin Source File
+@@ -390,10 +403,18 @@ SOURCE=.\include\util_cfgtree.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\include\util_charset.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\include\util_date.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\include\util_ebcdic.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\include\util_md5.h
+ # End Source File
+ # Begin Source File
+diff --git a/include/ap_config.h b/include/ap_config.h
+index 76b470c..4e646e7 100644
+--- a/include/ap_config.h
++++ b/include/ap_config.h
+@@ -56,7 +56,7 @@
+ #define AP_AC_CONFIG_H
+ 
+ #include "ap_mmn.h"		/* MODULE_MAGIC_NUMBER_ */
+-#include "apr_lib.h"		/* ap_isfoo() macros */
++#include "apr_lib.h"		/* apr_isfoo() macros */
+ 
+ /* Implemented flags for dynamic library bindings.
+  *
+diff --git a/include/mpm_common.h b/include/mpm_common.h
+index 7be9052..2eb8ecb 100644
+--- a/include/mpm_common.h
++++ b/include/mpm_common.h
+@@ -105,7 +105,7 @@ void ap_reclaim_child_processes(int terminate);
+  * @param ret The process id of the process that died
+  * @param p The pool to allocate out of
+  */
+-void ap_wait_or_timeout(ap_wait_t *status, apr_proc_t *ret, apr_pool_t *p);
++void ap_wait_or_timeout(apr_wait_t *status, apr_proc_t *ret, apr_pool_t *p);
+ 
+ /**
+  * Log why a child died to the error log, if the child died without the
+@@ -113,7 +113,7 @@ void ap_wait_or_timeout(ap_wait_t *status, apr_proc_t *ret, apr_pool_t *p);
+  * @param pid The child that has died
+  * @param status The status returned from ap_wait_or_timeout
+  */
+-void ap_process_child_status(apr_proc_t *pid, ap_wait_t status);
++void ap_process_child_status(apr_proc_t *pid, apr_wait_t status);
+ 
+ #if defined(TCP_NODELAY) && !defined(MPE) && !defined(TPF)
+ /**
+diff --git a/include/util_md5.h b/include/util_md5.h
+index 7d2896d..94721e8 100644
+--- a/include/util_md5.h
++++ b/include/util_md5.h
+@@ -67,7 +67,7 @@ extern "C" {
+ 
+ API_EXPORT(char *) ap_md5(apr_pool_t *a, const unsigned char *string);
+ API_EXPORT(char *) ap_md5_binary(apr_pool_t *a, const unsigned char *buf, int len);
+-API_EXPORT(char *) ap_md5contextTo64(apr_pool_t *p, ap_md5_ctx_t *context);
++API_EXPORT(char *) ap_md5contextTo64(apr_pool_t *p, apr_md5_ctx_t *context);
+ #ifdef APACHE_XLATE
+ API_EXPORT(char *) ap_md5digest(apr_pool_t *p, apr_file_t *infile,
+                                 apr_xlate_t *xlate);
+diff --git a/libhttpd.def b/libhttpd.def
+index d472426..e1ca63f 100644
+--- a/libhttpd.def
++++ b/libhttpd.def
+@@ -139,9 +139,9 @@ EXPORTS
+ ;	ap_kill_cleanups_for_socket   @132
+ 	;ap_kill_timeout   @133
+ 	ap_log_assert   @134
+-	ap_log_error_old   @135
+-	ap_log_reason   @136
+-	ap_log_unixerr   @137
++;	ap_log_error_old   @135
++;	ap_log_reason   @136
++;	ap_log_unixerr   @137
+ ;	ap_make_array   @138
+ 	ap_make_dirstr   @139
+ 	ap_make_dirstr_parent   @140
+@@ -279,7 +279,7 @@ EXPORTS
+ 	ap_limit_section   @272
+ 	ap_loaded_modules   @273
+ 	ap_log_error   @274
+-	ap_log_printf   @275
++;	ap_log_printf   @275
+ 	ap_log_rerror   @276
+ ;	ap_month_snames  @277
+ ;	ap_null_cleanup   @278
+diff --git a/modules/aaa/mod_access.c b/modules/aaa/mod_access.c
+index c299b4f..3cf74bf 100644
+--- a/modules/aaa/mod_access.c
++++ b/modules/aaa/mod_access.c
+@@ -156,7 +156,7 @@ static const char *order(cmd_parms *cmd, void *dv, const char *arg)
+ 
+ static int is_ip(const char *host)
+ {
+-    while ((*host == '.') || ap_isdigit(*host))
++    while ((*host == '.') || apr_isdigit(*host))
+ 	host++;
+     return (*host == '\0');
+ }
+@@ -193,7 +193,7 @@ static const char *allow_cmd(cmd_parms *cmd, void *dv, const char *from,
+ 	*s++ = '\0';
+ 
+ 	if (!is_ip(where)
+-	    || (a->x.ip.net = ap_inet_addr(where)) == INADDR_NONE) {
++	    || (a->x.ip.net = apr_inet_addr(where)) == INADDR_NONE) {
+ 	    a->type = T_FAIL;
+ 	    return "syntax error in network portion of network/netmask";
+ 	}
+@@ -205,7 +205,7 @@ static const char *allow_cmd(cmd_parms *cmd, void *dv, const char *from,
+ 	}
+ 	/* is it in /a.b.c.d form? */
+ 	if (strchr(s, '.')) {
+-	    mask = ap_inet_addr(s);
++	    mask = apr_inet_addr(s);
+ 	    if (mask == INADDR_NONE) {
+ 		a->type = T_FAIL;
+ 		return "syntax error in mask portion of network/netmask";
+@@ -224,7 +224,7 @@ static const char *allow_cmd(cmd_parms *cmd, void *dv, const char *from,
+ 	a->x.ip.mask = mask;
+         a->x.ip.net  = (a->x.ip.net & mask);   /* pjr - This fixes PR 4770 */
+     }
+-    else if (ap_isdigit(*where) && is_ip(where)) {
++    else if (apr_isdigit(*where) && is_ip(where)) {
+ 	/* legacy syntax for ip addrs: a.b.c. ==> a.b.c.0/24 for example */
+ 	int shift;
+ 	char *t;
+@@ -238,11 +238,11 @@ static const char *allow_cmd(cmd_parms *cmd, void *dv, const char *from,
+ 	shift = 24;
+ 	while (*s) {
+ 	    t = s;
+-	    if (!ap_isdigit(*t)) {
++	    if (!apr_isdigit(*t)) {
+ 		a->type = T_FAIL;
+ 		return "invalid ip address";
+ 	    }
+-	    while (ap_isdigit(*t)) {
++	    while (apr_isdigit(*t)) {
+ 		++t;
+ 	    }
+ 	    if (*t == '.') {
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index f261ec9..422b0e0 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -174,8 +174,8 @@ typedef struct digest_config_struct {
+ 
+ #define	DFLT_ALGORITHM	"MD5"
+ 
+-#define	DFLT_NONCE_LIFE	(300*AP_USEC_PER_SEC)
+-#define NEXTNONCE_DELTA	(30*AP_USEC_PER_SEC)
++#define	DFLT_NONCE_LIFE	(300*APR_USEC_PER_SEC)
++#define NEXTNONCE_DELTA	(30*APR_USEC_PER_SEC)
+ 
+ 
+ #define NONCE_TIME_LEN	(((sizeof(apr_time_t)+2)/3)*4)
+@@ -536,10 +536,10 @@ static const char *set_nonce_lifetime(cmd_parms *cmd, void *config,
+     long  lifetime;
+ 
+     lifetime = strtol(t, &endptr, 10); 
+-    if (endptr < (t+strlen(t)) && !ap_isspace(*endptr))
++    if (endptr < (t+strlen(t)) && !apr_isspace(*endptr))
+ 	return apr_pstrcat(cmd->pool, "Invalid time in AuthDigestNonceLifetime: ", t, NULL);
+ 
+-    ((digest_config_rec *) config)->nonce_lifetime = lifetime * AP_USEC_PER_SEC;
++    ((digest_config_rec *) config)->nonce_lifetime = lifetime * APR_USEC_PER_SEC;
+     return NULL;
+ }
+ 
+@@ -599,7 +599,7 @@ static const char *set_shmem_size(cmd_parms *cmd, void *config,
+     long  size, min;
+ 
+     size = strtol(size_str, &endptr, 10); 
+-    while (ap_isspace(*endptr)) endptr++;
++    while (apr_isspace(*endptr)) endptr++;
+     if (*endptr == '\0' || *endptr == 'b' || *endptr == 'B')
+ 	;
+     else if (*endptr == 'k' || *endptr == 'K')
+@@ -867,19 +867,19 @@ static int get_digest_rec(request_rec *r, digest_header_rec *resp)
+ 
+ 	/* find key */
+ 
+-	while (ap_isspace(auth_line[0])) auth_line++;
++	while (apr_isspace(auth_line[0])) auth_line++;
+ 	vk = 0;
+ 	while (auth_line[0] != '=' && auth_line[0] != ','
+-	       && auth_line[0] != '\0' && !ap_isspace(auth_line[0]))
++	       && auth_line[0] != '\0' && !apr_isspace(auth_line[0]))
+ 	    key[vk++] = *auth_line++;
+ 	key[vk] = '\0';
+-	while (ap_isspace(auth_line[0])) auth_line++;
++	while (apr_isspace(auth_line[0])) auth_line++;
+ 
+ 	/* find value */
+ 
+ 	if (auth_line[0] == '=') {
+ 	    auth_line++;
+-	    while (ap_isspace(auth_line[0])) auth_line++;
++	    while (apr_isspace(auth_line[0])) auth_line++;
+ 
+ 	    vv = 0;
+ 	    if (auth_line[0] == '\"') {		/* quoted string */
+@@ -893,7 +893,7 @@ static int get_digest_rec(request_rec *r, digest_header_rec *resp)
+ 	    }
+ 	    else {				 /* token */
+ 		while (auth_line[0] != ',' && auth_line[0] != '\0'
+-		       && !ap_isspace(auth_line[0]))
++		       && !apr_isspace(auth_line[0]))
+ 		    value[vv++] = *auth_line++;
+ 	    }
+ 	    value[vv] = '\0';
+@@ -1369,7 +1369,7 @@ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+ 	return OK;
+ 
+     nc = strtol(snc, &endptr, 16);
+-    if (endptr < (snc+strlen(snc)) && !ap_isspace(*endptr)) {
++    if (endptr < (snc+strlen(snc)) && !apr_isspace(*endptr)) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+ 		      "Digest: invalid nc %s received - not a number", snc);
+ 	return !OK;
+@@ -1433,8 +1433,8 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 	if (dt > conf->nonce_lifetime) {
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_INFO, 0,r,
+ 			  "Digest: user %s: nonce expired (%.2lf seconds old - max lifetime %.2lf) - sending new nonce", 
+-			  r->user, ((double)dt)/AP_USEC_PER_SEC, 
+-			  ((double)(conf->nonce_lifetime))/AP_USEC_PER_SEC);
++			  r->user, ((double)dt)/APR_USEC_PER_SEC, 
++			  ((double)(conf->nonce_lifetime))/APR_USEC_PER_SEC);
+ 	    note_digest_auth_failure(r, conf, resp, 1);
+ 	    return HTTP_UNAUTHORIZED;
+ 	}
+@@ -1928,7 +1928,7 @@ static int add_auth_info(request_rec *r)
+ 	 * Content-length is never set yet when we get here, and we can't
+ 	 * calc the entity hash) it's best to just leave this #def'd out.
+ 	 */
+-	char date[AP_RFC822_DATE_LEN];
++	char date[APR_RFC822_DATE_LEN];
+ 	apr_rfc822_date(date, r->request_time);
+ 	char *entity_info =
+ 	    ap_md5(r->pool,
+diff --git a/modules/arch/win32/mod_isapi.c b/modules/arch/win32/mod_isapi.c
+index e61cb47..9976c7b 100644
+--- a/modules/arch/win32/mod_isapi.c
++++ b/modules/arch/win32/mod_isapi.c
+@@ -534,7 +534,7 @@ static char* ComposeHeaders(request_rec *r, char* data)
+         }
+ 
+         *value++ = '\0';
+-        while (*value && ap_isspace(*value)) ++value;
++        while (*value && apr_isspace(*value)) ++value;
+ 
+         /* Check all the special-case headers. Similar to what
+          * ap_scan_script_header_err() does (see that function for
+@@ -546,7 +546,7 @@ static char* ComposeHeaders(request_rec *r, char* data)
+             /* Nuke trailing whitespace */    
+             char *tmp;
+             char *endp = value + strlen(value) - 1;
+-            while (endp > value && ap_isspace(*endp)) 
++            while (endp > value && apr_isspace(*endp)) 
+                 *endp-- = '\0';
+ 
+             tmp = apr_pstrdup (r->pool, value);
+diff --git a/modules/cache/mod_file_cache.c b/modules/cache/mod_file_cache.c
+index aec0aff..8794f97 100644
+--- a/modules/cache/mod_file_cache.c
++++ b/modules/cache/mod_file_cache.c
+@@ -360,7 +360,7 @@ static int file_cache_xlat(request_rec *r)
+     sconf = ap_get_module_config(r->server->module_config, &file_cache_module);
+ 
+     /* we only operate when at least one cachefile directive was used */
+-    if (ap_is_empty_table(sconf->files))
++    if (apr_is_empty_table(sconf->files))
+ 	return DECLINED;
+ 
+     res = ap_core_translate(r);
+diff --git a/modules/dav/fs/repos.c b/modules/dav/fs/repos.c
+index 9101034..ff91219 100644
+--- a/modules/dav/fs/repos.c
++++ b/modules/dav/fs/repos.c
+@@ -248,8 +248,8 @@ static void dav_format_time(int style, apr_time_t sec, char *buf)
+     /* 29 chars plus null term */
+     sprintf(buf,
+ 	    "%s, %.2d %s %d %.2d:%.2d:%.2d GMT",
+-           ap_day_snames[tms.tm_wday],
+-           tms.tm_mday, ap_month_snames[tms.tm_mon],
++           apr_day_snames[tms.tm_wday],
++           tms.tm_mday, apr_month_snames[tms.tm_mon],
+            tms.tm_year + 1900,
+            tms.tm_hour, tms.tm_min, tms.tm_sec);
+ }
+diff --git a/modules/dav/main/mod_dav.c b/modules/dav/main/mod_dav.c
+index a74aa0d..ab9bc9f 100644
+--- a/modules/dav/main/mod_dav.c
++++ b/modules/dav/main/mod_dav.c
+@@ -191,7 +191,7 @@ static void *dav_merge_dir_config(apr_pool_t *p, void *base, void *overrides)
+ 
+     newconf->d_params = apr_copy_table(p, parent->d_params);
+     apr_overlap_tables(newconf->d_params, child->d_params,
+-		      AP_OVERLAP_TABLES_SET);
++		      APR_OVERLAP_TABLES_SET);
+ 
+     return newconf;
+ }
+@@ -1888,7 +1888,7 @@ static int process_mkcol_body(request_rec *r)
+     else if (lenp) {
+ 	const char *pos = lenp;
+ 
+-	while (ap_isdigit(*pos) || ap_isspace(*pos)) {
++	while (apr_isdigit(*pos) || apr_isspace(*pos)) {
+ 	    ++pos;
+ 	}
+ 	if (*pos != '\0') {
+diff --git a/modules/filters/mod_include.c b/modules/filters/mod_include.c
+index f3de9f5..c6bfce4 100644
+--- a/modules/filters/mod_include.c
++++ b/modules/filters/mod_include.c
+@@ -329,7 +329,7 @@ otilde\365oslash\370ugrave\371uacute\372yacute\375"     /* 6 */
+ 
+         /* is it numeric ? */
+         if (s[1] == '#') {
+-            for (j = 2, val = 0; j < i && ap_isdigit(s[j]); j++) {
++            for (j = 2, val = 0; j < i && apr_isdigit(s[j]); j++) {
+                 val = val * 10 + s[j] - '0';
+             }
+             s += i;
+@@ -382,7 +382,7 @@ static char *get_tag(apr_pool_t *p, apr_file_t *in, char *tag, int tagbuf_len, i
+ 
+     do {                        /* skip whitespace */
+         GET_CHAR(in, c, NULL, p);
+-    } while (ap_isspace(c));
++    } while (apr_isspace(c));
+ 
+     /* tags can't start with - */
+     if (c == '-') {
+@@ -390,7 +390,7 @@ static char *get_tag(apr_pool_t *p, apr_file_t *in, char *tag, int tagbuf_len, i
+         if (c == '-') {
+             do {
+                 GET_CHAR(in, c, NULL, p);
+-            } while (ap_isspace(c));
++            } while (apr_isspace(c));
+             if (c == '>') {
+                 apr_cpystrn(tag, "done", tagbuf_len);
+                 return tag;
+@@ -405,17 +405,17 @@ static char *get_tag(apr_pool_t *p, apr_file_t *in, char *tag, int tagbuf_len, i
+             *t = '\0';
+             return NULL;
+         }
+-        if (c == '=' || ap_isspace(c)) {
++        if (c == '=' || apr_isspace(c)) {
+             break;
+         }
+-        *(t++) = ap_tolower(c);
++        *(t++) = apr_tolower(c);
+         GET_CHAR(in, c, NULL, p);
+     }
+ 
+     *t++ = '\0';
+     tag_val = t;
+ 
+-    while (ap_isspace(c)) {
++    while (apr_isspace(c)) {
+         GET_CHAR(in, c, NULL, p);       /* space before = */
+     }
+     if (c != '=') {
+@@ -425,7 +425,7 @@ static char *get_tag(apr_pool_t *p, apr_file_t *in, char *tag, int tagbuf_len, i
+ 
+     do {
+         GET_CHAR(in, c, NULL, p);       /* space after = */
+-    } while (ap_isspace(c));
++    } while (apr_isspace(c));
+ 
+     /* we should allow a 'name' as a value */
+ 
+@@ -470,7 +470,7 @@ static int get_directive(apr_file_t *in, char *dest, size_t len, apr_pool_t *p)
+     /* skip initial whitespace */
+     while (1) {
+         GET_CHAR(in, c, 1, p);
+-        if (!ap_isspace(c)) {
++        if (!apr_isspace(c)) {
+             break;
+         }
+     }
+@@ -479,9 +479,9 @@ static int get_directive(apr_file_t *in, char *dest, size_t len, apr_pool_t *p)
+ 	if (d - dest == (int)len) {
+ 	    return 1;
+ 	}
+-        *d++ = ap_tolower(c);
++        *d++ = apr_tolower(c);
+         GET_CHAR(in, c, 1, p);
+-        if (ap_isspace(c)) {
++        if (apr_isspace(c)) {
+             break;
+         }
+     }
+@@ -544,7 +544,7 @@ static void parse_string(request_rec *r, const char *in, char *out,
+ 		}
+ 		else {
+ 		    start_of_var_name = in;
+-		    while (ap_isalnum(*in) || *in == '_') {
++		    while (apr_isalnum(*in) || *in == '_') {
+ 			++in;
+ 		    }
+ 		    end_of_var_name = in;
+@@ -1281,7 +1281,7 @@ static const char *get_ptoken(request_rec *r, const char *string, struct token *
+         return (char *) NULL;
+     }
+     while ((ch = *string++)) {
+-        if (!ap_isspace(ch)) {
++        if (!apr_isspace(ch)) {
+             break;
+         }
+     }
+@@ -1370,7 +1370,7 @@ static const char *get_ptoken(request_rec *r, const char *string, struct token *
+             continue;
+         }
+         if (!qs) {
+-            if (ap_isspace(ch)) {
++            if (apr_isspace(ch)) {
+                 goto TOKEN_DONE;
+             }
+             switch (ch) {
+@@ -2179,7 +2179,7 @@ static int handle_printenv(apr_file_t *in, request_rec *r, const char *error)
+ {
+     char tag[MAX_STRING_LEN];
+     char *tag_val;
+-    apr_array_header_t *arr = ap_table_elts(r->subprocess_env);
++    apr_array_header_t *arr = apr_table_elts(r->subprocess_env);
+     apr_table_entry_t *elts = (apr_table_entry_t *)arr->elts;
+     int i;
+ 
+@@ -2452,7 +2452,7 @@ static int send_parsed_file(request_rec *r)
+ 	 * destroyed, that's dealt with in handle_include().
+ 	 */
+ 	r->subprocess_env = parent->subprocess_env;
+-	ap_pool_join(parent->pool, r->pool);
++	apr_pool_join(parent->pool, r->pool);
+ 	r->finfo.mtime = parent->finfo.mtime;
+     }
+     else {
+diff --git a/modules/generators/mod_autoindex.c b/modules/generators/mod_autoindex.c
+index 3c11591..cf4ec7d 100644
+--- a/modules/generators/mod_autoindex.c
++++ b/modules/generators/mod_autoindex.c
+@@ -183,7 +183,7 @@ static char c_by_encoding, c_by_type, c_by_path;
+  * matches ".." or "../").  Hopefully this one call is significantly less
+  * expensive than multiple strcmp() calls.
+  */
+-static ap_inline int is_parent(const char *name)
++static apr_inline int is_parent(const char *name)
+ {
+     /*
+      * Now, IFF the first two bytes are dots, and the third byte is either
+@@ -1128,7 +1128,7 @@ static char *find_title(request_rec *r)
+ 	}
+ 	titlebuf[n] = '\0';
+ 	for (x = 0, p = 0; titlebuf[x]; x++) {
+-	    if (ap_toupper(titlebuf[x]) == find[p]) {
++	    if (apr_toupper(titlebuf[x]) == find[p]) {
+ 		if (!find[++p]) {
+ 		    if ((p = ap_ind(&titlebuf[++x], '<')) != -1) {
+ 			titlebuf[x + p] = '\0';
+@@ -1179,8 +1179,8 @@ static struct ent *make_autoindex_entry(char *name, int autoindex_opts,
+     p->alt = NULL;
+     p->desc = NULL;
+     p->lm = -1;
+-    p->key = ap_toupper(keyid);
+-    p->ascending = (ap_toupper(direction) == D_ASCENDING);
++    p->key = apr_toupper(keyid);
++    p->ascending = (apr_toupper(direction) == D_ASCENDING);
+     p->version_sort = autoindex_opts & VERSION_SORT;
+ 
+     if (autoindex_opts & FANCY_INDEXING) {
+@@ -1430,7 +1430,7 @@ static void output_directories(struct ent **ar, int n,
+ 	    if (!(autoindex_opts & SUPPRESS_LAST_MOD)) {
+ 		if (ar[x]->lm != -1) {
+ 		    char time_str[MAX_STRING_LEN];
+-		    ap_exploded_time_t ts;
++		    apr_exploded_time_t ts;
+                     apr_explode_localtime(&ts, ar[x]->lm);
+ 		    apr_strftime(time_str, &rv, MAX_STRING_LEN, 
+                                 "%d-%b-%Y %H:%M  ", &ts);
+diff --git a/modules/generators/mod_cgi.c b/modules/generators/mod_cgi.c
+index a79d2c3..c9a732c 100644
+--- a/modules/generators/mod_cgi.c
++++ b/modules/generators/mod_cgi.c
+@@ -181,7 +181,7 @@ static int log_scripterror(request_rec *r, cgi_server_conf * conf, int ret,
+ {
+     apr_file_t *f = NULL;
+     apr_finfo_t finfo;
+-    char time_str[AP_CTIME_LEN];
++    char time_str[APR_CTIME_LEN];
+ 
+     ap_log_rerror(APLOG_MARK, show_errno|APLOG_ERR, errno, r, 
+ 		"%s: %s", error, r->filename);
+@@ -227,13 +227,13 @@ static void log_script_err(request_rec *r, BUFF *script_err)
+ static int log_script(request_rec *r, cgi_server_conf * conf, int ret,
+ 		  char *dbuf, const char *sbuf, BUFF *script_in, BUFF *script_err)
+ {
+-    apr_array_header_t *hdrs_arr = ap_table_elts(r->headers_in);
++    apr_array_header_t *hdrs_arr = apr_table_elts(r->headers_in);
+     apr_table_entry_t *hdrs = (apr_table_entry_t *) hdrs_arr->elts;
+     char argsbuffer[HUGE_STRING_LEN];
+     apr_file_t *f = NULL;
+     int i;
+     apr_finfo_t finfo;
+-    char time_str[AP_CTIME_LEN];
++    char time_str[APR_CTIME_LEN];
+ 
+     if (!conf->logname ||
+         ((apr_stat(&finfo, ap_server_root_relative(r->pool, conf->logname), r->pool) == APR_SUCCESS)
+@@ -267,7 +267,7 @@ static int log_script(request_rec *r, cgi_server_conf * conf, int ret,
+     }
+ 
+     apr_puts("%response\n", f);
+-    hdrs_arr = ap_table_elts(r->err_headers_out);
++    hdrs_arr = apr_table_elts(r->err_headers_out);
+     hdrs = (apr_table_entry_t *) hdrs_arr->elts;
+ 
+     for (i = 0; i < hdrs_arr->nelts; ++i) {
+diff --git a/modules/generators/mod_cgid.c b/modules/generators/mod_cgid.c
+index 41b1d6a..730a286 100644
+--- a/modules/generators/mod_cgid.c
++++ b/modules/generators/mod_cgid.c
+@@ -312,7 +312,7 @@ static int call_exec(request_rec *r, char *argv0, char **env, int shellcmd)
+     return (pid);
+ }
+ 
+-static void cgid_maint(int reason, void *data, ap_wait_t status)
++static void cgid_maint(int reason, void *data, apr_wait_t status)
+ {
+ #if APR_HAS_OTHER_CHILD
+     int *sd = data;
+@@ -739,7 +739,7 @@ static int log_scripterror(request_rec *r, cgid_server_conf * conf, int ret,
+ static int log_script(request_rec *r, cgid_server_conf * conf, int ret, 
+                   char *dbuf, const char *sbuf, BUFF *script_in, BUFF *script_err) 
+ { 
+-    apr_array_header_t *hdrs_arr = ap_table_elts(r->headers_in); 
++    apr_array_header_t *hdrs_arr = apr_table_elts(r->headers_in); 
+     apr_table_entry_t *hdrs = (apr_table_entry_t *) hdrs_arr->elts; 
+     char argsbuffer[HUGE_STRING_LEN]; 
+     apr_file_t *f = NULL; 
+@@ -781,7 +781,7 @@ static int log_script(request_rec *r, cgid_server_conf * conf, int ret,
+     } 
+ 
+     apr_puts("%response\n", f); 
+-    hdrs_arr = ap_table_elts(r->err_headers_out); 
++    hdrs_arr = apr_table_elts(r->err_headers_out); 
+     hdrs = (apr_table_entry_t *) hdrs_arr->elts; 
+ 
+     for (i = 0; i < hdrs_arr->nelts; ++i) { 
+diff --git a/modules/http/http_core.c b/modules/http/http_core.c
+index c00e9a3..eefdbca 100644
+--- a/modules/http/http_core.c
++++ b/modules/http/http_core.c
+@@ -584,7 +584,7 @@ char *ap_response_code_string(request_rec *r, int error_index)
+ 
+ 
+ /* Code from Harald Hanche-Olsen <hanche@imf.unit.no> */
+-static ap_inline void do_double_reverse (conn_rec *conn)
++static apr_inline void do_double_reverse (conn_rec *conn)
+ {
+     struct hostent *hptr;
+ 
+@@ -2845,7 +2845,7 @@ static int default_handler(request_rec *r)
+         apr_mmap_offset((void**)&addr, mm ,0);
+ 
+ 	if (d->content_md5 & 1) {
+-	    ap_md5_ctx_t context;
++	    apr_md5_ctx_t context;
+ 	    
+ 	    apr_MD5Init(&context);
+ #ifdef APACHE_XLATE
+diff --git a/modules/http/http_protocol.c b/modules/http/http_protocol.c
+index 7e1e122..0cfb497 100644
+--- a/modules/http/http_protocol.c
++++ b/modules/http/http_protocol.c
+@@ -669,7 +669,7 @@ API_EXPORT(char *) ap_make_etag(request_rec *r, int force_weak)
+      * would be incorrect.
+      */
+     
+-    weak = ((r->request_time - r->mtime > AP_USEC_PER_SEC) && !force_weak) ? "" : "W/";
++    weak = ((r->request_time - r->mtime > APR_USEC_PER_SEC) && !force_weak) ? "" : "W/";
+ 
+     if (r->finfo.protection != 0) {
+         etag = apr_psprintf(r->pool,
+@@ -738,7 +738,7 @@ API_EXPORT(void) ap_set_etag(request_rec *r)
+ API_EXPORT(void) ap_set_last_modified(request_rec *r)
+ {
+     apr_time_t mod_time = ap_rationalize_mtime(r, r->mtime);
+-    char *datestr = apr_palloc(r->pool, AP_RFC822_DATE_LEN);
++    char *datestr = apr_palloc(r->pool, APR_RFC822_DATE_LEN);
+     apr_rfc822_date(datestr, mod_time);
+     apr_table_setn(r->headers_out, "Last-Modified", datestr);
+ }
+@@ -1038,7 +1038,7 @@ static void get_mime_headers(request_rec *r)
+     char *value;
+     char *copy;
+     int len;
+-    unsigned int fields_read = 0;
++    int fields_read = 0;
+     apr_table_t *tmp_headers;
+ 
+     /* We'll use apr_overlap_tables later to merge these into r->headers_in. */
+@@ -1088,7 +1088,7 @@ static void get_mime_headers(request_rec *r)
+ 	apr_table_addn(tmp_headers, copy, value);
+     }
+ 
+-    apr_overlap_tables(r->headers_in, tmp_headers, AP_OVERLAP_TABLES_MERGE);
++    apr_overlap_tables(r->headers_in, tmp_headers, APR_OVERLAP_TABLES_MERGE);
+ }
+ 
+ request_rec *ap_read_request(conn_rec *conn)
+@@ -1527,7 +1527,7 @@ API_EXPORT(void) ap_basic_http_header(request_rec *r)
+ 
+     (void) checked_bputstrs(r, protocol, " ", r->status_line, CRLF, NULL);
+ 
+-    date = apr_palloc(r->pool, AP_RFC822_DATE_LEN);
++    date = apr_palloc(r->pool, APR_RFC822_DATE_LEN);
+     apr_rfc822_date(date, r->request_time);
+     ap_send_header_field(r, "Date", date);
+     ap_send_header_field(r, "Server", ap_get_server_version());
+@@ -1675,14 +1675,14 @@ static int uniq_field_values(void *d, const char *key, const char *val)
+     do {
+         /* Find a non-empty fieldname */
+ 
+-        while (*e == ',' || ap_isspace(*e)) {
++        while (*e == ',' || apr_isspace(*e)) {
+             ++e;
+         }
+         if (*e == '\0') {
+             break;
+         }
+         start = e;
+-        while (*e != '\0' && *e != ',' && !ap_isspace(*e)) {
++        while (*e != '\0' && *e != ',' && !apr_isspace(*e)) {
+             ++e;
+         }
+         if (*e != '\0') {
+@@ -1764,7 +1764,7 @@ API_EXPORT(void) ap_send_http_header(request_rec *r)
+      * header field tables into a single table.  If we don't do this, our
+      * later attempts to set or unset a given fieldname might be bypassed.
+      */
+-    if (!ap_is_empty_table(r->err_headers_out))
++    if (!apr_is_empty_table(r->err_headers_out))
+         r->headers_out = apr_overlay_tables(r->pool, r->err_headers_out,
+                                         r->headers_out);
+ 
+@@ -1820,7 +1820,7 @@ API_EXPORT(void) ap_send_http_header(request_rec *r)
+      * some other part of the server configuration.
+      */
+     if (r->no_cache && !apr_table_get(r->headers_out, "Expires")) {
+-	date = apr_palloc(r->pool, AP_RFC822_DATE_LEN);
++	date = apr_palloc(r->pool, APR_RFC822_DATE_LEN);
+         apr_rfc822_date(date, r->request_time);
+         apr_table_addn(r->headers_out, "Expires", date);
+     }
+@@ -1921,7 +1921,7 @@ API_EXPORT(int) ap_setup_client_block(request_rec *r, int read_policy)
+ {
+     const char *tenc = apr_table_get(r->headers_in, "Transfer-Encoding");
+     const char *lenp = apr_table_get(r->headers_in, "Content-Length");
+-    unsigned long max_body;
++    long max_body;
+ 
+     r->read_body = read_policy;
+     r->read_chunked = 0;
+@@ -1944,7 +1944,7 @@ API_EXPORT(int) ap_setup_client_block(request_rec *r, int read_policy)
+     else if (lenp) {
+         const char *pos = lenp;
+ 
+-        while (ap_isdigit(*pos) || ap_isspace(*pos))
++        while (apr_isdigit(*pos) || apr_isspace(*pos))
+             ++pos;
+         if (*pos != '\0') {
+             ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+@@ -2016,7 +2016,7 @@ static long get_chunk_size(char *b)
+ {
+     long chunksize = 0;
+ 
+-    while (ap_isxdigit(*b)) {
++    while (apr_isxdigit(*b)) {
+         int xvalue = 0;
+ 
+         if (*b >= '0' && *b <= '9')
+@@ -2052,7 +2052,7 @@ API_EXPORT(long) ap_get_client_block(request_rec *r, char *buffer, int bufsiz)
+     apr_size_t len_to_read;
+     apr_ssize_t len_read;
+     long chunk_start = 0;
+-    unsigned long max_body;
++    long max_body;
+     apr_status_t rv;
+ 
+     if (!r->read_chunked) {     /* Content-length read */
+@@ -2098,7 +2098,7 @@ API_EXPORT(long) ap_get_client_block(request_rec *r, char *buffer, int bufsiz)
+ 
+         chunk_start = getline(buffer, bufsiz, r->connection->client, 0);
+         if ((chunk_start <= 0) || (chunk_start >= (bufsiz - 1))
+-            || !ap_isxdigit(*buffer)) {
++            || !apr_isxdigit(*buffer)) {
+             r->connection->keepalive = -1;
+             return -1;
+         }
+@@ -2641,7 +2641,7 @@ API_EXPORT(void) ap_send_error_response(request_rec *r, int recursive_error)
+      * message body.  Note that being assbackwards here is not an option.
+      */
+     if (status == HTTP_NOT_MODIFIED) {
+-        if (!ap_is_empty_table(r->err_headers_out))
++        if (!apr_is_empty_table(r->err_headers_out))
+             r->headers_out = apr_overlay_tables(r->pool, r->err_headers_out,
+                                                r->headers_out);
+         ap_basic_http_header(r);
+@@ -2757,11 +2757,11 @@ API_EXPORT(void) ap_send_error_response(request_rec *r, int recursive_error)
+          */
+         if (r->status_line != NULL
+             && strlen(r->status_line) > 4       /* long enough */
+-            && ap_isdigit(r->status_line[0])
+-            && ap_isdigit(r->status_line[1])
+-            && ap_isdigit(r->status_line[2])
+-            && ap_isspace(r->status_line[3])
+-            && ap_isalnum(r->status_line[4])) {
++            && apr_isdigit(r->status_line[0])
++            && apr_isdigit(r->status_line[1])
++            && apr_isdigit(r->status_line[2])
++            && apr_isspace(r->status_line[3])
++            && apr_isalnum(r->status_line[4])) {
+             title = r->status_line;
+         }
+ 
+diff --git a/modules/http/http_request.c b/modules/http/http_request.c
+index 2f81390..2049386 100644
+--- a/modules/http/http_request.c
++++ b/modules/http/http_request.c
+@@ -1297,7 +1297,7 @@ void ap_process_request(request_rec *r)
+ 
+ static apr_table_t *rename_original_env(apr_pool_t *p, apr_table_t *t)
+ {
+-    apr_array_header_t *env_arr = ap_table_elts(t);
++    apr_array_header_t *env_arr = apr_table_elts(t);
+     apr_table_entry_t *elts = (apr_table_entry_t *) env_arr->elts;
+     apr_table_t *new = apr_make_table(p, env_arr->nalloc);
+     int i;
+diff --git a/modules/http/mod_mime.c b/modules/http/mod_mime.c
+index 34a73be..d8b758c 100644
+--- a/modules/http/mod_mime.c
++++ b/modules/http/mod_mime.c
+@@ -78,14 +78,14 @@
+ 
+ /* XXXX - fix me / EBCDIC
+  *        there was a cludge here which would use its
+- *	  own version ap_isascii(). Indicating that
++ *	  own version apr_isascii(). Indicating that
+  *	  on some platforms that might be needed. 
+  *
+  *	  #define OS_ASC(c) (c)		    -- for mere mortals 
+  *     or
+  *        #define OS_ASC(c) (ebcdic2ascii[c]) -- for dino's
+  *
+- *        #define ap_isascii(c) ((OS_ASC(c) & 0x80) == 0)
++ *        #define apr_isascii(c) ((OS_ASC(c) & 0x80) == 0)
+  */
+ 
+ /* XXXXX - fix me - See note with NOT_PROXY 
+@@ -313,7 +313,7 @@ AP_INIT_TAKE1("DefaultLanguage", ap_set_string_slot,
+  */
+ 
+ #define MIME_HASHSIZE (32)
+-#define hash(i) (ap_tolower(i) % MIME_HASHSIZE)
++#define hash(i) (apr_tolower(i) % MIME_HASHSIZE)
+ 
+ static apr_table_t *hash_buckets[MIME_HASHSIZE];
+ 
+@@ -381,7 +381,7 @@ static int is_token(char c)
+ {
+     int res;
+ 
+-    res = (ap_isascii(c) && ap_isgraph(c)
++    res = (apr_isascii(c) && apr_isgraph(c)
+ 	   && (strchr(tspecial, c) == NULL)) ? 1 : -1;
+     return res;
+ }
+@@ -390,7 +390,7 @@ static int is_qtext(char c)
+ {
+     int res;
+ 
+-    res = (ap_isascii(c) && (c != '"') && (c != '\\') && (c != '\n'))
++    res = (apr_isascii(c) && (c != '"') && (c != '\\') && (c != '\n'))
+ 	? 1 : -1;
+     return res;
+ }
+@@ -402,7 +402,7 @@ static int is_quoted_pair(char *s)
+ 
+     if (((s + 1) != NULL) && (*s == '\\')) {
+ 	c = (int) *(s + 1);
+-	if (ap_isascii(c)) {
++	if (apr_isascii(c)) {
+ 	    res = 1;
+ 	}
+     }
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 1136a6f..854ebe3 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -386,7 +386,7 @@ static const char *log_env_var(request_rec *r, char *a)
+ 
+ static const char *log_request_time(request_rec *r, char *a)
+ {
+-    ap_exploded_time_t xt;
++    apr_exploded_time_t xt;
+     apr_size_t retcode;
+     char tstr[MAX_STRING_LEN];
+ 
+@@ -423,7 +423,7 @@ static const char *log_request_time(request_rec *r, char *a)
+ 	}
+ 
+         apr_snprintf(tstr, sizeof(tstr), "[%02d/%s/%d:%02d:%02d:%02d %c%.2d%.2d]",
+-                xt.tm_mday, ap_month_snames[xt.tm_mon], xt.tm_year+1900,
++                xt.tm_mday, apr_month_snames[xt.tm_mon], xt.tm_year+1900,
+                 xt.tm_hour, xt.tm_min, xt.tm_sec,
+                 sign, timz / (60*60), timz % (60*60));
+     }
+@@ -433,7 +433,8 @@ static const char *log_request_time(request_rec *r, char *a)
+ 
+ static const char *log_request_duration(request_rec *r, char *a)
+ {
+-    return apr_psprintf(r->pool, "%lld", (apr_now() - r->request_time) / AP_USEC_PER_SEC);
++    return apr_psprintf(r->pool, "%lld", (apr_now() - r->request_time) 
++                                             / APR_USEC_PER_SEC);
+ }
+ 
+ /* These next two routines use the canonical name:port so that log
+@@ -667,7 +668,7 @@ static char *parse_log_item(apr_pool_t *p, log_format_item *it, const char **sa)
+         case '8':
+         case '9':
+             i = *s - '0';
+-            while (ap_isdigit(*++s)) {
++            while (apr_isdigit(*++s)) {
+                 i = i * 10 + (*s) - '0';
+             }
+             if (!it->conditions) {
+diff --git a/modules/mappers/mod_alias.c b/modules/mappers/mod_alias.c
+index d01ca91..cb221dc 100644
+--- a/modules/mappers/mod_alias.c
++++ b/modules/mappers/mod_alias.c
+@@ -188,7 +188,7 @@ static const char *add_redirect_internal(cmd_parms *cmd,
+ 	status = HTTP_MOVED_TEMPORARILY;
+     else if (!strcasecmp(arg1, "seeother"))
+ 	status = HTTP_SEE_OTHER;
+-    else if (ap_isdigit(*arg1))
++    else if (apr_isdigit(*arg1))
+ 	status = atoi(arg1);
+     else {
+ 	f = arg1;
+diff --git a/modules/mappers/mod_dir.c b/modules/mappers/mod_dir.c
+index 791057f..225d8ef 100644
+--- a/modules/mappers/mod_dir.c
++++ b/modules/mappers/mod_dir.c
+@@ -181,7 +181,7 @@ static int handle_dir(request_rec *r)
+         if (ap_is_HTTP_REDIRECT(rr->status) ||
+             (rr->status == HTTP_NOT_ACCEPTABLE && num_names == 1)) {
+ 
+-            ap_pool_join(r->pool, rr->pool);
++            apr_pool_join(r->pool, rr->pool);
+             error_notfound = rr->status;
+             r->notes = apr_overlay_tables(r->pool, r->notes, rr->notes);
+             r->headers_out = apr_overlay_tables(r->pool, r->headers_out,
+diff --git a/modules/mappers/mod_imap.c b/modules/mappers/mod_imap.c
+index 5f0d8e8..16bfd13 100644
+--- a/modules/mappers/mod_imap.c
++++ b/modules/mappers/mod_imap.c
+@@ -274,7 +274,7 @@ static double get_x_coord(const char *args)
+         return (-1);            /* in case we aren't passed anything */
+     }
+ 
+-    while (*args && !ap_isdigit(*args) && *args != ',') {
++    while (*args && !apr_isdigit(*args) && *args != ',') {
+         args++;                 /* jump to the first digit, but not past
+                                    a comma or end */
+     }
+@@ -306,7 +306,7 @@ static double get_y_coord(const char *args)
+         start_of_y++;           /* start looking at the character after
+                                    the comma */
+ 
+-        while (*start_of_y && !ap_isdigit(*start_of_y)) {
++        while (*start_of_y && !apr_isdigit(*start_of_y)) {
+             start_of_y++;       /* jump to the first digit, but not
+                                    past the end */
+ 	}
+@@ -337,7 +337,7 @@ static void read_quoted(char **string, char **quoted_part)
+     /* assume there's no quoted part */
+     *quoted_part = NULL;
+ 
+-    while (ap_isspace(*strp)) {
++    while (apr_isspace(*strp)) {
+         strp++;               	/* go along string until non-whitespace */
+     }
+ 
+@@ -396,7 +396,7 @@ static char *imap_url(request_rec *r, const char *base, const char *value)
+     }
+ 
+     string_pos_const = value;
+-    while (ap_isalpha(*string_pos_const)) {
++    while (apr_isalpha(*string_pos_const)) {
+ 	string_pos_const++;           /* go along the URL from the map
+                                          until a non-letter */
+     }
+@@ -705,7 +705,7 @@ static int imap_handler(request_rec *r)
+ 	}
+ 
+ 	directive = string_pos;
+-	while (*string_pos && !ap_isspace(*string_pos)) {	/* past directive */
++	while (*string_pos && !apr_isspace(*string_pos)) {	/* past directive */
+ 	    ++string_pos;
+ 	}
+ 	if (!*string_pos) {		/* need at least two fields */
+@@ -716,15 +716,15 @@ static int imap_handler(request_rec *r)
+ 	if (!*string_pos) {		/* need at least two fields */
+ 	    goto need_2_fields;
+ 	}
+-	while(*string_pos && ap_isspace(*string_pos)) { /* past whitespace */
++	while(*string_pos && apr_isspace(*string_pos)) { /* past whitespace */
+ 	    ++string_pos;
+ 	}
+ 
+ 	value = string_pos;
+-	while (*string_pos && !ap_isspace(*string_pos)) {	/* past value */
++	while (*string_pos && !apr_isspace(*string_pos)) {	/* past value */
+ 	    ++string_pos;
+ 	}
+-	if (ap_isspace(*string_pos)) {
++	if (apr_isspace(*string_pos)) {
+ 	    *string_pos++ = '\0';
+ 	}
+ 	else {
+@@ -763,17 +763,17 @@ static int imap_handler(request_rec *r)
+                sscanf(string_pos, "%lf%*[, ]%lf",
+                       &pointarray[vertex][X], &pointarray[vertex][Y]) == 2) {
+             /* Now skip what we just read... we can't use ANSIism %n */
+-            while (ap_isspace(*string_pos)) {      /* past whitespace */
++            while (apr_isspace(*string_pos)) {      /* past whitespace */
+                 string_pos++;
+ 	    }
+-            while (ap_isdigit(*string_pos)) {      /* and the 1st number */
++            while (apr_isdigit(*string_pos)) {      /* and the 1st number */
+                 string_pos++;
+ 	    }
+             string_pos++;       /* skip the ',' */
+-            while (ap_isspace(*string_pos)) {      /* past any more whitespace */
++            while (apr_isspace(*string_pos)) {      /* past any more whitespace */
+                 string_pos++;
+ 	    }
+-            while (ap_isdigit(*string_pos)) {      /* 2nd number */
++            while (apr_isdigit(*string_pos)) {      /* 2nd number */
+                 string_pos++;
+ 	    }
+             vertex++;
+diff --git a/modules/mappers/mod_negotiation.c b/modules/mappers/mod_negotiation.c
+index f344138..c9024b2 100644
+--- a/modules/mappers/mod_negotiation.c
++++ b/modules/mappers/mod_negotiation.c
+@@ -372,8 +372,8 @@ static const char *get_entry(apr_pool_t *p, accept_rec *result,
+ 
+         /* Look for 'var = value' --- and make sure the var is in lcase. */
+ 
+-        for (cp = parm; (*cp && !ap_isspace(*cp) && *cp != '='); ++cp) {
+-            *cp = ap_tolower(*cp);
++        for (cp = parm; (*cp && !apr_isspace(*cp) && *cp != '='); ++cp) {
++            *cp = apr_tolower(*cp);
+         }
+ 
+         if (!*cp) {
+@@ -381,7 +381,7 @@ static const char *get_entry(apr_pool_t *p, accept_rec *result,
+         }
+ 
+         *cp++ = '\0';           /* Delimit var */
+-        while (*cp && (ap_isspace(*cp) || *cp == '=')) {
++        while (*cp && (apr_isspace(*cp) || *cp == '=')) {
+             ++cp;
+         }
+ 
+@@ -392,7 +392,7 @@ static const char *get_entry(apr_pool_t *p, accept_rec *result,
+                  end++);
+         }
+         else {
+-            for (end = cp; (*end && !ap_isspace(*end)); end++);
++            for (end = cp; (*end && !apr_isspace(*end)); end++);
+         }
+         if (*end) {
+             *end = '\0';        /* strip ending quote or return */
+@@ -559,7 +559,7 @@ static void parse_negotiate_header(request_rec *r, negotiation_state *neg)
+         if (strcmp(tok, "trans") == 0 ||
+             strcmp(tok, "vlist") == 0 ||
+             strcmp(tok, "guess-small") == 0 ||
+-            ap_isdigit(tok[0]) ||
++            apr_isdigit(tok[0]) ||
+             strcmp(tok, "*") == 0) {
+ 
+             /* The user agent supports transparent negotiation */
+@@ -665,7 +665,7 @@ static enum header_state get_header_line(char *buffer, int len, apr_file_t *map)
+ 
+     /* If blank, just return it --- this ends information on this variant */
+ 
+-    for (cp = buffer; (*cp && ap_isspace(*cp)); ++cp) {
++    for (cp = buffer; (*cp && apr_isspace(*cp)); ++cp) {
+         continue;
+     }
+ 
+@@ -686,13 +686,13 @@ static enum header_state get_header_line(char *buffer, int len, apr_file_t *map)
+                 continue;
+             }
+         }
+-        else if (ap_isspace(c)) {
++        else if (apr_isspace(c)) {
+             /* Leading whitespace.  POSSIBLE continuation line
+              * Also, possibly blank --- if so, we ungetc() the final newline
+              * so that we will pick up the blank line the next time 'round.
+              */
+ 
+-            while (c != '\n' && ap_isspace(c)) {
++            while (c != '\n' && apr_isspace(c)) {
+                 if(apr_getc(&c, map) != APR_SUCCESS)
+ 		    break;
+             }
+@@ -761,7 +761,7 @@ static char *lcase_header_name_return_body(char *header, request_rec *r)
+     char *cp = header;
+ 
+     for ( ; *cp && *cp != ':' ; ++cp) {
+-        *cp = ap_tolower(*cp);
++        *cp = apr_tolower(*cp);
+     }
+ 
+     if (!*cp) {
+@@ -772,7 +772,7 @@ static char *lcase_header_name_return_body(char *header, request_rec *r)
+ 
+     do {
+         ++cp;
+-    } while (*cp && ap_isspace(*cp));
++    } while (*cp && apr_isspace(*cp));
+ 
+     if (!*cp) {
+         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r,
+@@ -2648,7 +2648,7 @@ static int handle_multi(request_rec *r)
+      * some values in this request will be allocated in r->pool, and others in
+      * sub_req->pool.
+      */
+-    ap_pool_join(r->pool, sub_req->pool);
++    apr_pool_join(r->pool, sub_req->pool);
+     r->mtime = 0; /* reset etag info for subrequest */
+     r->filename = sub_req->filename;
+     r->handler = sub_req->handler;
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 354355b..ec71caa 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -891,7 +891,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, rewriterule_entry *cfg
+             else if (strcasecmp(val, "seeother") == 0) {
+                 status = HTTP_SEE_OTHER;
+             }
+-            else if (ap_isdigit(*val)) {
++            else if (apr_isdigit(*val)) {
+                 status = atoi(val);
+             }
+             if (!ap_is_HTTP_REDIRECT(status)) {
+@@ -3064,7 +3064,7 @@ static char *rewrite_mapfunc_toupper(request_rec *r, char *key)
+ 
+     for (cp = value = apr_pstrdup(r->pool, key); cp != NULL && *cp != '\0';
+          cp++) {
+-        *cp = ap_toupper(*cp);
++        *cp = apr_toupper(*cp);
+     }
+     return value;
+ }
+@@ -3075,7 +3075,7 @@ static char *rewrite_mapfunc_tolower(request_rec *r, char *key)
+ 
+     for (cp = value = apr_pstrdup(r->pool, key); cp != NULL && *cp != '\0';
+          cp++) {
+-        *cp = ap_tolower(*cp);
++        *cp = apr_tolower(*cp);
+     }
+     return value;
+ }
+@@ -3300,7 +3300,7 @@ static void rewritelog(request_rec *r, int level, const char *text, ...)
+ 
+ static char *current_logtime(request_rec *r)
+ {
+-    ap_exploded_time_t t;
++    apr_exploded_time_t t;
+     char tstr[80];
+     apr_size_t len;
+ 
+@@ -3535,7 +3535,7 @@ static char *lookup_variable(request_rec *r, char *var)
+ {
+     const char *result;
+     char resultbuf[LONG_STRING_LEN];
+-    ap_exploded_time_t tm;
++    apr_exploded_time_t tm;
+     request_rec *rsub;
+ #ifndef WIN32
+     struct passwd *pw;
+@@ -3781,7 +3781,7 @@ static char *lookup_header(request_rec *r, const char *name)
+     apr_table_entry_t *hdrs;
+     int i;
+ 
+-    hdrs_arr = ap_table_elts(r->headers_in);
++    hdrs_arr = apr_table_elts(r->headers_in);
+     hdrs = (apr_table_entry_t *)hdrs_arr->elts;
+     for (i = 0; i < hdrs_arr->nelts; ++i) {
+         if (hdrs[i].key == NULL) {
+diff --git a/modules/mappers/mod_speling.c b/modules/mappers/mod_speling.c
+index b7afc44..df7fb40 100644
+--- a/modules/mappers/mod_speling.c
++++ b/modules/mappers/mod_speling.c
+@@ -197,15 +197,15 @@ typedef struct {
+ 
+ static sp_reason spdist(const char *s, const char *t)
+ {
+-    for (; ap_tolower(*s) == ap_tolower(*t); t++, s++) {
++    for (; apr_tolower(*s) == apr_tolower(*t); t++, s++) {
+         if (*t == '\0') {
+             return SP_MISCAPITALIZED;   /* exact match (sans case) */
+ 	}
+     }
+     if (*s) {
+         if (*t) {
+-            if (s[1] && t[1] && ap_tolower(*s) == ap_tolower(t[1])
+-		&& ap_tolower(*t) == ap_tolower(s[1])
++            if (s[1] && t[1] && apr_tolower(*s) == apr_tolower(t[1])
++		&& apr_tolower(*t) == apr_tolower(s[1])
+ 		&& strcasecmp(s + 2, t + 2) == 0) {
+                 return SP_TRANSPOSITION;        /* transposition */
+ 	    }
+diff --git a/modules/mappers/mod_vhost_alias.c b/modules/mappers/mod_vhost_alias.c
+index d1c2f67..eabee72 100644
+--- a/modules/mappers/mod_vhost_alias.c
++++ b/modules/mappers/mod_vhost_alias.c
+@@ -212,7 +212,7 @@ static const char *vhost_alias_set(cmd_parms *cmd, void *dummy, const char *map)
+ 	    ++p;
+ 	}
+ 	/* digit N */
+-	if (ap_isdigit(*p)) {
++	if (apr_isdigit(*p)) {
+ 	    ++p;
+ 	}
+ 	else {
+@@ -232,7 +232,7 @@ static const char *vhost_alias_set(cmd_parms *cmd, void *dummy, const char *map)
+ 	    ++p;
+ 	}
+ 	/* digit M */
+-	if (ap_isdigit(*p)) {
++	if (apr_isdigit(*p)) {
+ 	    ++p;
+ 	}
+ 	else {
+@@ -270,7 +270,7 @@ static const command_rec mva_commands[] =
+  * This really wants to be a nested function
+  * but C is too feeble to support them.
+  */
+-static ap_inline void vhost_alias_checkspace(request_rec *r, char *buf,
++static apr_inline void vhost_alias_checkspace(request_rec *r, char *buf,
+ 					     char **pdest, int size)
+ {
+     /* XXX: what if size > HUGE_STRING_LEN? */
+@@ -399,7 +399,7 @@ static void vhost_alias_interpolate(request_rec *r, const char *name,
+ 	}
+ 	vhost_alias_checkspace(r, buf, &dest, end - start);
+ 	for (p = start; p < end; ++p) {
+-	    *dest++ = ap_tolower(*p);
++	    *dest++ = apr_tolower(*p);
+ 	}
+     }
+     *dest = '\0';
+diff --git a/modules/metadata/mod_cern_meta.c b/modules/metadata/mod_cern_meta.c
+index c0c36e7..6cbc64a 100644
+--- a/modules/metadata/mod_cern_meta.c
++++ b/modules/metadata/mod_cern_meta.c
+@@ -267,7 +267,7 @@ static int scan_meta_file(request_rec *r, apr_file_t *f)
+ 	}
+ 
+ 	*l++ = '\0';
+-	while (*l && ap_isspace(*l))
++	while (*l && apr_isspace(*l))
+ 	    ++l;
+ 
+ 	if (!strcasecmp(w, "Content-type")) {
+@@ -275,7 +275,7 @@ static int scan_meta_file(request_rec *r, apr_file_t *f)
+ 	    /* Nuke trailing whitespace */
+ 
+ 	    char *endp = l + strlen(l) - 1;
+-	    while (endp > l && ap_isspace(*endp))
++	    while (endp > l && apr_isspace(*endp))
+ 		*endp-- = '\0';
+ 
+ 	    tmp = apr_pstrdup(r->pool, l);
+@@ -290,7 +290,7 @@ static int scan_meta_file(request_rec *r, apr_file_t *f)
+ 	    apr_table_set(tmp_headers, w, l);
+ 	}
+     }
+-    apr_overlap_tables(r->headers_out, tmp_headers, AP_OVERLAP_TABLES_SET);
++    apr_overlap_tables(r->headers_out, tmp_headers, APR_OVERLAP_TABLES_SET);
+     return OK;
+ }
+ 
+diff --git a/modules/metadata/mod_env.c b/modules/metadata/mod_env.c
+index 4f8f29b..abf30ff 100644
+--- a/modules/metadata/mod_env.c
++++ b/modules/metadata/mod_env.c
+@@ -152,7 +152,7 @@ static void *merge_env_dir_configs(apr_pool_t *p, void *basev, void *addv)
+ 
+     new_table = apr_copy_table(p, base->vars);
+ 
+-    arr = ap_table_elts(add->vars);
++    arr = apr_table_elts(add->vars);
+     elts = (apr_table_entry_t *)arr->elts;
+ 
+     for (i = 0; i < arr->nelts; ++i) {
+diff --git a/modules/metadata/mod_expires.c b/modules/metadata/mod_expires.c
+index 9b6bb2a..5b73425 100644
+--- a/modules/metadata/mod_expires.c
++++ b/modules/metadata/mod_expires.c
+@@ -290,7 +290,7 @@ static char *check_code(apr_pool_t *p, const char *code, char **real_code)
+     while (word[0]) {
+         /* <num>
+          */
+-        if (ap_isdigit(word[0])) {
++        if (apr_isdigit(word[0])) {
+             num = atoi(word);
+         }
+         else {
+@@ -487,8 +487,8 @@ static int add_expires(request_rec *r)
+     apr_table_mergen(r->headers_out, "Cache-Control",
+ 		    apr_psprintf(r->pool, "max-age=%qd",
+ 				(expires - r->request_time)
+-				    / AP_USEC_PER_SEC));
+-    timestr = apr_palloc(r->pool, AP_RFC822_DATE_LEN);
++				    / APR_USEC_PER_SEC));
++    timestr = apr_palloc(r->pool, APR_RFC822_DATE_LEN);
+     apr_rfc822_date(timestr, expires);
+     apr_table_setn(r->headers_out, "Expires", timestr);
+     return OK;
+diff --git a/modules/metadata/mod_mime_magic.c b/modules/metadata/mod_mime_magic.c
+index 76a053b..b6514dc 100644
+--- a/modules/metadata/mod_mime_magic.c
++++ b/modules/metadata/mod_mime_magic.c
+@@ -728,7 +728,7 @@ static int magic_rsl_to_request(request_rec *r)
+ 	 frag = frag->next, cur_frag++) {
+ 	/* loop through the characters in the fragment */
+ 	for (cur_pos = 0; frag->str[cur_pos]; cur_pos++) {
+-	    if (ap_isspace(frag->str[cur_pos])) {
++	    if (apr_isspace(frag->str[cur_pos])) {
+ 		/* process whitespace actions for each state */
+ 		if (state == rsl_leading_space) {
+ 		    /* eat whitespace in this state */
+@@ -933,7 +933,7 @@ static void tryit(request_rec *r, unsigned char *buf, int nb, int checkzmagic)
+     magic_rsl_puts(r, MIME_BINARY_UNKNOWN);
+ }
+ 
+-#define    EATAB {while (ap_isspace((unsigned char) *l))  ++l;}
++#define    EATAB {while (apr_isspace((unsigned char) *l))  ++l;}
+ 
+ /*
+  * apprentice - load configuration from the magic file r
+@@ -975,7 +975,7 @@ static int apprentice(server_rec *s, apr_pool_t *p)
+ 
+ 	/* skip leading whitespace */
+ 	ws_offset = 0;
+-	while (line[ws_offset] && ap_isspace(line[ws_offset])) {
++	while (line[ws_offset] && apr_isspace(line[ws_offset])) {
+ 	    ws_offset++;
+ 	}
+ 
+@@ -1018,10 +1018,10 @@ static int apprentice(server_rec *s, apr_pool_t *p)
+     ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, s,
+ 		MODNAME ": apprentice test");
+     for (m = conf->magic; m; m = m->next) {
+-	if (ap_isprint((((unsigned long) m) >> 24) & 255) &&
+-	    ap_isprint((((unsigned long) m) >> 16) & 255) &&
+-	    ap_isprint((((unsigned long) m) >> 8) & 255) &&
+-	    ap_isprint(((unsigned long) m) & 255)) {
++	if (apr_isprint((((unsigned long) m) >> 24) & 255) &&
++	    apr_isprint((((unsigned long) m) >> 16) & 255) &&
++	    apr_isprint((((unsigned long) m) >> 8) & 255) &&
++	    apr_isprint(((unsigned long) m) & 255)) {
+ 	    ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, s,
+ 			MODNAME ": apprentice: POINTER CLOBBERED! "
+ 			"m=\"%c%c%c%c\" line=%d",
+@@ -1149,7 +1149,7 @@ static int parse(server_rec *serv, apr_pool_t *p, char *l, int lineno)
+ 	s = l;
+ 	if (*l == '+' || *l == '-')
+ 	    l++;
+-	if (ap_isdigit((unsigned char) *l)) {
++	if (apr_isdigit((unsigned char) *l)) {
+ 	    m->in.offset = strtol(l, &t, 0);
+ 	    if (*s == '-')
+ 		m->in.offset = -m->in.offset;
+@@ -1164,7 +1164,7 @@ static int parse(server_rec *serv, apr_pool_t *p, char *l, int lineno)
+     }
+ 
+ 
+-    while (ap_isdigit((unsigned char) *l))
++    while (apr_isdigit((unsigned char) *l))
+ 	++l;
+     EATAB;
+ 
+@@ -1262,7 +1262,7 @@ static int parse(server_rec *serv, apr_pool_t *p, char *l, int lineno)
+ 	}
+ 	/* FALL THROUGH */
+     default:
+-	if (*l == 'x' && ap_isspace((unsigned char) l[1])) {
++	if (*l == 'x' && apr_isspace((unsigned char) l[1])) {
+ 	    m->reln = *l;
+ 	    ++l;
+ 	    goto GetDesc;	/* Bill The Cat */
+@@ -1334,7 +1334,7 @@ static char *getstr(server_rec *serv, register char *s, register char *p,
+     register int val;
+ 
+     while ((c = *s++) != '\0') {
+-	if (ap_isspace((unsigned char) c))
++	if (apr_isspace((unsigned char) c))
+ 	    break;
+ 	if (p >= pmax) {
+ 	    ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_ERR, 0, serv,
+@@ -1437,7 +1437,7 @@ static char *getstr(server_rec *serv, register char *s, register char *p,
+ /* Single hex char to int; -1 if not a hex char. */
+ static int hextoint(int c)
+ {
+-    if (ap_isdigit((unsigned char) c))
++    if (apr_isdigit((unsigned char) c))
+ 	return c - '0';
+     if ((c >= 'a') && (c <= 'f'))
+ 	return c + 10 - 'a';
+@@ -1570,10 +1570,10 @@ static int match(request_rec *r, unsigned char *s, int nbytes)
+ 
+ #if MIME_MAGIC_DEBUG
+     for (m = conf->magic; m; m = m->next) {
+-	if (ap_isprint((((unsigned long) m) >> 24) & 255) &&
+-	    ap_isprint((((unsigned long) m) >> 16) & 255) &&
+-	    ap_isprint((((unsigned long) m) >> 8) & 255) &&
+-	    ap_isprint(((unsigned long) m) & 255)) {
++	if (apr_isprint((((unsigned long) m) >> 24) & 255) &&
++	    apr_isprint((((unsigned long) m) >> 16) & 255) &&
++	    apr_isprint((((unsigned long) m) >> 8) & 255) &&
++	    apr_isprint(((unsigned long) m) & 255)) {
+ 	    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, r,
+ 			MODNAME ": match: POINTER CLOBBERED! "
+ 			"m=\"%c%c%c%c\"",
+@@ -2008,15 +2008,15 @@ static int ascmagic(request_rec *r, unsigned char *buf, int nbytes)
+     if (*buf == '.') {
+ 	unsigned char *tp = buf + 1;
+ 
+-	while (ap_isspace(*tp))
++	while (apr_isspace(*tp))
+ 	    ++tp;		/* skip leading whitespace */
+-	if ((ap_isalnum(*tp) || *tp == '\\') &&
+-	     (ap_isalnum(*(tp + 1)) || *tp == '"')) {
++	if ((apr_isalnum(*tp) || *tp == '\\') &&
++	     (apr_isalnum(*(tp + 1)) || *tp == '"')) {
+ 	    magic_rsl_puts(r, "application/x-troff");
+ 	    return 1;
+ 	}
+     }
+-    if ((*buf == 'c' || *buf == 'C') && ap_isspace(*(buf + 1))) {
++    if ((*buf == 'c' || *buf == 'C') && apr_isspace(*(buf + 1))) {
+ 	/* Fortran */
+ 	magic_rsl_puts(r, "text/plain");
+ 	return 1;
+@@ -2299,7 +2299,7 @@ static long from_oct(int digs, char *where)
+ {
+     register long value;
+ 
+-    while (ap_isspace(*where)) {	/* Skip spaces */
++    while (apr_isspace(*where)) {	/* Skip spaces */
+ 	where++;
+ 	if (--digs <= 0)
+ 	    return -1;		/* All blank field */
+@@ -2310,7 +2310,7 @@ static long from_oct(int digs, char *where)
+ 	--digs;
+     }
+ 
+-    if (digs > 0 && *where && !ap_isspace(*where))
++    if (digs > 0 && *where && !apr_isspace(*where))
+ 	return -1;		/* Ended on non-space/nul */
+ 
+     return value;
+@@ -2339,10 +2339,10 @@ static int revision_suffix(request_rec *r)
+ 
+     /* check for recognized revision suffix */
+     suffix_pos = strlen(r->filename) - 1;
+-    if (!ap_isdigit(r->filename[suffix_pos])) {
++    if (!apr_isdigit(r->filename[suffix_pos])) {
+ 	return 0;
+     }
+-    while (suffix_pos >= 0 && ap_isdigit(r->filename[suffix_pos]))
++    while (suffix_pos >= 0 && apr_isdigit(r->filename[suffix_pos]))
+ 	suffix_pos--;
+     if (suffix_pos < 0 || r->filename[suffix_pos] != '@') {
+ 	return 0;
+@@ -2409,10 +2409,10 @@ static void magic_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, serve
+ 	    ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, s,
+ 			MODNAME ": magic_init 1 test");
+ 	    for (m = conf->magic; m; m = m->next) {
+-		if (ap_isprint((((unsigned long) m) >> 24) & 255) &&
+-		    ap_isprint((((unsigned long) m) >> 16) & 255) &&
+-		    ap_isprint((((unsigned long) m) >> 8) & 255) &&
+-		    ap_isprint(((unsigned long) m) & 255)) {
++		if (apr_isprint((((unsigned long) m) >> 24) & 255) &&
++		    apr_isprint((((unsigned long) m) >> 16) & 255) &&
++		    apr_isprint((((unsigned long) m) >> 8) & 255) &&
++		    apr_isprint(((unsigned long) m) & 255)) {
+ 		    ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_DEBUG, 0, s,
+ 				MODNAME ": magic_init 1: POINTER CLOBBERED! "
+ 				"m=\"%c%c%c%c\" line=%d",
+diff --git a/modules/metadata/mod_setenvif.c b/modules/metadata/mod_setenvif.c
+index 55ccef6..7aeed03 100644
+--- a/modules/metadata/mod_setenvif.c
++++ b/modules/metadata/mod_setenvif.c
+@@ -435,7 +435,7 @@ static int match_headers(request_rec *r)
+         }
+ 
+         if (!ap_regexec(b->preg, val, 0, NULL, 0)) {
+-	    apr_array_header_t *arr = ap_table_elts(b->features);
++	    apr_array_header_t *arr = apr_table_elts(b->features);
+             elts = (apr_table_entry_t *) arr->elts;
+ 
+             for (j = 0; j < arr->nelts; ++j) {
+diff --git a/modules/metadata/mod_unique_id.c b/modules/metadata/mod_unique_id.c
+index b07b5b5..0ae1f82 100644
+--- a/modules/metadata/mod_unique_id.c
++++ b/modules/metadata/mod_unique_id.c
+@@ -244,7 +244,7 @@ static void unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *p
+      * But protecting against it is relatively cheap.  We just sleep into the
+      * next second.
+      */
+-    pause = (apr_interval_time_t)(1000000 - (apr_now() % AP_USEC_PER_SEC));
++    pause = (apr_interval_time_t)(1000000 - (apr_now() % APR_USEC_PER_SEC));
+     apr_sleep(pause);
+ }
+ 
+@@ -287,7 +287,7 @@ static void unique_id_child_init(apr_pool_t *p, server_rec *s)
+     /* Some systems have very low variance on the low end of their system
+      * counter, defend against that.
+      */
+-    cur_unique_id.counter = tv % AP_USEC_PER_SEC / 10;
++    cur_unique_id.counter = tv % APR_USEC_PER_SEC / 10;
+ 
+     /*
+      * We must always use network ordering for these bytes, so that
+diff --git a/modules/metadata/mod_usertrack.c b/modules/metadata/mod_usertrack.c
+index f59f08a..d21c586 100644
+--- a/modules/metadata/mod_usertrack.c
++++ b/modules/metadata/mod_usertrack.c
+@@ -140,15 +140,15 @@ static void make_cookie(request_rec *r)
+     apr_snprintf(cookiebuf, sizeof(cookiebuf), "%s.%qd", rname, apr_now());
+ 
+     if (cls->expires) {
+-	ap_exploded_time_t tms;
++	apr_exploded_time_t tms;
+ 
+-	apr_explode_gmt(&tms, r->request_time + cls->expires * AP_USEC_PER_SEC);
++	apr_explode_gmt(&tms, r->request_time + cls->expires * APR_USEC_PER_SEC);
+ 
+         /* Cookie with date; as strftime '%a, %d-%h-%y %H:%M:%S GMT' */
+         new_cookie = apr_psprintf(r->pool,
+                 "%s=%s; path=/; expires=%s, %.2d-%s-%.2d %.2d:%.2d:%.2d GMT",
+-                    dcfg->cookie_name, cookiebuf, ap_day_snames[tms.tm_wday],
+-                    tms.tm_mday, ap_month_snames[tms.tm_mon],
++                    dcfg->cookie_name, cookiebuf, apr_day_snames[tms.tm_wday],
++                    tms.tm_mday, apr_month_snames[tms.tm_mon],
+                     tms.tm_year % 100,
+                     tms.tm_hour, tms.tm_min, tms.tm_sec);
+     }
+@@ -229,7 +229,7 @@ static const char *set_cookie_exp(cmd_parms *parms, void *dummy, const char *arg
+     char *word;
+ 
+     /* The simple case first - all numbers (we assume) */
+-    if (ap_isdigit(arg[0]) && ap_isdigit(arg[strlen(arg) - 1])) {
++    if (apr_isdigit(arg[0]) && apr_isdigit(arg[strlen(arg) - 1])) {
+         cls->expires = atol(arg);
+         return NULL;
+     }
+@@ -248,7 +248,7 @@ static const char *set_cookie_exp(cmd_parms *parms, void *dummy, const char *arg
+     /* {<num> <type>}* */
+     while (word[0]) {
+         /* <num> */
+-	if (ap_isdigit(word[0]))
++	if (apr_isdigit(word[0]))
+             num = atoi(word);
+         else
+             return "bad expires code, numeric value expected.";
+diff --git a/modules/proxy/mod_proxy.c b/modules/proxy/mod_proxy.c
+index 717426b..828b1c9 100644
+--- a/modules/proxy/mod_proxy.c
++++ b/modules/proxy/mod_proxy.c
+@@ -609,7 +609,7 @@ static const char *
+       ap_get_module_config(s->module_config, &proxy_module);
+     int *New;
+ 
+-    if (!ap_isdigit(arg[0]))
++    if (!apr_isdigit(arg[0]))
+     return "AllowCONNECT: port number must be numeric";
+ 
+     New = apr_push_array(conf->allowed_connect_ports);
+diff --git a/modules/proxy/proxy_connect.c b/modules/proxy/proxy_connect.c
+index 491d390..d5c14dd 100644
+--- a/modules/proxy/proxy_connect.c
++++ b/modules/proxy/proxy_connect.c
+@@ -144,7 +144,7 @@ int ap_proxy_connect_handler(request_rec *r, ap_cache_el  *c, char *url,
+     }
+ 
+ /* check if ProxyBlock directive on this host */
+-    destaddr.s_addr = ap_inet_addr(host);
++    destaddr.s_addr = apr_inet_addr(host);
+     for (i = 0; i < conf->noproxies->nelts; i++) {
+     if ((npent[i].name != NULL && strstr(host, npent[i].name) != NULL)
+         || destaddr.s_addr == npent[i].addr.s_addr || npent[i].name[0] == '*')
+diff --git a/modules/proxy/proxy_ftp.c b/modules/proxy/proxy_ftp.c
+index 82d32e0..a0a4f48 100644
+--- a/modules/proxy/proxy_ftp.c
++++ b/modules/proxy/proxy_ftp.c
+@@ -87,7 +87,7 @@ static int decodeenc(char *x)
+     for (i = 0, j = 0; x[i] != '\0'; i++, j++) {
+ /* decode it if not already done */
+     ch = x[i];
+-    if (ch == '%' && ap_isxdigit(x[i + 1]) && ap_isxdigit(x[i + 2])) {
++    if (ch == '%' && apr_isxdigit(x[i + 1]) && apr_isxdigit(x[i + 2])) {
+         ch = ap_proxy_hex2c(&x[i + 1]);
+         i += 2;
+     }
+@@ -107,7 +107,7 @@ static int ftp_check_string(const char *x)
+ 
+     for (i = 0; x[i] != '\0'; i++) {
+     ch = x[i];
+-    if (ch == '%' && ap_isxdigit(x[i + 1]) && ap_isxdigit(x[i + 2])) {
++    if (ch == '%' && apr_isxdigit(x[i + 1]) && apr_isxdigit(x[i + 2])) {
+         ch = ap_proxy_hex2c(&x[i + 1]);
+         i += 2;
+     }
+@@ -207,8 +207,8 @@ static int ftp_getrc(BUFF *f)
+     if (len == -1)
+     return -1;
+ /* check format */
+-    if (len < 5 || !ap_isdigit(linebuff[0]) || !ap_isdigit(linebuff[1]) ||
+-    !ap_isdigit(linebuff[2]) || (linebuff[3] != ' ' && linebuff[3] != '-'))
++    if (len < 5 || !apr_isdigit(linebuff[0]) || !apr_isdigit(linebuff[1]) ||
++    !apr_isdigit(linebuff[2]) || (linebuff[3] != ' ' && linebuff[3] != '-'))
+     status = 0;
+     else
+     status = 100 * linebuff[0] + 10 * linebuff[1] + linebuff[2] - 111 * '0';
+@@ -248,8 +248,8 @@ static int ftp_getrc_msg(BUFF *f, char *msgbuf, int msglen)
+     len = ap_bgets(linebuff, sizeof linebuff, f);
+     if (len == -1)
+     return -1;
+-    if (len < 5 || !ap_isdigit(linebuff[0]) || !ap_isdigit(linebuff[1]) ||
+-    !ap_isdigit(linebuff[2]) || (linebuff[3] != ' ' && linebuff[3] != '-'))
++    if (len < 5 || !apr_isdigit(linebuff[0]) || !apr_isdigit(linebuff[1]) ||
++    !apr_isdigit(linebuff[2]) || (linebuff[3] != ' ' && linebuff[3] != '-'))
+     status = 0;
+     else
+     status = 100 * linebuff[0] + 10 * linebuff[1] + linebuff[2] - 111 * '0';
+@@ -359,8 +359,8 @@ static long int send_dir(BUFF *f, request_rec *r, ap_cache_el  *c, char *cwd)
+         apr_cpystrn(buf, buf2, sizeof(buf));
+         n = strlen(buf);
+     }
+-    else if (buf[0] == 'd' || buf[0] == '-' || buf[0] == 'l' || ap_isdigit(buf[0])) {
+-        if (ap_isdigit(buf[0])) {    /* handle DOS dir */
++    else if (buf[0] == 'd' || buf[0] == '-' || buf[0] == 'l' || apr_isdigit(buf[0])) {
++        if (apr_isdigit(buf[0])) {    /* handle DOS dir */
+         searchptr = strchr(buf, '<');
+         if (searchptr != NULL)
+             *searchptr = '[';
+@@ -487,7 +487,7 @@ int ap_proxy_ftp_handler(request_rec *r, ap_cache_el  *c, char *url)
+     unsigned short pport;
+     int pasvmode = 0;
+     char pasv[64];
+-    char *pstr, dates[AP_RFC822_DATE_LEN];
++    char *pstr, dates[APR_RFC822_DATE_LEN];
+ 
+     char *npaddr;
+     apr_uint32_t npport;
+@@ -546,7 +546,7 @@ int ap_proxy_ftp_handler(request_rec *r, ap_cache_el  *c, char *url)
+     }
+ 
+ /* check if ProxyBlock directive on this host */
+-    destaddr.s_addr = ap_inet_addr(host);
++    destaddr.s_addr = apr_inet_addr(host);
+     for (i = 0; i < conf->noproxies->nelts; i++) {
+     if ((npent[i].name != NULL && strstr(host, npent[i].name) != NULL)
+         || destaddr.s_addr == npent[i].addr.s_addr || npent[i].name[0] == '*')
+@@ -936,7 +936,7 @@ int ap_proxy_ftp_handler(request_rec *r, ap_cache_el  *c, char *url)
+                 len = 0;
+             }
+             else if (i == 213) { /* Size command ok */
+-                for (j = 0; j < sizeof resp && ap_isdigit(resp[j]); j++)
++                for (j = 0; j < sizeof resp && apr_isdigit(resp[j]); j++)
+                     ;
+                 resp[j] = '\0';
+                 if (resp[0] != '\0')
+diff --git a/modules/proxy/proxy_http.c b/modules/proxy/proxy_http.c
+index 38794c7..cb2eaff 100644
+--- a/modules/proxy/proxy_http.c
++++ b/modules/proxy/proxy_http.c
+@@ -147,9 +147,9 @@ static void clear_connection(apr_pool_t *p, apr_table_t *headers)
+ 
+     while (*next) {
+         name = next;
+-        while (*next && !ap_isspace(*next) && (*next != ','))
++        while (*next && !apr_isspace(*next) && (*next != ','))
+             ++next;
+-        while (*next && (ap_isspace(*next) || (*next == ','))) {
++        while (*next && (apr_isspace(*next) || (*next == ','))) {
+             *next = '\0';
+             ++next;
+         }
+@@ -224,14 +224,14 @@ int ap_proxy_http_handler(request_rec *r, ap_cache_el  *c, char *url,
+     strp2 = strchr(desthost, ':');
+     if (strp2 != NULL) {
+         *(strp2++) = '\0';
+-        if (ap_isdigit(*strp2)) {
++        if (apr_isdigit(*strp2)) {
+             destport = atoi(strp2);
+             destportstr = strp2;
+         }
+     }
+ 
+ /* check if ProxyBlock directive on this host */
+-    destaddr.s_addr = ap_inet_addr(desthost);
++    destaddr.s_addr = apr_inet_addr(desthost);
+     for (i = 0; i < conf->noproxies->nelts; i++) {
+         if ((npent[i].name != NULL && strstr(desthost, npent[i].name) != NULL)
+             || destaddr.s_addr == npent[i].addr.s_addr || npent[i].name[0] == '*')
+@@ -304,7 +304,7 @@ int ap_proxy_http_handler(request_rec *r, ap_cache_el  *c, char *url,
+             );
+     }
+ 
+-    reqhdrs_arr = ap_table_elts(r->headers_in);
++    reqhdrs_arr = apr_table_elts(r->headers_in);
+     reqhdrs = (apr_table_entry_t *) reqhdrs_arr->elts;
+     for (i = 0; i < reqhdrs_arr->nelts; i++) {
+         if (reqhdrs[i].key == NULL || reqhdrs[i].val == NULL
+diff --git a/modules/proxy/proxy_util.c b/modules/proxy/proxy_util.c
+index 4bbc8b5..4590f02 100644
+--- a/modules/proxy/proxy_util.c
++++ b/modules/proxy/proxy_util.c
+@@ -78,18 +78,18 @@ int ap_proxy_hex2c(const char *x)
+ 
+ #ifndef CHARSET_EBCDIC
+     ch = x[0];
+-    if (ap_isdigit(ch))
++    if (apr_isdigit(ch))
+     i = ch - '0';
+-    else if (ap_isupper(ch))
++    else if (apr_isupper(ch))
+     i = ch - ('A' - 10);
+     else
+     i = ch - ('a' - 10);
+     i <<= 4;
+ 
+     ch = x[1];
+-    if (ap_isdigit(ch))
++    if (apr_isdigit(ch))
+     i += ch - '0';
+-    else if (ap_isupper(ch))
++    else if (apr_isupper(ch))
+     i += ch - ('A' - 10);
+     else
+     i += ch - ('a' - 10);
+@@ -180,7 +180,7 @@ char *
+     }
+ /* decode it if not already done */
+     if (isenc && ch == '%') {
+-        if (!ap_isxdigit(x[i + 1]) || !ap_isxdigit(x[i + 2]))
++        if (!apr_isxdigit(x[i + 1]) || !apr_isxdigit(x[i + 2]))
+         return NULL;
+         ch = ap_proxy_hex2c(&x[i + 1]);
+         i += 2;
+@@ -191,7 +191,7 @@ char *
+         }
+     }
+ /* recode it, if necessary */
+-    if (!ap_isalnum(ch) && !strchr(allowed, ch)) {
++    if (!apr_isalnum(ch) && !strchr(allowed, ch)) {
+         ap_proxy_c2hex(ch, &y[j]);
+         j += 2;
+     }
+@@ -262,7 +262,7 @@ char *
+     *(strp++) = '\0';
+ 
+     for (i = 0; strp[i] != '\0'; i++)
+-        if (!ap_isdigit(strp[i]))
++        if (!apr_isdigit(strp[i]))
+         break;
+ 
+     /* if (i == 0) the no port was given; keep default */
+@@ -279,13 +279,13 @@ char *
+     return "Missing host in URL";
+ /* check hostname syntax */
+     for (i = 0; host[i] != '\0'; i++)
+-    if (!ap_isdigit(host[i]) && host[i] != '.')
++    if (!apr_isdigit(host[i]) && host[i] != '.')
+         break;
+     /* must be an IP address */
+ #ifdef WIN32
+     if (host[i] == '\0' && (inet_addr(host) == -1))
+ #else
+-    if (host[i] == '\0' && (ap_inet_addr(host) == -1 || inet_network(host) == -1))
++    if (host[i] == '\0' && (apr_inet_addr(host) == -1 || inet_network(host) == -1))
+ #endif
+     {
+     return "Bad IP address in URL";
+@@ -346,7 +346,7 @@ const char *
+            &min, &sec, &year) != 7)
+         return x;
+     for (wk = 0; wk < 7; wk++)
+-        if (strcmp(week, ap_day_snames[wk]) == 0)
++        if (strcmp(week, apr_day_snames[wk]) == 0)
+         break;
+     if (wk == 7)
+         return x;
+@@ -354,14 +354,14 @@ const char *
+ 
+ /* check date */
+     for (mon = 0; mon < 12; mon++)
+-    if (strcmp(month, ap_month_snames[mon]) == 0)
++    if (strcmp(month, apr_month_snames[mon]) == 0)
+         break;
+     if (mon == 12)
+     return x;
+ 
+     q = apr_palloc(p, 30);
+-    apr_snprintf(q, 30, "%s, %.2d %s %d %.2d:%.2d:%.2d GMT", ap_day_snames[wk], mday,
+-        ap_month_snames[mon], year, hour, min, sec);
++    apr_snprintf(q, 30, "%s, %.2d %s %d %.2d:%.2d:%.2d GMT", apr_day_snames[wk], mday,
++        apr_month_snames[mon], year, hour, min, sec);
+     return q;
+ }
+ 
+@@ -469,11 +469,11 @@ apr_table_t *ap_proxy_read_headers(request_rec *r, char *buffer, int size, BUFF
+     /* XXX: RFC2068 defines only SP and HT as whitespace, this test is
+      * wrong... and so are many others probably.
+      */
+-        while (ap_isspace(*value))
++        while (apr_isspace(*value))
+             ++value;            /* Skip to start of value   */
+ 
+     /* should strip trailing whitespace as well */
+-    for (end = &value[strlen(value)-1]; end > value && ap_isspace(*end); --end)
++    for (end = &value[strlen(value)-1]; end > value && apr_isspace(*end); --end)
+         *end = '\0';
+ 
+         apr_table_add(resp_hdrs, buffer, value);
+@@ -607,11 +607,11 @@ void ap_proxy_send_headers(request_rec *r, const char *respline, apr_table_t *t)
+ {
+     int i;
+     BUFF *fp = r->connection->client;
+-    apr_table_entry_t *elts = (apr_table_entry_t *) ap_table_elts(t)->elts;
++    apr_table_entry_t *elts = (apr_table_entry_t *) apr_table_elts(t)->elts;
+ 
+     ap_bvputs(fp, respline, CRLF, NULL);
+ 
+-    for (i = 0; i < ap_table_elts(t)->nelts; ++i) {
++    for (i = 0; i < apr_table_elts(t)->nelts; ++i) {
+         if (elts[i].key != NULL) {
+             ap_bvputs(fp, elts[i].key, ": ", elts[i].val, CRLF, NULL);
+             apr_table_addn(r->headers_out, elts[i].key, elts[i].val);
+@@ -641,12 +641,12 @@ int ap_proxy_liststr(const char *list, const char *val)
+         i = p - list;
+         do
+         p++;
+-        while (ap_isspace(*p));
++        while (apr_isspace(*p));
+     }
+     else
+         i = strlen(list);
+ 
+-    while (i > 0 && ap_isspace(list[i - 1]))
++    while (i > 0 && apr_isspace(list[i - 1]))
+         i--;
+     if (i == len && strncasecmp(list, val, len) == 0)
+         return 1;
+@@ -667,9 +667,9 @@ int ap_proxy_hex2sec(const char *x)
+     for (i = 0, j = 0; i < 8; i++) {
+     ch = x[i];
+     j <<= 4;
+-    if (ap_isdigit(ch))
++    if (apr_isdigit(ch))
+         j |= ch - '0';
+-    else if (ap_isupper(ch))
++    else if (apr_isupper(ch))
+         j |= ch - ('A' - 10);
+     else
+         j |= ch - ('a' - 10);
+@@ -744,7 +744,7 @@ const char *ap_proxy_host2addr(const char *host, struct hostent *reqhp)
+     static APACHE_TLS char *charpbuf[2];
+ 
+     for (i = 0; host[i] != '\0'; i++)
+-        if (!ap_isdigit(host[i]) && host[i] != '.')
++        if (!apr_isdigit(host[i]) && host[i] != '.')
+             break;
+ 
+     if (host[i] != '\0') {
+@@ -753,7 +753,7 @@ const char *ap_proxy_host2addr(const char *host, struct hostent *reqhp)
+             return "Host not found";
+     }
+     else {
+-        ipaddr = ap_inet_addr(host);
++        ipaddr = apr_inet_addr(host);
+         hp = gethostbyaddr((char *) &ipaddr, sizeof(u_long), AF_INET);
+         if (hp == NULL) {
+             memset(&hpbuf, 0, sizeof(hpbuf));
+@@ -806,7 +806,7 @@ int ap_proxy_is_ipaddr(struct dirconn_entry *This, apr_pool_t *p)
+     long bits;
+ 
+     /* if the address is given with an explicit netmask, use that */
+-    /* Due to a deficiency in ap_inet_addr(), it is impossible to parse */
++    /* Due to a deficiency in apr_inet_addr(), it is impossible to parse */
+     /* "partial" addresses (with less than 4 quads) correctly, i.e.  */
+     /* 192.168.123 is parsed as 192.168.0.123, which is not what I want. */
+     /* I therefore have to parse the IP address manually: */
+@@ -824,7 +824,7 @@ int ap_proxy_is_ipaddr(struct dirconn_entry *This, apr_pool_t *p)
+     if (*addr == '/' && quads > 0)    /* netmask starts here. */
+         break;
+ 
+-    if (!ap_isdigit(*addr))
++    if (!apr_isdigit(*addr))
+         return 0;        /* no digit at start of quad */
+ 
+     ip_addr[quads] = strtol(addr, &tmp, 0);
+@@ -846,7 +846,7 @@ int ap_proxy_is_ipaddr(struct dirconn_entry *This, apr_pool_t *p)
+     for (This->addr.s_addr = 0, i = 0; i < quads; ++i)
+     This->addr.s_addr |= htonl(ip_addr[i] << (24 - 8 * i));
+ 
+-    if (addr[0] == '/' && ap_isdigit(addr[1])) {    /* net mask follows: */
++    if (addr[0] == '/' && apr_isdigit(addr[1])) {    /* net mask follows: */
+     char *tmp;
+ 
+     ++addr;
+@@ -1004,7 +1004,7 @@ int ap_proxy_is_domainname(struct dirconn_entry *This, apr_pool_t *p)
+     return 0;
+ 
+     /* rfc1035 says DNS names must consist of "[-a-zA-Z0-9]" and '.' */
+-    for (i = 0; ap_isalnum(addr[i]) || addr[i] == '-' || addr[i] == '.'; ++i)
++    for (i = 0; apr_isalnum(addr[i]) || addr[i] == '-' || addr[i] == '.'; ++i)
+     continue;
+ 
+ #if 0
+@@ -1059,7 +1059,7 @@ int ap_proxy_is_hostname(struct dirconn_entry *This, apr_pool_t *p)
+     return 0;
+ 
+     /* rfc1035 says DNS names must consist of "[-a-zA-Z0-9]" and '.' */
+-    for (i = 0; ap_isalnum(addr[i]) || addr[i] == '-' || addr[i] == '.'; ++i);
++    for (i = 0; apr_isalnum(addr[i]) || addr[i] == '-' || addr[i] == '.'; ++i);
+ 
+ #if 0
+     if (addr[i] == ':') {
+@@ -1132,7 +1132,7 @@ int ap_proxy_doconnect(apr_socket_t *sock, char *host, apr_uint32_t port, reques
+ {
+     int i;
+     for (i = 0; host[i] != '\0'; i++)
+-        if (!ap_isdigit(host[i]) && host[i] != '.')
++        if (!apr_isdigit(host[i]) && host[i] != '.')
+             break;
+ 
+     apr_set_remote_port(sock, port);
+diff --git a/os/bs2000/bs2login.c b/os/bs2000/bs2login.c
+index 8edad89..23a5374 100644
+--- a/os/bs2000/bs2login.c
++++ b/os/bs2000/bs2login.c
+@@ -93,7 +93,7 @@ static void ap_pad(char *dest, size_t size, char ch)
+ static void ap_str_toupper(char *str)
+ {
+     while (*str) {
+-	*str = ap_toupper(*str);
++	*str = apr_toupper(*str);
+ 	++str;
+     }
+ }
+diff --git a/os/bs2000/os.h b/os/bs2000/os.h
+index 80c9e2e..e660d66 100644
+--- a/os/bs2000/os.h
++++ b/os/bs2000/os.h
+@@ -71,7 +71,7 @@
+ /* Compiler supports inline, so include the inlineable functions as
+  * part of the header
+  */
+-#define INLINE extern ap_inline
++#define INLINE extern apr_inline
+ 
+ INLINE int ap_os_is_path_absolute(const char *file);
+ 
+diff --git a/os/tpf/os.c b/os/tpf/os.c
+index d48d243..3833d99 100644
+--- a/os/tpf/os.c
++++ b/os/tpf/os.c
+@@ -223,7 +223,7 @@ int ap_tpf_spawn_child(apr_pool_t *p, int (*func) (void *, child_info *),
+    int                      fd_flags_out, fd_flags_in, fd_flags_err;
+    struct tpf_fork_input    fork_input;
+    TPF_FORK_CHILD           *cld = (TPF_FORK_CHILD *) data;
+-   apr_array_header_t             *env_arr = ap_table_elts ((array_header *) cld->subprocess_env);
++   apr_array_header_t       *env_arr = apr_table_elts ((array_header *) cld->subprocess_env);
+    table_entry              *elts = (table_entry *) env_arr->elts;
+ 
+ 
+diff --git a/os/tpf/os.h b/os/tpf/os.h
+index 380299c..993bfa3 100644
+--- a/os/tpf/os.h
++++ b/os/tpf/os.h
+@@ -77,7 +77,7 @@
+ /* Compiler supports inline, so include the inlineable functions as
+  * part of the header
+  */
+-#define INLINE extern ap_inline
++#define INLINE extern apr_inline
+ #include "os-inline.c"
+ #endif
+ 
+diff --git a/os/unix/os.h b/os/unix/os.h
+index 136a8f7..30e20d5 100644
+--- a/os/unix/os.h
++++ b/os/unix/os.h
+@@ -75,7 +75,7 @@
+ /* Compiler supports inline, so include the inlineable functions as
+  * part of the header
+  */
+-#define INLINE extern ap_inline
++#define INLINE extern apr_inline
+ 
+ INLINE int ap_os_is_path_absolute(const char *file);
+ 
+diff --git a/os/win32/apache.ico b/os/win32/apache.ico
+index 161bcf7..5e8adcb 100644
+Binary files a/os/win32/apache.ico and b/os/win32/apache.ico differ
+diff --git a/os/win32/mod_isapi.c b/os/win32/mod_isapi.c
+index e61cb47..9976c7b 100644
+--- a/os/win32/mod_isapi.c
++++ b/os/win32/mod_isapi.c
+@@ -534,7 +534,7 @@ static char* ComposeHeaders(request_rec *r, char* data)
+         }
+ 
+         *value++ = '\0';
+-        while (*value && ap_isspace(*value)) ++value;
++        while (*value && apr_isspace(*value)) ++value;
+ 
+         /* Check all the special-case headers. Similar to what
+          * ap_scan_script_header_err() does (see that function for
+@@ -546,7 +546,7 @@ static char* ComposeHeaders(request_rec *r, char* data)
+             /* Nuke trailing whitespace */    
+             char *tmp;
+             char *endp = value + strlen(value) - 1;
+-            while (endp > value && ap_isspace(*endp)) 
++            while (endp > value && apr_isspace(*endp)) 
+                 *endp-- = '\0';
+ 
+             tmp = apr_pstrdup (r->pool, value);
+diff --git a/server/connection.c b/server/connection.c
+index e8fec98..cd9c181 100644
+--- a/server/connection.c
++++ b/server/connection.c
+@@ -193,7 +193,7 @@ void ap_lingering_close(conn_rec *c)
+         if (rc != APR_SUCCESS || nbytes == 0) break;
+ 
+         /* how much time has elapsed? */
+-        timeout = (int)((apr_now() - start) / AP_USEC_PER_SEC);
++        timeout = (int)((apr_now() - start) / APR_USEC_PER_SEC);
+         if (timeout >= MAX_SECS_TO_LINGER) break;
+ 
+         /* figure out the new timeout */
+diff --git a/server/gen_test_char.c b/server/gen_test_char.c
+index f4258ab..52d1782 100644
+--- a/server/gen_test_char.c
++++ b/server/gen_test_char.c
+@@ -101,16 +101,16 @@ int main(int argc, char *argv[])
+ 	    flags |= T_ESCAPE_SHELL_CMD;
+ 	}
+ 
+-	if (!ap_isalnum(c) && !strchr("$-_.+!*'(),:@&=~", c)) {
++	if (!apr_isalnum(c) && !strchr("$-_.+!*'(),:@&=~", c)) {
+ 	    flags |= T_ESCAPE_PATH_SEGMENT;
+ 	}
+ 
+-	if (!ap_isalnum(c) && !strchr("$-_.+!*'(),:@&=/~", c)) {
++	if (!apr_isalnum(c) && !strchr("$-_.+!*'(),:@&=/~", c)) {
+ 	    flags |= T_OS_ESCAPE_PATH;
+ 	}
+ 
+ 	/* these are the "tspecials" from RFC2068 */
+-	if (ap_iscntrl(c) || strchr(" \t()<>@,;:\\/[]?={}", c)) {
++	if (apr_iscntrl(c) || strchr(" \t()<>@,;:\\/[]?={}", c)) {
+ 	    flags |= T_HTTP_TOKEN_STOP;
+ 	}
+ 	printf("%u%c", flags, (c < 255) ? ',' : ' ');
+diff --git a/server/log.c b/server/log.c
+index f3a2323..95cc650 100644
+--- a/server/log.c
++++ b/server/log.c
+@@ -372,9 +372,9 @@ static void log_error_core(const char *file, int line, int level,
+     if (logf && ((level & APLOG_STARTUP) != APLOG_STARTUP)) {
+ 	errstr[0] = '[';
+ 	apr_ctime(errstr + 1, apr_now());
+-	errstr[1 + AP_CTIME_LEN - 1] = ']';
+-	errstr[1 + AP_CTIME_LEN    ] = ' ';
+-	len = 1 + AP_CTIME_LEN + 1;
++	errstr[1 + APR_CTIME_LEN - 1] = ']';
++	errstr[1 + APR_CTIME_LEN    ] = ' ';
++	len = 1 + APR_CTIME_LEN + 1;
+     } else {
+ 	len = 0;
+     }
+@@ -534,7 +534,7 @@ void ap_log_pid(apr_pool_t *p, const char *fname)
+ 
+ API_EXPORT(void) ap_log_assert(const char *szExp, const char *szFile, int nLine)
+ {
+-    char time_str[AP_CTIME_LEN];
++    char time_str[APR_CTIME_LEN];
+ 
+     apr_ctime(time_str, apr_now());
+     ap_log_error(APLOG_MARK, APLOG_STARTUP | APLOG_NOERRNO, 0, NULL,
+@@ -552,7 +552,7 @@ API_EXPORT(void) ap_log_assert(const char *szExp, const char *szFile, int nLine)
+ 
+ #ifdef HAVE_RELIABLE_PIPED_LOGS
+ /* forward declaration */
+-static void piped_log_maintenance(int reason, void *data, ap_wait_t status);
++static void piped_log_maintenance(int reason, void *data, apr_wait_t status);
+ 
+ static int piped_log_spawn(piped_log *pl)
+ {
+@@ -599,7 +599,7 @@ static int piped_log_spawn(piped_log *pl)
+ }
+ 
+ 
+-static void piped_log_maintenance(int reason, void *data, ap_wait_t status)
++static void piped_log_maintenance(int reason, void *data, apr_wait_t status)
+ {
+     piped_log *pl = data;
+     apr_status_t stats;
+diff --git a/server/main.c b/server/main.c
+index 48c0827..caf648f 100644
+--- a/server/main.c
++++ b/server/main.c
+@@ -323,21 +323,21 @@ int main(int argc, char *argv[])
+         switch (c) {
+  	case 'c':
+ 	    new = (char **)apr_push_array(ap_server_post_read_config);
+-	    *new = apr_pstrdup(pcommands, ap_optarg);
++	    *new = apr_pstrdup(pcommands, apr_optarg);
+ 	    break;
+ 	case 'C':
+ 	    new = (char **)apr_push_array(ap_server_pre_read_config);
+-	    *new = apr_pstrdup(pcommands, ap_optarg);
++	    *new = apr_pstrdup(pcommands, apr_optarg);
+ 	    break;
+ 	case 'd':
+-	    def_server_root = ap_optarg;
++	    def_server_root = apr_optarg;
+ 	    break;
+ 	case 'D':
+ 	    new = (char **)apr_push_array(ap_server_config_defines);
+-	    *new = apr_pstrdup(pcommands, ap_optarg);
++	    *new = apr_pstrdup(pcommands, apr_optarg);
+ 	    break;
+ 	case 'f':
+-	    confname = ap_optarg;
++	    confname = apr_optarg;
+ 	    break;
+ 	case 'v':
+ 	    printf("Server version: %s\n", ap_get_server_version());
+diff --git a/server/mpm/beos/beos.c b/server/mpm/beos/beos.c
+index 7479644..6cc2405 100644
+--- a/server/mpm/beos/beos.c
++++ b/server/mpm/beos/beos.c
+@@ -591,7 +591,7 @@ static void perform_idle_server_maintenance(void)
+ static void server_main_loop(int remaining_threads_to_start)
+ {
+     int child_slot;
+-    ap_wait_t status;
++    apr_wait_t status;
+     apr_proc_t pid;
+     int i;
+ 
+diff --git a/server/mpm/dexter/dexter.c b/server/mpm/dexter/dexter.c
+index 4d9edbd..ecaa711 100644
+--- a/server/mpm/dexter/dexter.c
++++ b/server/mpm/dexter/dexter.c
+@@ -903,7 +903,7 @@ static void perform_child_maintenance(void)
+ static void server_main_loop(int remaining_children_to_start)
+ {
+     int child_slot;
+-    ap_wait_t status;
++    apr_wait_t status;
+     apr_proc_t pid;
+     int i;
+ 
+diff --git a/server/mpm/experimental/perchild/perchild.c b/server/mpm/experimental/perchild/perchild.c
+index 8921651..1e8690b 100644
+--- a/server/mpm/experimental/perchild/perchild.c
++++ b/server/mpm/experimental/perchild/perchild.c
+@@ -1066,7 +1066,7 @@ static void perform_child_maintenance(void)
+ static void server_main_loop(int remaining_children_to_start)
+ {
+     int child_slot;
+-    ap_wait_t status;
++    apr_wait_t status;
+     apr_proc_t pid;
+     int i;
+ 
+diff --git a/server/mpm/mpmt_beos/mpmt_beos.c b/server/mpm/mpmt_beos/mpmt_beos.c
+index ff66f04..6e8e1f6 100644
+--- a/server/mpm/mpmt_beos/mpmt_beos.c
++++ b/server/mpm/mpmt_beos/mpmt_beos.c
+@@ -624,7 +624,7 @@ static void perform_idle_server_maintenance(void)
+ static void server_main_loop(int remaining_children_to_start)
+ {
+     int child_slot;
+-    ap_wait_t status;
++    apr_wait_t status;
+     apr_proc_t pid;
+     int i;
+ 
+diff --git a/server/mpm/mpmt_pthread/mpmt_pthread.c b/server/mpm/mpmt_pthread/mpmt_pthread.c
+index 761df42..68307a7 100644
+--- a/server/mpm/mpmt_pthread/mpmt_pthread.c
++++ b/server/mpm/mpmt_pthread/mpmt_pthread.c
+@@ -937,7 +937,7 @@ static void perform_idle_server_maintenance(void)
+ static void server_main_loop(int remaining_children_to_start)
+ {
+     int child_slot;
+-    ap_wait_t status;
++    apr_wait_t status;
+     apr_proc_t pid;
+     int i;
+ 
+diff --git a/server/mpm/mpmt_pthread/scoreboard.c b/server/mpm/mpmt_pthread/scoreboard.c
+index 22e3774..72ee596 100644
+--- a/server/mpm/mpmt_pthread/scoreboard.c
++++ b/server/mpm/mpmt_pthread/scoreboard.c
+@@ -153,7 +153,7 @@ void reinit_scoreboard(apr_pool_t *p)
+  * anyway.
+  */
+ 
+-ap_inline void ap_sync_scoreboard_image(void)
++apr_inline void ap_sync_scoreboard_image(void)
+ {
+ }
+ 
+@@ -162,7 +162,7 @@ API_EXPORT(int) ap_exists_scoreboard_image(void)
+     return (ap_scoreboard_image ? 1 : 0);
+ }
+ 
+-static ap_inline void put_scoreboard_info(int child_num, int thread_num, 
++static apr_inline void put_scoreboard_info(int child_num, int thread_num, 
+ 				       thread_score *new_score_rec)
+ {
+     /* XXX - needs to be fixed to account for threads */
+diff --git a/server/mpm/mpmt_pthread/scoreboard.h b/server/mpm/mpmt_pthread/scoreboard.h
+index 822ae8b..ee57443 100644
+--- a/server/mpm/mpmt_pthread/scoreboard.h
++++ b/server/mpm/mpmt_pthread/scoreboard.h
+@@ -217,7 +217,7 @@ void ap_mpmt_pthread_force_reset_connection_status(long conn_id);
+ 
+ API_EXPORT(void) reopen_scoreboard(apr_pool_t *p);
+ 
+-ap_inline void ap_sync_scoreboard_image(void);
++apr_inline void ap_sync_scoreboard_image(void);
+ void increment_counts(int child_num, int thread_num, request_rec *r);
+ void update_scoreboard_global(void);
+ API_EXPORT(int) find_child_by_pid(apr_proc_t *pid);
+diff --git a/server/mpm/perchild/perchild.c b/server/mpm/perchild/perchild.c
+index 8921651..1e8690b 100644
+--- a/server/mpm/perchild/perchild.c
++++ b/server/mpm/perchild/perchild.c
+@@ -1066,7 +1066,7 @@ static void perform_child_maintenance(void)
+ static void server_main_loop(int remaining_children_to_start)
+ {
+     int child_slot;
+-    ap_wait_t status;
++    apr_wait_t status;
+     apr_proc_t pid;
+     int i;
+ 
+diff --git a/server/mpm/prefork/prefork.c b/server/mpm/prefork/prefork.c
+index a6b6d9d..8cd3512 100644
+--- a/server/mpm/prefork/prefork.c
++++ b/server/mpm/prefork/prefork.c
+@@ -373,7 +373,7 @@ static void reinit_scoreboard(apr_pool_t *p)
+  * since when the parent is writing an entry, it's only noting SERVER_DEAD
+  * anyway.
+  */
+-ap_inline void ap_sync_scoreboard_image(void)
++apr_inline void ap_sync_scoreboard_image(void)
+ {
+ #ifdef SCOREBOARD_FILE
+     lseek(scoreboard_fd, 0L, 0);
+@@ -392,7 +392,7 @@ API_EXPORT(int) ap_get_max_daemons(void)
+     return ap_max_daemons_limit;
+ }
+ 
+-static ap_inline void put_scoreboard_info(int child_num,
++static apr_inline void put_scoreboard_info(int child_num,
+                                        short_score *new_score_rec)
+ {
+ #ifdef SCOREBOARD_FILE
+@@ -534,7 +534,7 @@ static int find_child_by_pid(apr_proc_t *pid)
+    Systems without a real waitpid sometimes lose a child's exit while waiting
+    for another.  Search through the scoreboard for missing children.
+  */
+-int reap_children(ap_wait_t *status)
++int reap_children(apr_wait_t *status)
+ {
+     int n, pid;
+ 
+@@ -544,7 +544,7 @@ int reap_children(ap_wait_t *status)
+ 		kill((pid = ap_scoreboard_image->parent[n].pid), 0) == -1) {
+ 	    ap_update_child_status(n, SERVER_DEAD, NULL);
+ 	    /* just mark it as having a successful exit status */
+-	    bzero((char *) status, sizeof(ap_wait_t));
++	    bzero((char *) status, sizeof(apr_wait_t));
+ 	    return(pid);
+ 	}
+     }
+@@ -1372,7 +1372,7 @@ int ap_mpm_run(apr_pool_t *_pconf, apr_pool_t *plog, server_rec *s)
+ 
+     while (!restart_pending && !shutdown_pending) {
+ 	int child_slot;
+-	ap_wait_t status;
++	apr_wait_t status;
+         /* this is a memory leak, but I'll fix it later. */
+ 	apr_proc_t pid;
+ 
+diff --git a/server/mpm/spmt_os2/spmt_os2.c b/server/mpm/spmt_os2/spmt_os2.c
+index 80db6b6..8cba8ad 100644
+--- a/server/mpm/spmt_os2/spmt_os2.c
++++ b/server/mpm/spmt_os2/spmt_os2.c
+@@ -359,7 +359,7 @@ static int find_child_by_tid(int tid)
+ #endif
+ static int wait_or_timeout_counter;
+ 
+-static int wait_or_timeout(ap_wait_t *status)
++static int wait_or_timeout(apr_wait_t *status)
+ {
+     int ret;
+     ULONG tid;
+@@ -1247,7 +1247,7 @@ int ap_mpm_run(apr_pool_t *_pconf, apr_pool_t *plog, server_rec *s)
+ 
+     while (!restart_pending && !shutdown_pending) {
+ 	int child_slot;
+-	ap_wait_t status;
++	apr_wait_t status;
+ 	int tid = wait_or_timeout(&status);
+ 
+ 	/* XXX: if it takes longer than 1 second for all our children
+diff --git a/server/mpm/winnt/mpm_winnt.c b/server/mpm/winnt/mpm_winnt.c
+index 7856ad4..bd9f084 100644
+--- a/server/mpm/winnt/mpm_winnt.c
++++ b/server/mpm/winnt/mpm_winnt.c
+@@ -390,7 +390,7 @@ static void sock_disable_nagle(int s)
+  */
+ static ap_listen_rec *head_listener;
+ 
+-static ap_inline ap_listen_rec *find_ready_listener(fd_set * main_fds)
++static apr_inline ap_listen_rec *find_ready_listener(fd_set * main_fds)
+ {
+     ap_listen_rec *lr;
+     SOCKET nsd;
+@@ -908,7 +908,7 @@ static int create_acceptex_context(apr_pool_t *_pconf, ap_listen_rec *lr)
+ 
+     return 0;
+ }
+-static ap_inline apr_status_t reset_acceptex_context(PCOMP_CONTEXT context) 
++static apr_inline apr_status_t reset_acceptex_context(PCOMP_CONTEXT context) 
+ {
+     DWORD BytesRead;
+     SOCKET nsd;
+@@ -1906,10 +1906,10 @@ void winnt_rewrite_args(process_rec *process)
+                      &opt, process->pool) == APR_SUCCESS) {
+         switch (opt) {
+         case 'n':
+-            service_named = mpm_service_set_name(process->pool, ap_optarg);
++            service_named = mpm_service_set_name(process->pool, apr_optarg);
+             break;
+         case 'k':
+-            signal_arg = ap_optarg;
++            signal_arg = apr_optarg;
+             break;
+         case 'i':
+             /* TODO: warn of depreciated syntax, "use -k install instead" */
+@@ -1923,9 +1923,9 @@ void winnt_rewrite_args(process_rec *process)
+             optbuf[1] = (char) opt;
+             new_arg = (char**) apr_push_array(mpm_new_argv);
+             *new_arg = apr_pstrdup(process->pool, optbuf);
+-            if (ap_optarg) {
++            if (apr_optarg) {
+                 new_arg = (char**) apr_push_array(mpm_new_argv);
+-                *new_arg = ap_optarg;
++                *new_arg = apr_optarg;
+             }
+             break;
+         }
+@@ -1933,8 +1933,8 @@ void winnt_rewrite_args(process_rec *process)
+     /* Set optreset and optind to allow apr_getopt to work correctly
+      * when called from http_main.c
+      */
+-    ap_optreset = 1;
+-    ap_optind = 1;
++    apr_optreset = 1;
++    apr_optind = 1;
+     
+     /* Track the number of args actually entered by the user */
+     inst_argc = mpm_new_argv->nelts - fixed_args;
+diff --git a/server/mpm_common.c b/server/mpm_common.c
+index 144390d..6cc477c 100644
+--- a/server/mpm_common.c
++++ b/server/mpm_common.c
+@@ -179,7 +179,7 @@ void ap_reclaim_child_processes(int terminate)
+ #endif
+ static int wait_or_timeout_counter;
+ 
+-void ap_wait_or_timeout(ap_wait_t *status, apr_proc_t *ret, apr_pool_t *p)
++void ap_wait_or_timeout(apr_wait_t *status, apr_proc_t *ret, apr_pool_t *p)
+ {
+     apr_status_t rv;
+ 
+@@ -208,7 +208,7 @@ void ap_wait_or_timeout(ap_wait_t *status, apr_proc_t *ret, apr_pool_t *p)
+     return;
+ }
+ 
+-void ap_process_child_status(apr_proc_t *pid, ap_wait_t status)
++void ap_process_child_status(apr_proc_t *pid, apr_wait_t status)
+ {
+     /* Child died... if it died due to a fatal error,
+         * we should simply bail out.
+diff --git a/server/util.c b/server/util.c
+index afad57f..9797d3f 100644
+--- a/server/util.c
++++ b/server/util.c
+@@ -137,7 +137,7 @@ API_EXPORT(char *) ap_field_noparam(apr_pool_t *p, const char *intype)
+ 	return apr_pstrdup(p, intype);
+     } 
+     else {
+-	while ((semi > intype) && ap_isspace(semi[-1])) {
++	while ((semi > intype) && apr_isspace(semi[-1])) {
+ 	    semi--;
+ 	}
+ 	return apr_pstrndup(p, intype, semi - intype);
+@@ -149,7 +149,7 @@ API_EXPORT(char *) ap_ht_time(apr_pool_t *p, apr_time_t t, const char *fmt, int
+     apr_size_t retcode;
+     char ts[MAX_STRING_LEN];
+     char tf[MAX_STRING_LEN];
+-    ap_exploded_time_t xt;
++    apr_exploded_time_t xt;
+ 
+     if (gmt) {
+ 	const char *f;
+@@ -251,7 +251,7 @@ API_EXPORT(int) ap_strcasecmp_match(const char *str, const char *exp)
+ 	    }
+ 	    return -1;
+ 	}
+-	else if ((exp[y] != '?') && (ap_tolower(str[x]) != ap_tolower(exp[y])))
++	else if ((exp[y] != '?') && (apr_tolower(str[x]) != apr_tolower(exp[y])))
+ 	    return 1;
+     }
+     return (str[x] != '\0');
+@@ -313,12 +313,12 @@ API_EXPORT(char *) ap_strcasestr(const char *s1, const char *s2)
+         return((char *)s1);
+     }
+     while(1) {
+-	for ( ; (*s1 != '\0') && (ap_tolower(*s1) != ap_tolower(*s2)); s1++);
++	for ( ; (*s1 != '\0') && (apr_tolower(*s1) != apr_tolower(*s2)); s1++);
+ 	if (*s1 == '\0') return(NULL);
+ 	/* found first character of s2, see if the rest matches */
+         p1 = (char *)s1;
+         p2 = (char *)s2;
+-        while (ap_tolower(*++p1) == ap_tolower(*++p2)) {
++        while (apr_tolower(*++p1) == apr_tolower(*++p2)) {
+             if (*p1 == '\0') {
+                 /* both strings ended together */
+                 return((char *)s1);
+@@ -386,7 +386,7 @@ API_EXPORT(char *) ap_pregsub(apr_pool_t *p, const char *input, const char *sour
+     while ((c = *src++) != '\0') {
+ 	if (c == '&')
+ 	    no = 0;
+-	else if (c == '$' && ap_isdigit(*src))
++	else if (c == '$' && apr_isdigit(*src))
+ 	    no = *src++ - '0';
+ 	else
+ 	    no = 10;
+@@ -411,7 +411,7 @@ API_EXPORT(char *) ap_pregsub(apr_pool_t *p, const char *input, const char *sour
+     while ((c = *src++) != '\0') {
+ 	if (c == '&')
+ 	    no = 0;
+-	else if (c == '$' && ap_isdigit(*src))
++	else if (c == '$' && apr_isdigit(*src))
+ 	    no = *src++ - '0';
+ 	else
+ 	    no = 10;
+@@ -663,7 +663,7 @@ API_EXPORT(char *) ap_getword_white(apr_pool_t *atrans, const char **line)
+     char *res;
+ 
+     for (x = 0; (*line)[x]; x++) {
+-	if (ap_isspace((*line)[x])) {
++	if (apr_isspace((*line)[x])) {
+ 	    pos = x;
+ 	    break;
+ 	}
+@@ -678,7 +678,7 @@ API_EXPORT(char *) ap_getword_white(apr_pool_t *atrans, const char **line)
+     res = apr_palloc(atrans, pos + 1);
+     apr_cpystrn(res, *line, pos + 1);
+ 
+-    while (ap_isspace((*line)[pos]))
++    while (apr_isspace((*line)[pos]))
+ 	++pos;
+ 
+     *line += pos;
+@@ -748,7 +748,7 @@ API_EXPORT(char *) ap_getword_conf(apr_pool_t *p, const char **line)
+     char *res;
+     char quote;
+ 
+-    while (*str && ap_isspace(*str))
++    while (*str && apr_isspace(*str))
+ 	++str;
+ 
+     if (!*str) {
+@@ -771,13 +771,13 @@ API_EXPORT(char *) ap_getword_conf(apr_pool_t *p, const char **line)
+     }
+     else {
+ 	strend = str;
+-	while (*strend && !ap_isspace(*strend))
++	while (*strend && !apr_isspace(*strend))
+ 	    ++strend;
+ 
+ 	res = substring_conf(p, str, strend - str, 0);
+     }
+ 
+-    while (*strend && ap_isspace(*strend))
++    while (*strend && apr_isspace(*strend))
+ 	++strend;
+     *line = strend;
+     return res;
+@@ -1005,11 +1005,11 @@ API_EXPORT(int) ap_cfg_getline(char *buf, size_t bufsize, configfile_t *cfp)
+ 	 * Leading and trailing white space is eliminated completely
+ 	 */
+ 	src = buf;
+-	while (ap_isspace(*src))
++	while (apr_isspace(*src))
+ 	    ++src;
+ 	/* blast trailing whitespace */
+ 	dst = &src[strlen(src)];
+-	while (--dst >= src && ap_isspace(*dst))
++	while (--dst >= src && apr_isspace(*dst))
+ 	    *dst = '\0';
+         /* Zap leading whitespace by shifting */
+         if (src != buf)
+@@ -1070,7 +1070,7 @@ API_EXPORT(int) ap_cfg_getline(char *buf, size_t bufsize, configfile_t *cfp)
+ 		     */
+ 		}
+ 		/* blast trailing whitespace */
+-		while (i > 0 && ap_isspace(buf[i - 1]))
++		while (i > 0 && apr_isspace(buf[i - 1]))
+ 		    --i;
+ 		buf[i] = '\0';
+ #ifdef DEBUG_CFG_LINES
+@@ -1099,7 +1099,7 @@ API_EXPORT(const char *) ap_size_list_item(const char **field, int *len)
+ 
+     /* Find first non-comma, non-whitespace byte */
+ 
+-    while (*ptr == ',' || ap_isspace(*ptr))
++    while (*ptr == ',' || apr_isspace(*ptr))
+         ++ptr;
+ 
+     token = ptr;
+@@ -1138,7 +1138,7 @@ API_EXPORT(const char *) ap_size_list_item(const char **field, int *len)
+ 
+     /* Advance field pointer to the next non-comma, non-white byte */
+ 
+-    while (*ptr == ',' || ap_isspace(*ptr))
++    while (*ptr == ',' || apr_isspace(*ptr))
+ 	++ptr;
+ 
+     *field = (const char *)ptr;
+@@ -1224,7 +1224,7 @@ API_EXPORT(char *) ap_get_list_item(apr_pool_t *p, const char **field)
+                 default  : if (addspace == 1)
+                                *pos++ = ' ';
+                            *pos++ = (in_com || in_qstr) ? *ptr
+-                                                        : ap_tolower(*ptr);
++                                                        : apr_tolower(*ptr);
+                            addspace = 0;
+                            break;
+             }
+@@ -1253,7 +1253,7 @@ API_EXPORT(int) ap_find_list_item(apr_pool_t *p, const char *line, const char *t
+ 
+         /* Find first non-comma, non-whitespace byte */
+ 
+-        while (*ptr == ',' || ap_isspace(*ptr))
++        while (*ptr == ',' || apr_isspace(*ptr))
+             ++ptr;
+ 
+         if (*ptr)
+@@ -1322,7 +1322,7 @@ API_EXPORT(int) ap_find_list_item(apr_pool_t *p, const char *line, const char *t
+                                if (in_com || in_qstr)
+                                    good = good && (*pos++ == *ptr);
+                                else
+-                                   good = good && (*pos++ == ap_tolower(*ptr));
++                                   good = good && (*pos++ == apr_tolower(*ptr));
+                                addspace = 0;
+                                break;
+                 }
+@@ -1352,7 +1352,7 @@ API_EXPORT(char *) ap_get_token(apr_pool_t *p, const char **accept_line, int acc
+ 
+     /* Find first non-white byte */
+ 
+-    while (*ptr && ap_isspace(*ptr))
++    while (*ptr && apr_isspace(*ptr))
+ 	++ptr;
+ 
+     tok_start = ptr;
+@@ -1361,7 +1361,7 @@ API_EXPORT(char *) ap_get_token(apr_pool_t *p, const char **accept_line, int acc
+      * (comments are already gone).
+      */
+ 
+-    while (*ptr && (accept_white || !ap_isspace(*ptr))
++    while (*ptr && (accept_white || !apr_isspace(*ptr))
+ 	   && *ptr != ';' && *ptr != ',') {
+ 	if (*ptr++ == '"')
+ 	    while (*ptr)
+@@ -1374,7 +1374,7 @@ API_EXPORT(char *) ap_get_token(apr_pool_t *p, const char **accept_line, int acc
+ 
+     /* Advance accept_line pointer to the next non-white byte */
+ 
+-    while (*ptr && ap_isspace(*ptr))
++    while (*ptr && apr_isspace(*ptr))
+ 	++ptr;
+ 
+     *accept_line = ptr;
+@@ -1429,7 +1429,7 @@ API_EXPORT(int) ap_find_last_token(apr_pool_t *p, const char *line, const char *
+     lidx = llen - tlen;
+ 
+     if ((lidx < 0) ||
+-	((lidx > 0) && !(ap_isspace(line[lidx - 1]) || line[lidx - 1] == ',')))
++	((lidx > 0) && !(apr_isspace(line[lidx - 1]) || line[lidx - 1] == ',')))
+ 	return 0;
+ 
+     return (strncasecmp(&line[lidx], tok, tlen) == 0);
+@@ -1512,7 +1512,7 @@ API_EXPORT(int) ap_unescape_url(char *url)
+ 	if (*y != '%')
+ 	    *x = *y;
+ 	else {
+-	    if (!ap_isxdigit(*(y + 1)) || !ap_isxdigit(*(y + 2))) {
++	    if (!apr_isxdigit(*(y + 1)) || !apr_isxdigit(*(y + 2))) {
+ 		badesc = 1;
+ 		*x = '%';
+ 	    }
+@@ -1555,7 +1555,7 @@ API_EXPORT(char *) ap_construct_server(apr_pool_t *p, const char *hostname,
+  */
+ static const char c2x_table[] = "0123456789abcdef";
+ 
+-static ap_inline unsigned char *c2x(unsigned what, unsigned char *where)
++static apr_inline unsigned char *c2x(unsigned what, unsigned char *where)
+ {
+ #ifdef CHARSET_EBCDIC
+     what = ap_xlate_conv_byte(ap_hdrs_to_ascii, (unsigned char)what);
+@@ -1702,7 +1702,7 @@ API_EXPORT(int) ap_is_url(const char *u)
+ 
+     for (x = 0; u[x] != ':'; x++) {
+ 	if ((!u[x]) ||
+-	    ((!ap_isalpha(u[x])) && (!ap_isdigit(u[x])) &&
++	    ((!apr_isalpha(u[x])) && (!apr_isdigit(u[x])) &&
+ 	     (u[x] != '+') && (u[x] != '-') && (u[x] != '.'))) {
+ 	    return 0;
+ 	}
+@@ -1767,7 +1767,7 @@ API_EXPORT(int) ap_rind(const char *s, char c)
+ API_EXPORT(void) ap_str_tolower(char *str)
+ {
+     while (*str) {
+-	*str = ap_tolower(*str);
++	*str = apr_tolower(*str);
+ 	++str;
+     }
+ }
+@@ -1834,7 +1834,7 @@ unsigned long ap_get_virthost_addr(char *w, unsigned short *ports)
+ 	return htonl(INADDR_ANY);
+     }
+ 
+-    my_addr = ap_inet_addr((char *)w);
++    my_addr = apr_inet_addr((char *)w);
+     if (my_addr != INADDR_NONE) {
+ 	if (p != NULL)
+ 	    *p = ':';
+@@ -1979,7 +1979,7 @@ API_EXPORT(void) ap_content_type_tolower(char *str)
+ 	*semi = '\0';
+     }
+     while (*str) {
+-	*str = ap_tolower(*str);
++	*str = apr_tolower(*str);
+ 	++str;
+     }
+     if (semi) {
+diff --git a/server/util_date.c b/server/util_date.c
+index f4c365c..c79f605 100644
+--- a/server/util_date.c
++++ b/server/util_date.c
+@@ -104,23 +104,23 @@ API_EXPORT(int) ap_checkmask(const char *data, const char *mask)
+ 	    return 1;
+ 
+ 	case '@':
+-	    if (!ap_isupper(d))
++	    if (!apr_isupper(d))
+ 		return 0;
+ 	    break;
+ 	case '$':
+-	    if (!ap_islower(d))
++	    if (!apr_islower(d))
+ 		return 0;
+ 	    break;
+ 	case '#':
+-	    if (!ap_isdigit(d))
++	    if (!apr_isdigit(d))
+ 		return 0;
+ 	    break;
+ 	case '&':
+-	    if (!ap_isxdigit(d))
++	    if (!apr_isxdigit(d))
+ 		return 0;
+ 	    break;
+ 	case '~':
+-	    if ((d != ' ') && !ap_isdigit(d))
++	    if ((d != ' ') && !apr_isdigit(d))
+ 		return 0;
+ 	    break;
+ 	default:
+@@ -182,7 +182,7 @@ API_EXPORT(int) ap_checkmask(const char *data, const char *mask)
+  */
+ API_EXPORT(apr_time_t) ap_parseHTTPdate(const char *date)
+ {
+-    ap_exploded_time_t ds;
++    apr_exploded_time_t ds;
+     apr_time_t result;
+     int mint, mon;
+     const char *monstr, *timstr;
+@@ -198,7 +198,7 @@ API_EXPORT(apr_time_t) ap_parseHTTPdate(const char *date)
+     if (!date)
+ 	return BAD_DATE;
+ 
+-    while (*date && ap_isspace(*date))	/* Find first non-whitespace char */
++    while (*date && apr_isspace(*date))	/* Find first non-whitespace char */
+ 	++date;
+ 
+     if (*date == '\0') 
+diff --git a/server/util_md5.c b/server/util_md5.c
+index 97104b6..32c1d2e 100644
+--- a/server/util_md5.c
++++ b/server/util_md5.c
+@@ -95,7 +95,7 @@
+ API_EXPORT(char *) ap_md5_binary(apr_pool_t *p, const unsigned char *buf, int length)
+ {
+     const char *hex = "0123456789abcdef";
+-    ap_md5_ctx_t my_md5;
++    apr_md5_ctx_t my_md5;
+     unsigned char hash[MD5_DIGESTSIZE];
+     char *r, result[33];
+     int i;
+@@ -170,7 +170,7 @@ API_EXPORT(char *) ap_md5(apr_pool_t *p, const unsigned char *string)
+ static char basis_64[] =
+ "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+ 
+-API_EXPORT(char *) ap_md5contextTo64(apr_pool_t *a, ap_md5_ctx_t *context)
++API_EXPORT(char *) ap_md5contextTo64(apr_pool_t *a, apr_md5_ctx_t *context)
+ {
+     unsigned char digest[18];
+     char *encodedDigest;
+@@ -200,7 +200,7 @@ API_EXPORT(char *) ap_md5contextTo64(apr_pool_t *a, ap_md5_ctx_t *context)
+ API_EXPORT(char *) ap_md5digest(apr_pool_t *p, apr_file_t *infile,
+                                 apr_xlate_t *xlate)
+ {
+-    ap_md5_ctx_t context;
++    apr_md5_ctx_t context;
+     unsigned char buf[1000];
+     long length = 0;
+     int nbytes;
+@@ -223,7 +223,7 @@ API_EXPORT(char *) ap_md5digest(apr_pool_t *p, apr_file_t *infile,
+ 
+ API_EXPORT(char *) ap_md5digest(apr_pool_t *p, apr_file_t *infile)
+ {
+-    ap_md5_ctx_t context;
++    apr_md5_ctx_t context;
+     unsigned char buf[1000];
+     long length = 0;
+     apr_ssize_t nbytes;
+diff --git a/server/util_script.c b/server/util_script.c
+index 53a3af8..01bc37c 100644
+--- a/server/util_script.c
++++ b/server/util_script.c
+@@ -103,11 +103,11 @@ static char *http2env(apr_pool_t *a, char *w)
+     char *cp = res;
+ 
+     while (*++cp) {
+-	if (!ap_isalnum(*cp) && *cp != '_') {
++	if (!apr_isalnum(*cp) && *cp != '_') {
+ 	    *cp = '_';
+ 	}
+ 	else {
+-	    *cp = ap_toupper(*cp);
++	    *cp = apr_toupper(*cp);
+ 	}
+     }
+ 
+@@ -116,7 +116,7 @@ static char *http2env(apr_pool_t *a, char *w)
+ 
+ API_EXPORT(char **) ap_create_environment(apr_pool_t *p, apr_table_t *t)
+ {
+-    apr_array_header_t *env_arr = ap_table_elts(t);
++    apr_array_header_t *env_arr = apr_table_elts(t);
+     apr_table_entry_t *elts = (apr_table_entry_t *) env_arr->elts;
+     char **env = (char **) apr_palloc(p, (env_arr->nelts + 2) * sizeof(char *));
+     int i, j;
+@@ -136,11 +136,11 @@ API_EXPORT(char **) ap_create_environment(apr_pool_t *p, apr_table_t *t)
+ 	}
+ 	env[j] = apr_pstrcat(p, elts[i].key, "=", elts[i].val, NULL);
+ 	whack = env[j];
+-	if (ap_isdigit(*whack)) {
++	if (apr_isdigit(*whack)) {
+ 	    *whack++ = '_';
+ 	}
+ 	while (*whack != '=') {
+-	    if (!ap_isalnum(*whack) && *whack != '_') {
++	    if (!apr_isalnum(*whack) && *whack != '_') {
+ 		*whack = '_';
+ 	    }
+ 	    ++whack;
+@@ -163,7 +163,7 @@ API_EXPORT(void) ap_add_common_vars(request_rec *r)
+     char *env_temp;
+ #endif
+     const char *host;
+-    apr_array_header_t *hdrs_arr = ap_table_elts(r->headers_in);
++    apr_array_header_t *hdrs_arr = apr_table_elts(r->headers_in);
+     apr_table_entry_t *hdrs = (apr_table_entry_t *) hdrs_arr->elts;
+     int i;
+ 
+@@ -281,7 +281,7 @@ API_EXPORT(void) ap_add_common_vars(request_rec *r)
+ 	}
+     }
+ 
+-    apr_overlap_tables(r->subprocess_env, e, AP_OVERLAP_TABLES_SET);
++    apr_overlap_tables(r->subprocess_env, e, APR_OVERLAP_TABLES_SET);
+ }
+ 
+ /* This "cute" little function comes about because the path info on
+@@ -319,15 +319,15 @@ static char *original_uri(request_rec *r)
+ 
+     first = r->the_request;	/* use the request-line */
+ 
+-    while (*first && !ap_isspace(*first)) {
++    while (*first && !apr_isspace(*first)) {
+ 	++first;		/* skip over the method */
+     }
+-    while (ap_isspace(*first)) {
++    while (apr_isspace(*first)) {
+ 	++first;		/*   and the space(s)   */
+     }
+ 
+     last = first;
+-    while (*last && !ap_isspace(*last)) {
++    while (*last && !apr_isspace(*last)) {
+ 	++last;			/* end at next whitespace */
+     }
+ 
+@@ -474,8 +474,8 @@ API_EXPORT(int) ap_scan_script_header_err_core(request_rec *r, char *buffer,
+ 		cond_status = ap_meets_conditions(r);
+ 	    }
+ 	    apr_overlap_tables(r->err_headers_out, merge,
+-		AP_OVERLAP_TABLES_MERGE);
+-	    if (!ap_is_empty_table(cookie_table)) {
++		APR_OVERLAP_TABLES_MERGE);
++	    if (!apr_is_empty_table(cookie_table)) {
+ 		/* the cookies have already been copied to the cookie_table */
+ 		apr_table_unset(r->err_headers_out, "Set-Cookie");
+ 		r->err_headers_out = apr_overlay_tables(r->pool,
+@@ -532,7 +532,7 @@ API_EXPORT(int) ap_scan_script_header_err_core(request_rec *r, char *buffer,
+ 	}
+ 
+ 	*l++ = '\0';
+-	while (*l && ap_isspace(*l)) {
++	while (*l && apr_isspace(*l)) {
+ 	    ++l;
+ 	}
+ 
+@@ -542,7 +542,7 @@ API_EXPORT(int) ap_scan_script_header_err_core(request_rec *r, char *buffer,
+ 	    /* Nuke trailing whitespace */
+ 
+ 	    char *endp = l + strlen(l) - 1;
+-	    while (endp > l && ap_isspace(*endp)) {
++	    while (endp > l && apr_isspace(*endp)) {
+ 		*endp-- = '\0';
+ 	    }
+ 
+diff --git a/server/vhost.c b/server/vhost.c
+index 9248130..f083f64 100644
+--- a/server/vhost.c
++++ b/server/vhost.c
+@@ -221,7 +221,7 @@ static const char *get_addresses(apr_pool_t *p, const char *w_,
+ 	my_addr = DEFAULT_VHOST_ADDR;
+ 	is_an_ip_addr = 1;
+     }
+-    else if ((my_addr = ap_inet_addr(w)) != INADDR_NONE) {
++    else if ((my_addr = apr_inet_addr(w)) != INADDR_NONE) {
+ 	is_an_ip_addr = 1;
+     }
+     if (is_an_ip_addr) {
+@@ -354,7 +354,7 @@ static void dump_iphash_statistics(server_rec *main_s)
+  *
+  * Hash function provided by David Hankins.
+  */
+-static ap_inline unsigned hash_inaddr(unsigned key)
++static apr_inline unsigned hash_inaddr(unsigned key)
+ {
+     key ^= (key >> 16);
+     return ((key >> 8) ^ key) % IPHASH_TABLE_SIZE;
+@@ -388,7 +388,7 @@ static name_chain *new_name_chain(apr_pool_t *p, server_rec *s, server_addr_rec
+ }
+ 
+ 
+-static ap_inline ipaddr_chain *find_ipaddr(struct in_addr *server_ip,
++static apr_inline ipaddr_chain *find_ipaddr(struct in_addr *server_ip,
+     unsigned port)
+ {
+     unsigned bucket;
+@@ -687,7 +687,7 @@ static void fix_hostname(request_rec *r)
+     src = r->hostname;
+     dst = host;
+     while (*src) {
+-	if (!ap_isalnum(*src) && *src != '.' && *src != '-') {
++	if (!apr_isalnum(*src) && *src != '.' && *src != '-') {
+ 	    if (*src == ':')
+ 		break;
+ 	    else
+@@ -699,7 +699,7 @@ static void fix_hostname(request_rec *r)
+     /* check the port part */
+     if (*src++ == ':') {
+ 	while (*src) {
+-	    if (!ap_isdigit(*src++)) {
++	    if (!apr_isdigit(*src++)) {
+ 		goto bad;
+ 	    }
+ 	}
+diff --git a/srclib/pcre/pcre.dsp b/srclib/pcre/pcre.dsp
+index 9de85c3..3f6487c 100644
+--- a/srclib/pcre/pcre.dsp
++++ b/srclib/pcre/pcre.dsp
+@@ -67,7 +67,7 @@ RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
+ # ADD BASE CPP /nologo /MDd /W3 /GX /Z7 /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /Z7 /Od /D "_WIN32" /D "_DEBUG" /D "_WINDOWS" /D "STATIC" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /D "_WIN32" /D "_DEBUG" /D "_WINDOWS" /D "STATIC" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+diff --git a/srclib/pcre/pcreposix.dsp b/srclib/pcre/pcreposix.dsp
+index 68b5bb9..5386c78 100644
+--- a/srclib/pcre/pcreposix.dsp
++++ b/srclib/pcre/pcreposix.dsp
+@@ -67,7 +67,7 @@ RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
+ # ADD BASE CPP /nologo /MDd /W3 /GX /Z7 /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /Z7 /Od /D "_WIN32" /D "_DEBUG" /D "_WINDOWS" /D "STATIC" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /D "_WIN32" /D "_DEBUG" /D "_WINDOWS" /D "STATIC" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+diff --git a/support/ab.c b/support/ab.c
+index ff02bdd..5be01f2 100644
+--- a/support/ab.c
++++ b/support/ab.c
+@@ -190,7 +190,7 @@ char cookie[1024],        	/* optional cookie line */
+         			 * authentification */
+      hdrs[4096];        	/* optional arbitrary headers */
+ int port = 80;        		/* port number */
+-time_t aprtimeout = 30 * AP_USEC_PER_SEC; /* timeout value */
++time_t aprtimeout = 30 * APR_USEC_PER_SEC; /* timeout value */
+ 
+ int use_html = 0;        	/* use html in the report */
+ char *tablestring;
+@@ -259,7 +259,7 @@ static void write_request(struct connection *c)
+ {
+     apr_ssize_t len = reqlen;
+     c->connect = apr_now();
+-    apr_setsocketopt(c->aprsock, APR_SO_TIMEOUT, 30 * AP_USEC_PER_SEC);
++    apr_setsocketopt(c->aprsock, APR_SO_TIMEOUT, 30 * APR_USEC_PER_SEC);
+     if (apr_send(c->aprsock, request, &reqlen) != APR_SUCCESS ||
+         reqlen != len) {
+         printf("Send request failed!\n");
+@@ -815,12 +815,12 @@ static void test(void)
+ 
+         /* check for time limit expiry */
+         now = apr_now();
+-        timed = (now - start) / AP_USEC_PER_SEC;
++        timed = (now - start) / APR_USEC_PER_SEC;
+         if (tlimit && timed > (tlimit * 1000)) {
+             requests = done;   /* so stats are correct */
+         }
+         /* Timeout of 30 seconds. */
+-        timeout = 30 * AP_USEC_PER_SEC;
++        timeout = 30 * APR_USEC_PER_SEC;
+ 
+         n = concurrency;
+         status = apr_poll(readbits, &n, timeout);
+@@ -862,14 +862,14 @@ static void test(void)
+ static void copyright(void)
+ {
+     if (!use_html) {
+-        printf("This is ApacheBench, Version %s\n", AB_VERSION " <$Revision: 1.21 $> apache-2.0");
++        printf("This is ApacheBench, Version %s\n", AB_VERSION " <$Revision: 1.22 $> apache-2.0");
+         printf("Copyright (c) 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/\n");
+         printf("Copyright (c) 1998-2000 The Apache Software Foundation, http://www.apache.org/\n");
+         printf("\n");
+     }
+     else {
+         printf("<p>\n");
+-        printf(" This is ApacheBench, Version %s <i>&lt;%s&gt;</i> apache-2.0<br>\n", AB_VERSION, "$Revision: 1.21 $");
++        printf(" This is ApacheBench, Version %s <i>&lt;%s&gt;</i> apache-2.0<br>\n", AB_VERSION, "$Revision: 1.22 $");
+         printf(" Copyright (c) 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/<br>\n");
+         printf(" Copyright (c) 1998-2000 The Apache Software Foundation, http://www.apache.org/<br>\n");
+         printf("</p>\n<p>\n");
+@@ -1006,11 +1006,11 @@ int main(int argc, char **argv)
+     }
+ #endif
+ 
+-    ap_optind = 1;
++    apr_optind = 1;
+     while (apr_getopt(argc, argv, "n:c:t:T:p:v:kVhwix:y:z:C:H:P:A:", &c, cntxt) == APR_SUCCESS) {
+         switch (c) {
+         case 'n':
+-            requests = atoi(ap_optarg);
++            requests = atoi(apr_optarg);
+             if (!requests) {
+                err("Invalid number of requests\n");
+             }
+@@ -1019,7 +1019,7 @@ int main(int argc, char **argv)
+             keepalive = 1;
+             break;
+         case 'c':
+-            concurrency = atoi(ap_optarg);
++            concurrency = atoi(apr_optarg);
+             break;
+         case 'i':
+             if (posting == 1)
+@@ -1030,7 +1030,7 @@ int main(int argc, char **argv)
+             if (posting != 0)
+                 err("Cannot mix POST and HEAD\n");
+ 
+-            if (0 == (r = open_postfile(ap_optarg))) {
++            if (0 == (r = open_postfile(apr_optarg))) {
+                posting = 1;
+             }
+             else if (postdata) {
+@@ -1038,27 +1038,27 @@ int main(int argc, char **argv)
+             }
+             break;
+         case 'v':
+-            verbosity = atoi(ap_optarg);
++            verbosity = atoi(apr_optarg);
+             break;
+         case 't':
+-            tlimit = atoi(ap_optarg);
++            tlimit = atoi(apr_optarg);
+             requests = MAX_REQUESTS;  /* need to size data array on something */
+             break;
+         case 'T':
+-            strcpy(content_type, ap_optarg);
++            strcpy(content_type, apr_optarg);
+             break;
+         case 'C':
+             strncat(cookie, "Cookie: ", sizeof(cookie));
+-            strncat(cookie, ap_optarg, sizeof(cookie));
++            strncat(cookie, apr_optarg, sizeof(cookie));
+             strncat(cookie, "\r\n", sizeof(cookie));
+             break;
+         case 'A':
+             /* assume username passwd already to be in colon separated form. 
+              * Ready to be uu-encoded.
+              */
+-            while(isspace(*ap_optarg))
+-                ap_optarg++;
+-            l=ap_base64encode(tmp, ap_optarg, strlen(ap_optarg));
++            while(isspace(*apr_optarg))
++                apr_optarg++;
++            l=ap_base64encode(tmp, apr_optarg, strlen(apr_optarg));
+             tmp[l]='\0';
+  
+             strncat(auth, "Authorization: basic ", sizeof(auth));
+@@ -1069,9 +1069,9 @@ int main(int argc, char **argv)
+             /*
+              * assume username passwd already to be in colon separated form.
+              */
+-            while(isspace(*ap_optarg))
+-                ap_optarg++;
+-            l=ap_base64encode(tmp, ap_optarg, strlen(ap_optarg));
++            while(isspace(*apr_optarg))
++                apr_optarg++;
++            l=ap_base64encode(tmp, apr_optarg, strlen(apr_optarg));
+             tmp[l]='\0';
+  
+             strncat(auth, "Proxy-Authorization: basic ", sizeof(auth));
+@@ -1079,7 +1079,7 @@ int main(int argc, char **argv)
+             strncat(auth, "\r\n", sizeof(auth));
+             break;
+         case 'H':
+-            strncat(hdrs, ap_optarg, sizeof(hdrs));
++            strncat(hdrs, apr_optarg, sizeof(hdrs));
+             strncat(hdrs, "\r\n", sizeof(hdrs));
+             break;
+ 	case 'w':
+@@ -1091,15 +1091,15 @@ int main(int argc, char **argv)
+ 	     */
+ 	case 'x':
+ 	    use_html = 1;
+-	    tablestring = ap_optarg;
++	    tablestring = apr_optarg;
+ 	    break;
+ 	case 'y':
+ 	    use_html = 1;
+-	    trstring = ap_optarg;
++	    trstring = apr_optarg;
+ 	    break;
+ 	case 'z':
+ 	    use_html = 1;
+-	    tdstring = ap_optarg;
++	    tdstring = apr_optarg;
+ 	    break;
+ 	case 'h':
+ 	    usage(argv[0]);
+@@ -1110,12 +1110,12 @@ int main(int argc, char **argv)
+         }
+     }
+ 
+-    if (ap_optind != argc - 1) {
++    if (apr_optind != argc - 1) {
+         fprintf(stderr, "%s: wrong number of arguments\n", argv[0]);
+         usage(argv[0]);
+     }
+ 
+-    if (parse_url(argv[ap_optind++])) {
++    if (parse_url(argv[apr_optind++])) {
+         fprintf(stderr, "%s: invalid URL\n", argv[0]);
+         usage(argv[0]);
+     }
+diff --git a/support/htdigest.c b/support/htdigest.c
+index 5c13782..195e241 100644
+--- a/support/htdigest.c
++++ b/support/htdigest.c
+@@ -157,7 +157,7 @@ static void putline(apr_file_t *f, char *l)
+ static void add_password(char *user, char *realm, apr_file_t *f)
+ {
+     char *pw;
+-    ap_md5_ctx_t context;
++    apr_md5_ctx_t context;
+     unsigned char digest[16];
+     char string[MAX_STRING_LEN];
+     char pwin[MAX_STRING_LEN];

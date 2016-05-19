@@ -1,0 +1,110 @@
+commit 3ff055dcce39c7630b882b4537b0f253ed263448
+Author: Eric Covener <covener@apache.org>
+Date:   Fri Jan 13 19:16:50 2012 +0000
+
+      *) mod_authnz_ldap: Don't try a potentially expensive nested groups
+         search before exhausting all AuthLDAPGroupAttribute checks on the
+         current group. PR52464
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1231255 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 433014a..b5eb1a2 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,6 +1,10 @@
+                                                          -*- coding: utf-8 -*-
+ Changes with Apache 2.5.0
+ 
++  *) mod_authnz_ldap: Don't try a potentially expensive nested groups
++     search before exhausting all AuthLDAPGroupAttribute checks on the
++     current group. PR52464 [Eric Covener]
++
+   *) mod_policy: Add a new testing module to help server administrators
+      enforce a configurable level of protocol compliance on their
+      servers and application servers behind theirs. [Graham Leggett]
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 689d5b7..1f59391 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -870,6 +870,7 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+                   "membership in \"%s\"",
+                   t);
+ 
++    /* PR52464 exhaust attrs in base group before checking subgroups */
+     for (i = 0; i < sec->groupattr->nelts; i++) {
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01714)
+                       "auth_ldap authorize: require group: testing for %s: "
+@@ -879,19 +880,26 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+ 
+         result = util_ldap_cache_compare(r, ldc, sec->url, t, ent[i].name,
+                              sec->group_attrib_is_dn ? req->dn : req->user);
+-        switch(result) {
+-            case LDAP_COMPARE_TRUE: {
+-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01715)
+-                              "auth_ldap authorize: require group: "
+-                              "authorization successful (attribute %s) "
+-                              "[%s][%d - %s]",
+-                              ent[i].name, ldc->reason, result,
++        if (result == LDAP_COMPARE_TRUE) {
++            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01715)
++                          "auth_ldap authorize: require group: "
++                          "authorization successful (attribute %s) "
++                          "[%s][%d - %s]",
++                          ent[i].name, ldc->reason, result,
++                          ldap_err2string(result));
++            set_request_vars(r, LDAP_AUTHZ);
++            return AUTHZ_GRANTED;
++        }
++        else { 
++                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01719)
++                              "auth_ldap authorize: require group \"%s\": "
++                              "didn't match with attr %s [%s][%d - %s]",
++                              t, ldc->reason, ent[i].name, result, 
+                               ldap_err2string(result));
+-                set_request_vars(r, LDAP_AUTHZ);
+-                return AUTHZ_GRANTED;
+-            }
+-            case LDAP_NO_SUCH_ATTRIBUTE:
+-            case LDAP_COMPARE_FALSE: {
++        }
++    }
++    
++    for (i = 0; i < sec->groupattr->nelts; i++) {
+                 /* nested groups need searches and compares, so grab a new handle */
+                 authnz_ldap_cleanup_connection_close(ldc);
+                 apr_pool_cleanup_kill(r->pool, ldc,authnz_ldap_cleanup_connection_close);
+@@ -911,7 +919,7 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+                                                          sec->sgAttributes[0] ? sec->sgAttributes : default_attributes,
+                                                          sec->subgroupclasses,
+                                                          0, sec->maxNestingDepth);
+-                if(result == LDAP_COMPARE_TRUE) {
++                if (result == LDAP_COMPARE_TRUE) {
+                     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01717)
+                                   "auth_ldap authorise: require group "
+                                   "(sub-group): authorisation successful "
+@@ -924,20 +932,11 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+                 else {
+                     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01718)
+                                   "auth_ldap authorise: require group "
+-                                  "(sub-group) \"%s\": authorisation failed "
++                                  "(sub-group) \"%s\": didn't match with attr %s "
+                                   "[%s][%d - %s]",
+-                                  t, ldc->reason, result,
++                                  t, ldc->reason, ent[i].name, result, 
+                                   ldap_err2string(result));
+                 }
+-                break;
+-            }
+-            default: {
+-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01719)
+-                              "auth_ldap authorize: require group \"%s\": "
+-                              "authorization failed [%s][%d - %s]",
+-                              t, ldc->reason, result, ldap_err2string(result));
+-            }
+-        }
+     }
+ 
+     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01720)

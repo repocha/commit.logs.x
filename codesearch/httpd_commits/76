@@ -1,0 +1,55 @@
+commit 31252bd063e45ec7c45050ad3ca9a80089608091
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sun Dec 4 16:05:28 2011 +0000
+
+    More pointers to mod_socache*
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1210130 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authn_socache.c b/modules/aaa/mod_authn_socache.c
+index 1188a0b..cccd076 100644
+--- a/modules/aaa/mod_authn_socache.c
++++ b/modules/aaa/mod_authn_socache.c
+@@ -95,7 +95,8 @@ static int authn_cache_post_config(apr_pool_t *pconf, apr_pool_t *plog,
+     if (socache_provider == NULL) {
+         ap_log_perror(APLOG_MARK, APLOG_CRIT, 0, plog, APLOGNO(01674)
+                       "Please select a socache provider with AuthnCacheSOCache "
+-                      "(no default found on this platform)");
++                      "(no default found on this platform). Maybe you need to "
++                      "load mod_socache_shmcb or another socache module first");
+         return 500; /* An HTTP status would be a misnomer! */
+     }
+ 
+@@ -143,10 +144,15 @@ static const char *authn_cache_socache(cmd_parms *cmd, void *CFG,
+                                        const char *arg)
+ {
+     const char *errmsg = ap_check_cmd_context(cmd, GLOBAL_ONLY);
++    if (errmsg)
++        return errmsg;
+     socache_provider = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP, arg,
+                                           AP_SOCACHE_PROVIDER_VERSION);
+     if (socache_provider == NULL) {
+-        errmsg = "Unknown socache provider";
++        errmsg = apr_psprintf(cmd->pool,
++                              "Unknown socache provider '%s'. Maybe you need "
++                              "to load the appropriate socache module "
++                              "(mod_socache_%s?)", arg, arg);
+     }
+     return errmsg;
+ }
+diff --git a/modules/ssl/ssl_engine_config.c b/modules/ssl/ssl_engine_config.c
+index 5ad9cc8..9ba61f7 100644
+--- a/modules/ssl/ssl_engine_config.c
++++ b/modules/ssl/ssl_engine_config.c
+@@ -1689,7 +1689,9 @@ const char *ssl_cmd_SSLStaplingCache(cmd_parms *cmd,
+         all_names = apr_array_pstrcat(cmd->pool, name_list, ',');
+ 
+         err = apr_psprintf(cmd->pool, "'%s' stapling cache not supported "
+-                           "(known names: %s)", name, all_names);
++                           "(known names: %s) Maybe you need to load the "
++                           "appropriate socache module (mod_socache_%s?)",
++                           name, all_names, name);
+     }
+ 
+     if (err) {

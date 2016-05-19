@@ -1,0 +1,1226 @@
+commit 089c86b56da6c7f41e920e900c4eee0db8111c3d
+Author: Justin Erenkrantz <jerenkrantz@apache.org>
+Date:   Tue Sep 10 06:57:03 2002 +0000
+
+    Stage #2 of aaa rewrite: Add provider support so that mod_authn_* modules
+    do not have to re-implement basic auth and to allow mod_auth_digest (and
+    other modules) to leverage the authn backends.
+    
+    Adds AuthBasicProvider and AuthDigestProvider directives.
+    
+    This also moves a lot of the basic auth handling code inside of mod_auth_basic
+    (but does not remove the code in server/protocol.c - that will have to wait
+    for a version bump so that we don't totally bust old modules).
+    
+    This patch incorporates code review comments by Greg Stein.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@96739 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/auth_provider.c b/modules/aaa/auth_provider.c
+new file mode 100644
+index 0000000..5f08483
+--- /dev/null
++++ b/modules/aaa/auth_provider.c
+@@ -0,0 +1,120 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ */
++
++#include "apr_pools.h"
++#include "apr_hash.h"
++
++#include "mod_auth.h"
++
++static apr_hash_t *authn_repos_providers = NULL;
++static apr_hash_t *authz_repos_providers = NULL;
++
++static apr_status_t authn_cleanup_providers(void *ctx)
++{
++    authn_repos_providers = NULL;
++    return APR_SUCCESS;
++}
++
++static apr_status_t authz_cleanup_providers(void *ctx)
++{
++    authz_repos_providers = NULL;
++    return APR_SUCCESS;
++}
++
++AP_DECLARE(void) authn_register_provider(apr_pool_t *p, const char *name,
++                                         const authn_provider *provider)
++{
++    if (authn_repos_providers == NULL) {
++        authn_repos_providers = apr_hash_make(p);
++        apr_pool_cleanup_register(p, NULL, authn_cleanup_providers,
++                                  apr_pool_cleanup_null);
++    }
++
++    /* just set it. no biggy if it was there before. */
++    apr_hash_set(authn_repos_providers, name, APR_HASH_KEY_STRING, provider);
++}
++
++AP_DECLARE(const authn_provider *) authn_lookup_provider(const char *name)
++{
++    /* Better watch out against no registered providers */
++    if (authn_repos_providers == NULL) {
++        return NULL;
++    }
++
++    return apr_hash_get(authn_repos_providers, name, APR_HASH_KEY_STRING);
++}
++
++AP_DECLARE(void) authz_register_provider(apr_pool_t *p, const char *name,
++                                         const authz_provider *provider)
++{
++    if (authz_repos_providers == NULL) {
++        authz_repos_providers = apr_hash_make(p);
++        apr_pool_cleanup_register(p, NULL, authz_cleanup_providers,
++                                  apr_pool_cleanup_null);
++    }
++
++    /* just set it. no biggy if it was there before. */
++    apr_hash_set(authz_repos_providers, name, APR_HASH_KEY_STRING, provider);
++}
++
++AP_DECLARE(const authz_provider *) authz_lookup_provider(const char *name)
++{
++    /* Better watch out against no registered providers */
++    if (authz_repos_providers == NULL) {
++        return NULL;
++    }
++
++    return apr_hash_get(authz_repos_providers, name, APR_HASH_KEY_STRING);
++}
+diff --git a/modules/aaa/config.m4 b/modules/aaa/config.m4
+index fa1df7a..500623c 100644
+--- a/modules/aaa/config.m4
++++ b/modules/aaa/config.m4
+@@ -32,8 +32,13 @@ dnl keep the bad guys out.
+ APACHE_MODULE(authz_default, authorization control backstopper, , , yes)
+ 
+ dnl these are the front-end authentication modules
+-APACHE_MODULE(auth_basic, basic authentication, , , yes)
+-APACHE_MODULE(auth_digest, RFC2617 Digest authentication, , , most, [
++
++std_auth_provider_objects="auth_provider.lo"
++
++APACHE_MODULE(auth_basic, basic authentication,
++              mod_auth_basic.lo $std_auth_provider_objects, , yes)
++APACHE_MODULE(auth_digest, RFC2617 Digest authentication,
++              mod_auth_digest.lo $std_auth_provider_objects , , most, [
+   ap_old_cppflags=$CPPFLAGS
+   CPPFLAGS="$CPPFLAGS -I$APR_SOURCE_DIR/include -I$abs_builddir/srclib/apr/include"
+   AC_TRY_COMPILE([#include <apr.h>], [
+diff --git a/modules/aaa/mod_auth.h b/modules/aaa/mod_auth.h
+new file mode 100644
+index 0000000..e7b24cf
+--- /dev/null
++++ b/modules/aaa/mod_auth.h
+@@ -0,0 +1,108 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ */
++
++#ifndef APACHE_MOD_AUTH_H
++#define APACHE_MOD_AUTH_H
++
++#include "apr_pools.h"
++#include "apr_hash.h"
++
++#include "httpd.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#define AUTHN_DEFAULT_PROVIDER "file"
++
++typedef enum {
++    AUTH_DENIED,
++    AUTH_GRANTED,
++    AUTH_USER_FOUND,
++    AUTH_USER_NOT_FOUND,
++    AUTH_GENERAL_ERROR,
++} authn_status;
++
++typedef struct {
++    /* Given a username and password, expected to return AUTH_GRANTED
++     * if we can validate this user/password combination.
++     */
++    authn_status (*check_password)(request_rec *r, const char *user,
++                                  const char *password);
++
++    /* Given a user and realm, expected to return AUTH_USER_FOUND if we
++     * can find a md5 hash of 'user:realm:password'
++     */
++    authn_status (*get_realm_hash)(request_rec *r, const char *user,
++                                   const char *realm, char **rethash);
++} authn_provider;
++
++AP_DECLARE(void) authn_register_provider(apr_pool_t *p, const char *name,
++                                         const authn_provider *provider);
++AP_DECLARE(const authn_provider *) authn_lookup_provider(const char *name);
++
++typedef struct {
++    /* For a given user, return a hash of all groups the user belongs to.  */
++    apr_hash_t * (*get_user_groups)(request_rec *r, const char *user);
++} authz_provider;
++
++AP_DECLARE(void) authz_register_provider(apr_pool_t *p, const char *name,
++                                         const authz_provider *provider);
++AP_DECLARE(const authz_provider *) authz_lookup_provider(const char *name);
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/modules/aaa/mod_auth_basic.c b/modules/aaa/mod_auth_basic.c
+index 1350283..5626e13 100644
+--- a/modules/aaa/mod_auth_basic.c
++++ b/modules/aaa/mod_auth_basic.c
+@@ -56,22 +56,9 @@
+  * University of Illinois, Urbana-Champaign.
+  */
+ 
+-/*
+- * http_auth: authentication
+- * 
+- * Rob McCool
+- * 
+- * Adapted to Apache by rst.
+- *
+- * dirkx - Added Authoritative control to allow passing on to lower
+- *         modules if and only if the userid is not known to this
+- *         module. A known user with a faulty or absent password still
+- *         causes an AuthRequired. The default is 'Authoritative', i.e.
+- *         no control is passed along.
+- */
+-
+ #include "apr_strings.h"
+ #include "apr_md5.h"            /* for apr_password_validate */
++#include "apr_lib.h"            /* for apr_isspace */
+ 
+ #include "ap_config.h"
+ #include "httpd.h"
+@@ -81,44 +68,64 @@
+ #include "http_protocol.h"
+ #include "http_request.h"
+ 
++#include "mod_auth.h"
+ 
+ typedef struct {
+-    char *auth_pwfile;
+-    char *auth_grpfile;
++    const char *provider_name;
++    const authn_provider *provider;
++    char *dir;
+     int authoritative;
+-} auth_config_rec;
++} auth_basic_config_rec;
+ 
+-static void *create_auth_dir_config(apr_pool_t *p, char *d)
++static void *create_auth_basic_dir_config(apr_pool_t *p, char *d)
+ {
+-    auth_config_rec *conf = apr_palloc(p, sizeof(*conf));
++    auth_basic_config_rec *conf = apr_pcalloc(p, sizeof(*conf));
++
++    conf->dir = d;
++    /* Any failures are fatal. */
++    conf->authoritative = 1;
+ 
+-    conf->auth_pwfile = NULL;     /* just to illustrate the default really */
+-    conf->auth_grpfile = NULL;    /* unless you have a broken HP cc */
+-    conf->authoritative = 1; /* keep the fortress secure by default */
+     return conf;
+ }
+ 
+-static const char *set_auth_slot(cmd_parms *cmd, void *offset, const char *f, 
+-                                 const char *t)
++static const char *add_authn_provider(cmd_parms *cmd, void *config,
++                                      const char *arg)
+ {
+-    if (t && strcmp(t, "standard")) {
+-        return apr_pstrcat(cmd->pool, "Invalid auth file type: ", t, NULL);
++    auth_basic_config_rec *conf = (auth_basic_config_rec*)config;
++
++    if (strcasecmp(arg, "on") == 0) {
++        conf->provider_name = AUTHN_DEFAULT_PROVIDER;
++    }
++    else if (strcasecmp(arg, "off") == 0) {
++        conf->provider_name = NULL;
++        conf->provider = NULL;
++    }
++    else {
++        conf->provider_name = apr_pstrdup(cmd->pool, arg);
++    }
++
++    if (conf->provider_name != NULL) {
++        /* lookup and cache the actual provider now */
++        conf->provider = authn_lookup_provider(conf->provider_name);
++
++        if (conf->provider == NULL) {
++            /* by the time they use it, the provider should be loaded and
++               registered with us. */
++            return apr_psprintf(cmd->pool,
++                                "Unknown Authn provider: %s",
++                                conf->provider_name);
++        }
+     }
+ 
+-    return ap_set_file_slot(cmd, offset, f);
++    return NULL;
+ }
+ 
+ static const command_rec auth_basic_cmds[] =
+ {
+-    AP_INIT_TAKE12("AuthUserFile", set_auth_slot,
+-                   (void *)APR_OFFSETOF(auth_config_rec, auth_pwfile),
+-                   OR_AUTHCFG, "text file containing user IDs and passwords"),
+-    AP_INIT_TAKE12("AuthGroupFile", set_auth_slot,
+-                   (void *)APR_OFFSETOF(auth_config_rec, auth_grpfile),
+-                   OR_AUTHCFG,
+-                   "text file containing group names and member user IDs"),
+-    AP_INIT_FLAG("AuthAuthoritative", ap_set_flag_slot,
+-                 (void *)APR_OFFSETOF(auth_config_rec, authoritative),
++    AP_INIT_ITERATE("AuthBasicProvider", add_authn_provider, NULL, ACCESS_CONF,
++                    "specify the auth providers for a directory or location"),
++    AP_INIT_FLAG("AuthBasicAuthoritative", ap_set_flag_slot,
++                 (void *)APR_OFFSETOF(auth_basic_config_rec, authoritative),
+                  OR_AUTHCFG,
+                  "Set to 'no' to allow access control to be passed along to "
+                  "lower modules if the UserID is not known to this module"),
+@@ -127,73 +134,6 @@ static const command_rec auth_basic_cmds[] =
+ 
+ module AP_MODULE_DECLARE_DATA auth_basic_module;
+ 
+-static char *get_pw(request_rec *r, char *user, char *auth_pwfile)
+-{
+-    ap_configfile_t *f;
+-    char l[MAX_STRING_LEN];
+-    const char *rpw, *w;
+-    apr_status_t status;
+-
+-    if ((status = ap_pcfg_openfile(&f, r->pool, auth_pwfile)) != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+-                      "Could not open password file: %s", auth_pwfile);
+-        return NULL;
+-    }
+-    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
+-        if ((l[0] == '#') || (!l[0])) {
+-            continue;
+-        }
+-        rpw = l;
+-        w = ap_getword(r->pool, &rpw, ':');
+-
+-        if (!strcmp(user, w)) {
+-            ap_cfg_closefile(f);
+-            return ap_getword(r->pool, &rpw, ':');
+-        }
+-    }
+-    ap_cfg_closefile(f);
+-    return NULL;
+-}
+-
+-static apr_table_t *groups_for_user(apr_pool_t *p, char *user, char *grpfile)
+-{
+-    ap_configfile_t *f;
+-    apr_table_t *grps = apr_table_make(p, 15);
+-    apr_pool_t *sp;
+-    char l[MAX_STRING_LEN];
+-    const char *group_name, *ll, *w;
+-    apr_status_t status;
+-
+-    if ((status = ap_pcfg_openfile(&f, p, grpfile)) != APR_SUCCESS) {
+-/*add?  aplog_error(APLOG_MARK, APLOG_ERR, NULL,
+-                    "Could not open group file: %s", grpfile);*/
+-        return NULL;
+-    }
+-
+-    apr_pool_create(&sp, p);
+-
+-    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
+-        if ((l[0] == '#') || (!l[0])) {
+-            continue;
+-        }
+-        ll = l;
+-        apr_pool_clear(sp);
+-
+-        group_name = ap_getword(sp, &ll, ':');
+-
+-        while (ll[0]) {
+-            w = ap_getword_conf(sp, &ll);
+-            if (!strcmp(w, user)) {
+-                apr_table_setn(grps, apr_pstrdup(p, group_name), "in");
+-                break;
+-            }
+-        }
+-    }
+-    ap_cfg_closefile(f);
+-    apr_pool_destroy(sp);
+-    return grps;
+-}
+-
+ /* These functions return 0 if client is OK, and proper error status
+  * if not... either HTTP_UNAUTHORIZED, if we made a check, and it failed, or
+  * HTTP_INTERNAL_SERVER_ERROR, if things are so totally confused that we
+@@ -204,153 +144,157 @@ static apr_table_t *groups_for_user(apr_pool_t *p, char *user, char *grpfile)
+  * reported as such.
+  */
+ 
+-/* Determine user ID, and check if it really is that user, for HTTP
+- * basic authentication...
+- */
++static void note_basic_auth_failure(request_rec *r)
++{
++    apr_table_setn(r->err_headers_out,
++                   (PROXYREQ_PROXY == r->proxyreq) ? "Proxy-Authenticate"
++                                                   : "WWW-Authenticate",
++                   apr_pstrcat(r->pool, "Basic realm=\"", ap_auth_name(r),
++                               "\"", NULL));
++}
+ 
+-static int authenticate_basic_user(request_rec *r)
++static int get_basic_auth(request_rec *r, const char **user,
++                          const char **pw)
+ {
+-    auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                 &auth_basic_module);
+-    const char *sent_pw;
+-    char *real_pw;
+-    apr_status_t invalid_pw;
+-    int res;
++    const char *auth_line;
++    char *decoded_line;
++    int length;
+ 
+-    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
+-        return res;
+-    }
++    /* Get the appropriate header */
++    auth_line = apr_table_get(r->headers_in, (PROXYREQ_PROXY == r->proxyreq)
++                                              ? "Proxy-Authorization"
++                                              : "Authorization");
+ 
+-    if (!conf->auth_pwfile) {
+-        return DECLINED;
++    if (!auth_line) {
++        note_basic_auth_failure(r);
++        return HTTP_UNAUTHORIZED;
+     }
+ 
+-    if (!(real_pw = get_pw(r, r->user, conf->auth_pwfile))) {
+-        if (!conf->authoritative) {
+-            return DECLINED;
+-        }
++    if (strcasecmp(ap_getword(r->pool, &auth_line, ' '), "Basic")) {
++        /* Client tried to authenticate using wrong auth scheme */
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "user %s not found: %s", r->user, r->uri);
+-        ap_note_basic_auth_failure(r);
++                      "client used wrong authentication scheme: %s", r->uri);
++        note_basic_auth_failure(r);
+         return HTTP_UNAUTHORIZED;
+     }
+-    invalid_pw = apr_password_validate(sent_pw, real_pw);
+-    if (invalid_pw != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "user %s: authentication failure for \"%s\": "
+-                      "Password Mismatch",
+-                      r->user, r->uri);
+-        ap_note_basic_auth_failure(r);
+-        return HTTP_UNAUTHORIZED;
++
++    /* Skip leading spaces. */
++    while (apr_isspace(*auth_line)) {
++        auth_line++;
+     }
++
++    decoded_line = apr_palloc(r->pool, apr_base64_decode_len(auth_line) + 1);
++    length = apr_base64_decode(decoded_line, auth_line);
++    /* Null-terminate the string. */
++    decoded_line[length] = '\0';
++
++    *user = ap_getword_nulls(r->pool, (const char**)&decoded_line, ':');
++    *pw = decoded_line;
++
+     return OK;
+ }
+ 
+-/* Checking ID */
+-
+-static int check_user_access(request_rec *r)
++/* Determine user ID, and check if it really is that user, for HTTP
++ * basic authentication...
++ */
++static int authenticate_basic_user(request_rec *r)
+ {
+-    auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                 &auth_basic_module);
+-    char *user = r->user;
+-    int m = r->method_number;
+-    int method_restricted = 0;
+-    register int x;
+-    const char *t, *w;
+-    apr_table_t *grpstatus;
+-    const apr_array_header_t *reqs_arr = ap_requires(r);
+-    require_line *reqs;
+-
+-    /* BUG FIX: tadc, 11-Nov-1995.  If there is no "requires" directive, 
+-     * then any user will do.
+-     */
+-    if (!reqs_arr) {
+-        return OK;
++    auth_basic_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                       &auth_basic_module);
++    const char *sent_user, *sent_pw, *current_auth;
++    char *real_pw;
++    apr_status_t invalid_pw;
++    int res;
++    authn_status auth_result;
++
++    /* Are we configured to be Basic auth? */
++    current_auth = ap_auth_type(r);
++    if (!current_auth || strcasecmp(current_auth, "Basic")) {
++        return DECLINED;
+     }
+-    reqs = (require_line *)reqs_arr->elts;
+ 
+-    if (conf->auth_grpfile) {
+-        grpstatus = groups_for_user(r->pool, user, conf->auth_grpfile);
++    /* We need an authentication realm. */
++    if (!ap_auth_name(r)) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR,
++                      0, r, "need AuthName: %s", r->uri);
++        return HTTP_INTERNAL_SERVER_ERROR;
+     }
+-    else {
+-        grpstatus = NULL;
++
++    r->ap_auth_type = "Basic";
++
++    res = get_basic_auth(r, &sent_user, &sent_pw);
++    if (res) {
++        return res;
+     }
+ 
+-    for (x = 0; x < reqs_arr->nelts; x++) {
++    /* For now, if a provider isn't set, we'll be nice and use the file
++     * provider.
++     */
++    if (!conf->provider) {
++        conf->provider = authn_lookup_provider(AUTHN_DEFAULT_PROVIDER);
++    }
+ 
+-        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m))) {
+-            continue;
+-        }
++    auth_result = conf->provider->check_password(r, sent_user, sent_pw);
+ 
+-        method_restricted = 1;
++    if (auth_result != AUTH_GRANTED) {
++        int return_code;
+ 
+-        t = reqs[x].requirement;
+-        w = ap_getword_white(r->pool, &t);
+-        if (!strcmp(w, "valid-user")) {
+-            return OK;
+-        }
+-        if (!strcmp(w, "user")) {
+-            while (t[0]) {
+-                w = ap_getword_conf(r->pool, &t);
+-                if (!strcmp(user, w)) {
+-                    return OK;
+-                }
+-            }
+-        }
+-        else if (!strcmp(w, "group")) {
+-            if (!grpstatus) {
+-                return DECLINED;        /* DBM group?  Something else? */
+-            }
+-
+-            while (t[0]) {
+-                w = ap_getword_conf(r->pool, &t);
+-                if (apr_table_get(grpstatus, w)) {
+-                    return OK;
+-                }
+-            }
++        /* If we're not authoritative, then any error is ignored. */
++        if (!(conf->authoritative)) {
++            return DECLINED;
+         }
+-        else if (conf->authoritative) {
+-            /* if we aren't authoritative, any require directive could be
+-             * valid even if we don't grok it.  However, if we are 
+-             * authoritative, we can warn the user they did something wrong.
+-             * That something could be a missing "AuthAuthoritative off", but
+-             * more likely is a typo in the require directive.
+-             */
++
++        switch (auth_result) {
++        case AUTH_DENIED:
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "user %s: authentication failure for \"%s\": "
++                      "Password Mismatch",
++                      sent_user, r->uri);
++            return_code = HTTP_UNAUTHORIZED;
++            break;
++        case AUTH_USER_NOT_FOUND:
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "access to %s failed, reason: unknown require "
+-                          "directive:\"%s\"", r->uri, reqs[x].requirement);
++                      "user %s not found: %s", sent_user, r->uri);
++            return_code = HTTP_UNAUTHORIZED;
++            break;
++        case AUTH_GENERAL_ERROR:
++            /* We'll assume that the module has already said what its error 
++             * was in the logs.
++             */
++            return_code = HTTP_INTERNAL_SERVER_ERROR;
++            break;
++        default:
++            break;
+         }
+-    }
+ 
+-    if (!method_restricted) {
+-        return OK;
++        /* If we're returning 403, tell them to try again. */
++        if (return_code == HTTP_UNAUTHORIZED) {
++            note_basic_auth_failure(r);
++        }
++        return return_code;
+     }
+ 
+-    if (!conf->authoritative) {
+-        return DECLINED;
+-    }
++    /* Now that we are done, set the request_rec values so others will know
++     * who we are.
++     */
++    r->user = (char*)sent_user;
++    r->ap_auth_type = "Basic";
+ 
+-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                  "access to %s failed, reason: user %s not allowed access",
+-                  r->uri, user);
+-        
+-    ap_note_basic_auth_failure(r);
+-    return HTTP_UNAUTHORIZED;
++    return OK;
+ }
+ 
+ static void register_hooks(apr_pool_t *p)
+ {
+     ap_hook_check_user_id(authenticate_basic_user,NULL,NULL,APR_HOOK_MIDDLE);
+-    ap_hook_auth_checker(check_user_access,NULL,NULL,APR_HOOK_MIDDLE);
+ }
+ 
+ module AP_MODULE_DECLARE_DATA auth_basic_module =
+ {
+     STANDARD20_MODULE_STUFF,
+-    create_auth_dir_config,     /* dir config creater */
+-    NULL,                       /* dir merger --- default is to override */
+-    NULL,                       /* server config */
+-    NULL,                       /* merge server config */
+-    auth_basic_cmds,            /* command apr_table_t */
+-    register_hooks              /* register hooks */
++    create_auth_basic_dir_config,  /* dir config creater */
++    NULL,                          /* dir merger --- default is to override */
++    NULL,                          /* server config */
++    NULL,                          /* merge server config */
++    auth_basic_cmds,               /* command apr_table_t */
++    register_hooks                 /* register hooks */
+ };
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 0545f14..4dbe89c 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -119,6 +119,8 @@
+ #include "apr_shm.h"
+ #include "apr_rmm.h"
+ 
++#include "mod_auth.h"
++
+ /* Disable shmem until pools/init gets sorted out 
+  * remove following two lines when fixed 
+  */
+@@ -129,7 +131,8 @@
+ 
+ typedef struct digest_config_struct {
+     const char  *dir_name;
+-    const char  *pwfile;
++    const char *provider_name;
++    const authn_provider *provider;
+     const char  *realm;
+     char **qop_list;
+     apr_sha1_ctx_t  nonce_ctx;
+@@ -479,10 +482,35 @@ static const char *set_realm(cmd_parms *cmd, void *config, const char *realm)
+     return DECLINE_CMD;
+ }
+ 
+-static const char *set_digest_file(cmd_parms *cmd, void *config,
+-                                   const char *file)
++static const char *add_authn_provider(cmd_parms *cmd, void *config,
++                                      const char *arg)
+ {
+-    ((digest_config_rec *) config)->pwfile = file;
++    digest_config_rec *conf = (digest_config_rec*)config;
++
++    if (strcasecmp(arg, "on") == 0) {
++        conf->provider_name = AUTHN_DEFAULT_PROVIDER;
++    }
++    else if (strcasecmp(arg, "off") == 0) {
++        conf->provider_name = NULL;
++        conf->provider = NULL;
++    }
++    else {
++        conf->provider_name = apr_pstrdup(cmd->pool, arg);
++    }
++
++    if (conf->provider_name != NULL) {
++        /* lookup and cache the actual provider now */
++        conf->provider = authn_lookup_provider(conf->provider_name);
++
++        if (conf->provider == NULL) {
++            /* by the time they use it, the provider should be loaded and
++               registered with us. */
++            return apr_psprintf(cmd->pool,
++                                "Unknown Authn provider: %s",
++                                conf->provider_name);
++        }
++    }
++
+     return NULL;
+ }
+ 
+@@ -635,8 +663,8 @@ static const command_rec digest_cmds[] =
+ {
+     AP_INIT_TAKE1("AuthName", set_realm, NULL, OR_AUTHCFG, 
+      "The authentication realm (e.g. \"Members Only\")"),
+-    AP_INIT_TAKE1("AuthDigestFile", set_digest_file, NULL, OR_AUTHCFG, 
+-     "The name of the file containing the usernames and password hashes"),
++    AP_INIT_ITERATE("AuthDigestProvider", add_authn_provider, NULL, ACCESS_CONF,
++                     "specify the auth providers for a directory or location"),
+     AP_INIT_ITERATE("AuthDigestQop", set_qop, NULL, OR_AUTHCFG, 
+      "A list of quality-of-protection options"),
+     AP_INIT_TAKE1("AuthDigestNonceLifetime", set_nonce_lifetime, NULL, OR_AUTHCFG, 
+@@ -1415,34 +1443,27 @@ static void note_digest_auth_failure(request_rec *r,
+  */
+ 
+ static const char *get_hash(request_rec *r, const char *user,
+-                            const char *realm, const char *auth_pwfile)
++                            digest_config_rec *conf)
+ {
+-    ap_configfile_t *f;
+-    char l[MAX_STRING_LEN];
+-    const char *rpw;
+-    char *w, *x;
+-    apr_status_t sts;
++    authn_status auth_result;
++    char *password;
+ 
+-    if ((sts = ap_pcfg_openfile(&f, r->pool, auth_pwfile)) != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, sts, r,
+-                      "Digest: Could not open password file: %s", auth_pwfile);
+-        return NULL;
++    /* To be nice, if we make it this far and we don't have a provider set,
++     * we'll use the default provider.
++     */
++    if (!conf->provider) {
++        conf->provider = authn_lookup_provider(AUTHN_DEFAULT_PROVIDER);
+     }
+-    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
+-        if ((l[0] == '#') || (!l[0])) {
+-            continue;
+-        }
+-        rpw = l;
+-        w = ap_getword(r->pool, &rpw, ':');
+-        x = ap_getword(r->pool, &rpw, ':');
+ 
+-        if (x && w && !strcmp(user, w) && !strcmp(realm, x)) {
+-            ap_cfg_closefile(f);
+-            return apr_pstrdup(r->pool, rpw);
+-        }
++    /* We expect the password to be md5 hash of user:realm:password */
++    auth_result = conf->provider->get_realm_hash(r, user, conf->realm,
++                                                 &password);
++
++    if (auth_result != AUTH_USER_FOUND) {
++        return NULL;
+     }
+-    ap_cfg_closefile(f);
+-    return NULL;
++
++    return password;
+ }
+ 
+ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+@@ -1801,11 +1822,11 @@ static int authenticate_digest_user(request_rec *r)
+         return HTTP_UNAUTHORIZED;
+     }
+ 
+-    if (!conf->pwfile) {
++    if (!conf->provider) {
+         return DECLINED;
+     }
+ 
+-    if (!(conf->ha1 = get_hash(r, r->user, conf->realm, conf->pwfile))) {
++    if (!(conf->ha1 = get_hash(r, r->user, conf))) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                       "Digest: user `%s' in realm `%s' not found: %s",
+                       r->user, conf->realm, r->uri);
+diff --git a/modules/aaa/mod_authn_dbm.c b/modules/aaa/mod_authn_dbm.c
+index 302b7fc..a62ebfd 100644
+--- a/modules/aaa/mod_authn_dbm.c
++++ b/modules/aaa/mod_authn_dbm.c
+@@ -83,6 +83,7 @@
+ #include "http_protocol.h"
+ #include "http_request.h"   /* for ap_hook_(check_user_id | auth_checker)*/
+ 
++#include "mod_auth.h"
+ 
+ typedef struct {
+     char *pwfile;
+@@ -127,113 +128,80 @@ static const command_rec authn_dbm_cmds[] =
+ 
+ module AP_MODULE_DECLARE_DATA authn_dbm_module;
+ 
+-/* This should go into APR; perhaps with some nice
+- * caching/locking/flocking of the open dbm file.
+- *
+- * Duplicated in mod_auth_dbm.c
+- */
+-static apr_status_t
+-get_dbm_entry_as_str(request_rec *r, 
+-                     char *user, 
+-                     char *auth_dbmfile, 
+-                     char *dbtype,
+-                     char **str)
++static apr_status_t fetch_dbm(const char *dbmtype, const char *dbmfile,
++                              const char *user, apr_datum_t *val,
++                              apr_pool_t *pool)
+ {
+     apr_dbm_t *f;
+-    apr_datum_t d, q;
+-    char *pw = NULL;
+-    apr_status_t retval;
+-    q.dptr = user;
+-
+-#ifndef NETSCAPE_DBM_COMPAT
+-    q.dsize = strlen(q.dptr);
+-#else
+-    q.dsize = strlen(q.dptr) + 1;
+-#endif
++    apr_datum_t key;
++    apr_status_t rv;
+ 
+-    retval = apr_dbm_open_ex(&f, dbtype, auth_dbmfile, APR_DBM_READONLY, 
+-                             APR_OS_DEFAULT, r->pool);
++    rv = apr_dbm_open_ex(&f, dbmtype, dbmfile, APR_DBM_READONLY, 
++                         APR_OS_DEFAULT, pool);
+ 
+-    if (retval != APR_SUCCESS) {
+-        return retval;
++    if (rv != APR_SUCCESS) {
++        return rv;
+     }
+ 
+-    *str = NULL;
++    key.dptr = (char*)user;
++#ifndef NETSCAPE_DBM_COMPAT
++    key.dsize = strlen(key.dptr);
++#else
++    key.dsize = strlen(key.dptr) + 1;
++#endif
+ 
+-    if (apr_dbm_fetch(f, q, &d) == APR_SUCCESS && d.dptr) {
+-        *str = apr_palloc(r->pool, d.dsize + 1);
+-        strncpy(pw, d.dptr, d.dsize);
+-        *str[d.dsize] = '\0'; /* Terminate the string */
+-    }
++    rv = apr_dbm_fetch(f, key, val);
+ 
+     apr_dbm_close(f);
+-
+-    return retval;
++    
++    return rv;
+ }
+ 
+-static int dbm_authenticate_basic_user(request_rec *r)
++static authn_status check_dbm_pw(request_rec *r, const char *user,
++                                 const char *password)
+ {
+     authn_dbm_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                     &authn_dbm_module);
+-    const char *sent_pw;
+-    char *real_pw,*colon_pw;
+-    apr_status_t status;
++                                                      &authn_dbm_module);
++    apr_datum_t dbm_pw;
++    apr_status_t rv;
++    char *dbm_password;
+     int res;
+ 
+-    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
+-        return res;
+-    }
++    rv = fetch_dbm(conf->dbmtype, conf->pwfile, user, &dbm_pw, r->pool);
+ 
+-    if (!conf->pwfile) {
+-        return DECLINED;
++    if (rv != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
++                      "could not open dbm (type %s) auth file: %s",
++                      conf->dbmtype, conf->pwfile);
++        return AUTH_GENERAL_ERROR;
+     }
+ 
+-    status = get_dbm_entry_as_str(r, r->user, conf->pwfile,
+-                                  conf->dbmtype, &real_pw);
+-
+-    if (status != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+-                      "could not open dbm (type %s) user auth file: %s",
+-                      conf->dbmtype, 
+-                      conf->pwfile);
+-        return HTTP_INTERNAL_SERVER_ERROR;
+-    }
+-
+-    if(real_pw == NULL) {
+-
+-        if (!conf->authoritative) {
+-            return DECLINED;
+-        }
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "DBM user %s not found: %s", r->user, r->filename);
+-        ap_note_basic_auth_failure(r);
+-
+-        return HTTP_UNAUTHORIZED;
++    if (dbm_pw.dptr) {
++        dbm_password = apr_pstrmemdup(r->pool, dbm_pw.dptr, dbm_pw.dsize);
+     }
+ 
+-    /* Password is up to first : if exists */
+-    colon_pw = strchr(real_pw, ':');
+-    if (colon_pw) {
+-        *colon_pw = '\0';
++    if (!dbm_password) {
++        return AUTH_USER_NOT_FOUND;
+     }
+ 
+-    status = apr_password_validate(sent_pw, real_pw);
++    rv = apr_password_validate(password, dbm_password);
+ 
+-    if (status != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "DBM user %s: authentication failure for \"%s\": "
+-                      "Password Mismatch",
+-                      r->user, r->uri);
+-        ap_note_basic_auth_failure(r);
+-        return HTTP_UNAUTHORIZED;
++    if (rv != APR_SUCCESS) {
++        return AUTH_DENIED;
+     }
+-    return OK;
++
++    return AUTH_GRANTED;
+ }
+ 
++static const authn_provider authn_dbm_provider =
++{
++    &check_dbm_pw,
++    NULL,               /* No realm support yet. */
++};
++
+ static void register_hooks(apr_pool_t *p)
+ {
+-    ap_hook_check_user_id(dbm_authenticate_basic_user, NULL, NULL,
+-                          APR_HOOK_MIDDLE);
++    authn_register_provider(p, "dbm", &authn_dbm_provider);
+ }
+ 
+ module AP_MODULE_DECLARE_DATA authn_dbm_module =
+diff --git a/modules/aaa/mod_authn_file.c b/modules/aaa/mod_authn_file.c
+index 8f214d6..fb7c110 100644
+--- a/modules/aaa/mod_authn_file.c
++++ b/modules/aaa/mod_authn_file.c
+@@ -81,6 +81,8 @@
+ #include "http_protocol.h"
+ #include "http_request.h"
+ 
++#include "mod_auth.h"
++
+ typedef struct {
+     char *pwfile;
+     int authoritative;
+@@ -121,103 +123,110 @@ static const command_rec authn_file_cmds[] =
+ 
+ module AP_MODULE_DECLARE_DATA authn_file_module;
+ 
+-static apr_status_t get_pw(request_rec *r, char *user, char *pwfile, 
+-                           char ** out)
++static authn_status check_password(request_rec *r, const char *user,
++                                   const char *password)
+ {
++    authn_file_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                       &authn_file_module);
+     ap_configfile_t *f;
+     char l[MAX_STRING_LEN];
+-    const char *rpw, *w;
+     apr_status_t status;
++    char *file_password = NULL;
+ 
+-    *out = NULL;
++    status = ap_pcfg_openfile(&f, r->pool, conf->pwfile);
+ 
+-    if ((status = ap_pcfg_openfile(&f, r->pool, pwfile)) != APR_SUCCESS) {
+-        return status;
++    if (status != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
++                      "Could not open password file: %s", conf->pwfile);
++        return AUTH_GENERAL_ERROR;
+     }
+ 
+     while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
++        const char *rpw, *w;
++
++        /* Skip # or blank lines. */
+         if ((l[0] == '#') || (!l[0])) {
+             continue;
+         }
++
+         rpw = l;
+         w = ap_getword(r->pool, &rpw, ':');
+ 
+         if (!strcmp(user, w)) {
+-            ap_cfg_closefile(f);
+-            *out = ap_getword(r->pool, &rpw, ':');
+-            return APR_SUCCESS;
++            file_password = ap_getword(r->pool, &rpw, ':');
++            break;
+         }
+     }
+     ap_cfg_closefile(f);
+ 
+-    return APR_SUCCESS;
+-}
++    if (!file_password) {
++        return AUTH_USER_NOT_FOUND;
++    }
+ 
+-/* These functions return 0 if client is OK, and proper error status
+- * if not... either HTTP_UNAUTHORIZED, if we made a check, and it failed, or
+- * HTTP_INTERNAL_SERVER_ERROR, if things are so totally confused that we
+- * couldn't figure out how to tell if the client is authorized or not.
+- *
+- * If they return DECLINED, and all other modules also decline, that's
+- * treated by the server core as a configuration error, logged and
+- * reported as such.
+- */
++    status = apr_password_validate(password, file_password);
++    if (status != APR_SUCCESS) {
++        return AUTH_DENIED;
++    }
+ 
+-/* Determine user ID, and check if it really is that user, for HTTP
+- * basic authentication...
+- */
++    return AUTH_GRANTED;
++}
+ 
+-static int authenticate_basic_user(request_rec *r)
++static authn_status get_realm_hash(request_rec *r, const char *user,
++                                   const char *realm, char **rethash)
+ {
+     authn_file_config_rec *conf = ap_get_module_config(r->per_dir_config,
+                                                        &authn_file_module);
+-    const char *sent_pw;
+-    char *real_pw = NULL;
++    ap_configfile_t *f;
++    char l[MAX_STRING_LEN];
+     apr_status_t status;
+-    int res;
++    char *file_hash = NULL;
+ 
+-    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
+-        return res;
+-    }
++    status = ap_pcfg_openfile(&f, r->pool, conf->pwfile);
+ 
+-    if (!conf->pwfile) {
+-        return DECLINED;
+-    }
+-
+-    if ((status = get_pw(r, r->user, conf->pwfile, &real_pw)) != APR_SUCCESS) 
+-    {
++    if (status != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+                       "Could not open password file: %s", conf->pwfile);
+-        return HTTP_INTERNAL_SERVER_ERROR;
++        return AUTH_GENERAL_ERROR;
+     }
+ 
+-    if (real_pw == NULL) {
+-        if (!conf->authoritative) {
+-           return DECLINED;
+-        } 
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "user %s not found: %s", r->user, r->uri);
+-        ap_note_basic_auth_failure(r);
+-        return HTTP_UNAUTHORIZED;
+-    }
++    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
++        const char *rpw, *w, *x;
+ 
+-    status = apr_password_validate(sent_pw, real_pw);
++        /* Skip # or blank lines. */
++        if ((l[0] == '#') || (!l[0])) {
++            continue;
++        }
+ 
+-    if (status != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "user %s: authentication failure for \"%s\": "
+-                      "Password Mismatch",
+-                      r->user, r->uri);
+-        ap_note_basic_auth_failure(r);
+-        return HTTP_UNAUTHORIZED;
++        rpw = l;
++        w = ap_getword(r->pool, &rpw, ':');
++        x = ap_getword(r->pool, &rpw, ':');
++
++        if (x && w && !strcmp(user, w) && !strcmp(realm, x)) {
++            /* Remember that this is a md5 hash of user:realm:password.  */
++            file_hash = ap_getword(r->pool, &rpw, ':');
++            break;
++        }
++    }
++    ap_cfg_closefile(f);
++
++    if (!file_hash) {
++        return AUTH_USER_NOT_FOUND;
+     }
+ 
+-    return OK;
++    *rethash = file_hash;
++
++    return AUTH_USER_FOUND;
+ }
+ 
++static const authn_provider authn_file_provider =
++{
++    &check_password,
++    &get_realm_hash,
++};
++
+ static void register_hooks(apr_pool_t *p)
+ {
+-    ap_hook_check_user_id(authenticate_basic_user,NULL,NULL,APR_HOOK_MIDDLE);
++    authn_register_provider(p, "file", &authn_file_provider);
+ }
+ 
+ module AP_MODULE_DECLARE_DATA authn_file_module =

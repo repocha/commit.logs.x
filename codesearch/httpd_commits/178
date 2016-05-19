@@ -1,0 +1,212 @@
+commit a3e875d3f36a0079b1e74c14fa292c4e462e5a63
+Author: Bradley Nicholes <bnicholes@apache.org>
+Date:   Fri Nov 5 18:48:16 2004 +0000
+
+    Added the directive "Requires ldap-filter" that allows the module to only authorize a user based on a complex LDAP search filter.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@105694 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index faab502..376b311 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,11 @@ Changes with Apache 2.1.0-dev
+ 
+   [Remove entries to the current 2.0 section below, when backported]
+ 
++  *) mod_authnz_ldap: Added the directive "Requires ldap-filter" that
++     allows the module to authorize a user based on a complex LDAP
++     search filter.
++     [Brad Nicholes]
++     
+   *) SECURITY: CAN-2004-0942, Fix for memory consumption DoS.
+      [Joe Orton]
+ 
+diff --git a/docs/manual/mod/mod_authnz_ldap.xml b/docs/manual/mod/mod_authnz_ldap.xml
+index 474552e..b12155a 100644
+--- a/docs/manual/mod/mod_authnz_ldap.xml
++++ b/docs/manual/mod/mod_authnz_ldap.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0"?>
+ <!DOCTYPE modulesynopsis SYSTEM "../style/modulesynopsis.dtd">
+ <?xml-stylesheet type="text/xsl" href="../style/manual.en.xsl"?>
+-<!-- $Revision: 1.3 $ -->
++<!-- $Revision: 1.4 $ -->
+ 
+ <!--
+  Copyright 2002-2004 The Apache Software Foundation
+@@ -88,6 +88,7 @@ for HTTP Basic authentication.</description>
+           <li><a href="#reqgroup">require ldap-group</a></li>
+           <li><a href="#reqdn">require ldap-dn</a></li>
+           <li><a href="#reqattribute">require ldap-attribute</a></li>
++          <li><a href="#reqfilter">require ldap-filter</a></li>
+         </ul>
+       </li>
+ 
+@@ -216,6 +217,11 @@ for HTTP Basic authentication.</description>
+       directive, and the attribute fetched from the LDAP directory
+       matches the given value.</li> 
+ 
++      <li>Grant access if there is a <a href="#reqfilter">
++      <code>require ldap-filter</code></a> 
++      directive, and the search filter successfully finds a single user
++      object that matches the dn of the authenticated user.</li> 
++
+       <li>otherwise, deny or decline access</li>
+     </ul>
+ 
+@@ -285,9 +291,9 @@ for HTTP Basic authentication.</description>
+     directives are used during the authorization phase to ensure that
+     a user is allowed to access a resource.  mod_authnz_ldap extends the 
+     authorization types with <code>ldap-user</code>, <code>ldap-dn</code>, 
+-    <code>ldap-group</code> and <code>ldap-attribute</code>.  Other 
+-    authorization types may also be used but may require that additional 
+-    authorization modules be loaded.</p>
++    <code>ldap-group</code>, <code>ldap-attribute</code> and 
++    <code>ldap-filter</code>.  Other authorization types may also be 
++    used but may require that additional authorization modules be loaded.</p>
+ 
+ <section id="reqvaliduser"><title>require valid-user</title>
+ 
+@@ -406,6 +412,28 @@ uniqueMember: cn=Fred User, o=Airius<br />
+ 
+ </section>
+ 
++<section id="reqfilter"><title>require ldap-filter</title>
++
++    <p>The <code>require ldap-filter</code> directive allows the
++    administrator to grant access based on a complex LDAP search filter.
++    If the dn returned by the filter search matches the authenticated user
++    dn, access is granted.</p>
++    
++    <p>The following directive would grant access to anyone having a cell phone
++    and is in the marketing department</p>
++
++    <example>require ldap-filter &amp;(cell=*)(department=marketing)</example>
++
++    <p>The difference between the <code>require ldap-filter</code> directive and the 
++    <code>require ldap-attribute</code> directive is that <code>ldap-filter</code> 
++    performs a search operation on the LDAP directory using the specified search 
++    filter rather than a simple attribute comparison. If a simple attribute 
++    comparison is all that is required, the comparison operation performed by 
++    <code>ldap-attribute</code> will be faster than the search operation 
++    used by <code>ldap-filter</code> especially within a large directory.</p>
++
++</section>
++
+ </section>
+ 
+ <section id="examples"><title>Examples</title>
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 88d95f3..9c2bbdf 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -166,10 +166,11 @@ static apr_xlate_t* get_conv_set (request_rec *r)
+ static void authn_ldap_build_filter(char *filtbuf, 
+                              request_rec *r,
+                              const char* sent_user,
++                             const char* sent_filter,
+                              authn_ldap_config_t *sec)
+ {
+     char *p, *q, *filtbuf_end;
+-    char *user;
++    char *user, *filter;
+     apr_xlate_t *convset = NULL;
+     apr_size_t inbytes;
+     apr_size_t outbytes;
+@@ -181,6 +182,12 @@ static void authn_ldap_build_filter(char *filtbuf,
+     else
+         return;
+ 
++    if (sent_filter != NULL) {
++        filter = apr_pstrdup (r->pool, sent_filter);
++    }
++    else
++        filter = sec->filter;
++
+     if (charset_conversions) {
+         convset = get_conv_set(r);
+     }
+@@ -200,7 +207,7 @@ static void authn_ldap_build_filter(char *filtbuf,
+      * Create the first part of the filter, which consists of the 
+      * config-supplied portions.
+      */
+-    apr_snprintf(filtbuf, FILTER_LENGTH, "(&(%s)(%s=", sec->filter, sec->attribute);
++    apr_snprintf(filtbuf, FILTER_LENGTH, "(&(%s)(%s=", filter, sec->attribute);
+ 
+     /* 
+      * Now add the client-supplied username to the filter, ensuring that any
+@@ -375,7 +382,7 @@ start_over:
+     }
+ 
+     /* build the username filter */
+-    authn_ldap_build_filter(filtbuf, r, user, sec);
++    authn_ldap_build_filter(filtbuf, r, user, NULL, sec);
+ 
+     /* do the user search */
+     result = util_ldap_cache_checkuserid(r, ldc, sec->url, sec->basedn, sec->scope,
+@@ -541,7 +548,7 @@ static int authz_ldap_check_user_access(request_rec *r)
+             "ldap authorize: Creating LDAP req structure");
+ 
+         /* Build the username filter */
+-        authn_ldap_build_filter(filtbuf, r, r->user, sec);
++        authn_ldap_build_filter(filtbuf, r, r->user, NULL, sec);
+ 
+         /* Search for the user DN */
+         result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
+@@ -722,6 +729,54 @@ static int authz_ldap_check_user_access(request_rec *r)
+                 }
+             }
+         }
++        else if (strcmp(w, "ldap-filter") == 0) {
++            if (t[0]) {
++                ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
++                              "[%d] auth_ldap authorise: checking filter %s", 
++                              getpid(), t);
++
++                /* Build the username filter */
++                authn_ldap_build_filter(filtbuf, r, req->user, t, sec);
++
++                /* Search for the user DN */
++                result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
++                     sec->scope, sec->attributes, filtbuf, &dn, &vals);
++
++                /* Make sure that the filtered search returned the correct user dn */
++                if (result == LDAP_SUCCESS) {
++                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
++                                  "[%d] auth_ldap authorise: checking dn match %s", 
++                                  getpid(), dn);
++                    result = util_ldap_cache_comparedn(r, ldc, sec->url, req->dn, dn, 
++                         sec->compare_dn_on_server);
++                }
++
++                switch(result) {
++                    case LDAP_COMPARE_TRUE: {
++                        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 
++                                      0, r, "[%d] auth_ldap authorise: "
++                                      "require ldap-filter: authorisation "
++                                      "successful", getpid());
++                        return OK;
++                    }
++                    case LDAP_FILTER_ERROR: {
++                        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 
++                                      0, r, "[%d] auth_ldap authorise: "
++                                      "require ldap-filter: %s authorisation "
++                                      "failed [%s][%s]", getpid(), 
++                                      filtbuf, ldc->reason, ldap_err2string(result));
++                        break;
++                    }
++                    default: {
++                        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 
++                                      0, r, "[%d] auth_ldap authorise: "
++                                      "require ldap-filter: authorisation "
++                                      "failed [%s][%s]", getpid(), 
++                                      ldc->reason, ldap_err2string(result));
++                    }
++                }
++            }
++        }
+     }
+ 
+     if (!method_restricted) {

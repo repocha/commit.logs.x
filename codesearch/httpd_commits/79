@@ -1,0 +1,1590 @@
+commit f6183803ac75fe847925d92f292ad5a938a8ae90
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Tue Nov 29 22:28:21 2011 +0000
+
+    Remove more log message prefixes that are now redundant as the
+    the error log format includes the module name.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1208110 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index ad338e8..77240b6 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -201,7 +201,7 @@ module AP_MODULE_DECLARE_DATA auth_digest_module;
+ static apr_status_t cleanup_tables(void *not_used)
+ {
+     ap_log_error(APLOG_MARK, APLOG_INFO, 0, NULL,
+-                  "Digest: cleaning up shared memory");
++                  "cleaning up shared memory");
+ 
+     if (client_rmm) {
+         apr_rmm_destroy(client_rmm);
+@@ -231,7 +231,7 @@ static apr_status_t initialize_secret(server_rec *s)
+     apr_status_t status;
+ 
+     ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, s,
+-                 "Digest: generating secret for digest authentication ...");
++                 "generating secret for digest authentication ...");
+ 
+ #if APR_HAS_RANDOM
+     status = apr_generate_random_bytes(secret, sizeof(secret));
+@@ -242,12 +242,12 @@ static apr_status_t initialize_secret(server_rec *s)
+     if (status != APR_SUCCESS) {
+         char buf[120];
+         ap_log_error(APLOG_MARK, APLOG_CRIT, status, s,
+-                     "Digest: error generating secret: %s",
++                     "error generating secret: %s",
+                      apr_strerror(status, buf, sizeof(buf)));
+         return status;
+     }
+ 
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, "Digest: done");
++    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, "done");
+ 
+     return APR_SUCCESS;
+ }
+@@ -255,7 +255,7 @@ static apr_status_t initialize_secret(server_rec *s)
+ static void log_error_and_cleanup(char *msg, apr_status_t sts, server_rec *s)
+ {
+     ap_log_error(APLOG_MARK, APLOG_ERR, sts, s,
+-                 "Digest: %s - all nonce-count checking, one-time nonces, and "
++                 "%s - all nonce-count checking, one-time nonces, and "
+                  "MD5-sess algorithm disabled", msg);
+ 
+     cleanup_tables(NULL);
+@@ -672,7 +672,7 @@ static const char *set_shmem_size(cmd_parms *cmd, void *config,
+         num_buckets = 1;
+     }
+     ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, cmd->server,
+-                 "Digest: Set shmem-size: %" APR_SIZE_T_FMT ", num-buckets: %ld",
++                 "Set shmem-size: %" APR_SIZE_T_FMT ", num-buckets: %ld",
+                  shmem_size, num_buckets);
+ 
+     return NULL;
+@@ -861,7 +861,7 @@ static client_entry *add_client(unsigned long key, client_entry *info,
+     if (!entry) {
+         long num_removed = gc();
+         ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+-                     "Digest: gc'd %ld client entries. Total new clients: "
++                     "gc'd %ld client entries. Total new clients: "
+                      "%ld; Total removed clients: %ld; Total renewed clients: "
+                      "%ld", num_removed,
+                      client_list->num_created - client_list->num_renewed,
+@@ -1145,8 +1145,7 @@ static client_entry *gen_client(const request_rec *r)
+ 
+     if (!(entry = add_client(op, &new_entry, r->server))) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: failed to allocate client entry - ignoring "
+-                      "client");
++                      "failed to allocate client entry - ignoring client");
+         return NULL;
+     }
+ 
+@@ -1466,7 +1465,7 @@ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+     if (conf->check_nc && !client_shm) {
+         /* Shouldn't happen, but just in case... */
+         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                      "Digest: cannot check nonce count without shared memory");
++                      "cannot check nonce count without shared memory");
+         return OK;
+     }
+ 
+@@ -1480,7 +1479,7 @@ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+         /* qop is none, client must not send a nonce count */
+         if (snc != NULL) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: invalid nc %s received - no nonce count allowed when qop=none",
++                          "invalid nc %s received - no nonce count allowed when qop=none",
+                           snc);
+             return !OK;
+         }
+@@ -1491,7 +1490,7 @@ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+     nc = strtol(snc, &endptr, 16);
+     if (endptr < (snc+strlen(snc)) && !apr_isspace(*endptr)) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: invalid nc %s received - not a number", snc);
++                      "invalid nc %s received - not a number", snc);
+         return !OK;
+     }
+ 
+@@ -1501,7 +1500,7 @@ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+ 
+     if (nc != resp->client->nonce_count) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: Warning, possible replay attack: nonce-count "
++                      "Warning, possible replay attack: nonce-count "
+                       "check failed: %lu != %lu", nc,
+                       resp->client->nonce_count);
+         return !OK;
+@@ -1519,7 +1518,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 
+     if (strlen(resp->nonce) != NONCE_LEN) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: invalid nonce %s received - length is not %d",
++                      "invalid nonce %s received - length is not %d",
+                       resp->nonce, NONCE_LEN);
+         note_digest_auth_failure(r, conf, resp, 1);
+         return HTTP_UNAUTHORIZED;
+@@ -1534,7 +1533,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+ 
+     if (strcmp(hash, resp->nonce+NONCE_TIME_LEN)) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: invalid nonce %s received - hash is not %s",
++                      "invalid nonce %s received - hash is not %s",
+                       resp->nonce, hash);
+         note_digest_auth_failure(r, conf, resp, 1);
+         return HTTP_UNAUTHORIZED;
+@@ -1543,7 +1542,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+     dt = r->request_time - nonce_time.time;
+     if (conf->nonce_lifetime > 0 && dt < 0) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: invalid nonce %s received - user attempted "
++                      "invalid nonce %s received - user attempted "
+                       "time travel", resp->nonce);
+         note_digest_auth_failure(r, conf, resp, 1);
+         return HTTP_UNAUTHORIZED;
+@@ -1552,7 +1551,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+     if (conf->nonce_lifetime > 0) {
+         if (dt > conf->nonce_lifetime) {
+             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0,r,
+-                          "Digest: user %s: nonce expired (%.2f seconds old "
++                          "user %s: nonce expired (%.2f seconds old "
+                           "- max lifetime %.2f) - sending new nonce",
+                           r->user, (double)apr_time_sec(dt),
+                           (double)apr_time_sec(conf->nonce_lifetime));
+@@ -1563,7 +1562,7 @@ static int check_nonce(request_rec *r, digest_header_rec *resp,
+     else if (conf->nonce_lifetime == 0 && resp->client) {
+         if (memcmp(resp->client->last_nonce, resp->nonce, NONCE_LEN)) {
+             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+-                          "Digest: user %s: one-time-nonce mismatch - sending "
++                          "user %s: one-time-nonce mismatch - sending "
+                           "new nonce", r->user);
+             note_digest_auth_failure(r, conf, resp, 1);
+             return HTTP_UNAUTHORIZED;
+@@ -1699,7 +1698,7 @@ static int authenticate_digest_user(request_rec *r)
+ 
+     if (!ap_auth_name(r)) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: need AuthName: %s", r->uri);
++                      "need AuthName: %s", r->uri);
+         return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+@@ -1729,12 +1728,12 @@ static int authenticate_digest_user(request_rec *r)
+     if (resp->auth_hdr_sts != VALID) {
+         if (resp->auth_hdr_sts == NOT_DIGEST) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: client used wrong authentication scheme "
+-                          "`%s': %s", resp->scheme, r->uri);
++                          "client used wrong authentication scheme `%s': %s",
++                          resp->scheme, r->uri);
+         }
+         else if (resp->auth_hdr_sts == INVALID) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: missing user, realm, nonce, uri, digest, "
++                          "missing user, realm, nonce, uri, digest, "
+                           "cnonce, or nonce_count in authorization header: %s",
+                           r->uri);
+         }
+@@ -1757,7 +1756,7 @@ static int authenticate_digest_user(request_rec *r)
+         copy_uri_components(&r_uri, resp->psd_request_uri, r);
+         if (apr_uri_parse(r->pool, resp->uri, &d_uri) != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: invalid uri <%s> in Authorization header",
++                          "invalid uri <%s> in Authorization header",
+                           resp->uri);
+             return HTTP_BAD_REQUEST;
+         }
+@@ -1791,7 +1790,7 @@ static int authenticate_digest_user(request_rec *r)
+             if (apr_table_get(r->subprocess_env,
+                               "AuthDigestEnableQueryStringHack")) {
+ 
+-                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, "Digest: "
++                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                               "applying AuthDigestEnableQueryStringHack "
+                               "to uri <%s>", resp->raw_request_uri);
+ 
+@@ -1802,7 +1801,7 @@ static int authenticate_digest_user(request_rec *r)
+         if (r->method_number == M_CONNECT) {
+             if (!r_uri.hostinfo || strcmp(resp->uri, r_uri.hostinfo)) {
+                 ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                              "Digest: uri mismatch - <%s> does not match "
++                              "uri mismatch - <%s> does not match "
+                               "request-uri <%s>", resp->uri, r_uri.hostinfo);
+                 return HTTP_BAD_REQUEST;
+             }
+@@ -1830,7 +1829,7 @@ static int authenticate_digest_user(request_rec *r)
+                     || strcmp(d_uri.query, r_uri.query)))
+             ) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: uri mismatch - <%s> does not match "
++                          "uri mismatch - <%s> does not match "
+                           "request-uri <%s>", resp->uri, resp->raw_request_uri);
+             return HTTP_BAD_REQUEST;
+         }
+@@ -1838,7 +1837,7 @@ static int authenticate_digest_user(request_rec *r)
+ 
+     if (resp->opaque && resp->opaque_num == 0) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: received invalid opaque - got `%s'",
++                      "received invalid opaque - got `%s'",
+                       resp->opaque);
+         note_digest_auth_failure(r, conf, resp, 0);
+         return HTTP_UNAUTHORIZED;
+@@ -1846,7 +1845,7 @@ static int authenticate_digest_user(request_rec *r)
+ 
+     if (strcmp(resp->realm, conf->realm)) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: realm mismatch - got `%s' but expected `%s'",
++                      "realm mismatch - got `%s' but expected `%s'",
+                       resp->realm, conf->realm);
+         note_digest_auth_failure(r, conf, resp, 0);
+         return HTTP_UNAUTHORIZED;
+@@ -1856,7 +1855,7 @@ static int authenticate_digest_user(request_rec *r)
+         && strcasecmp(resp->algorithm, "MD5")
+         && strcasecmp(resp->algorithm, "MD5-sess")) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: unknown algorithm `%s' received: %s",
++                      "unknown algorithm `%s' received: %s",
+                       resp->algorithm, r->uri);
+         note_digest_auth_failure(r, conf, resp, 0);
+         return HTTP_UNAUTHORIZED;
+@@ -1866,7 +1865,7 @@ static int authenticate_digest_user(request_rec *r)
+ 
+     if (return_code == AUTH_USER_NOT_FOUND) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: user `%s' in realm `%s' not found: %s",
++                      "user `%s' in realm `%s' not found: %s",
+                       r->user, conf->realm, r->uri);
+         note_digest_auth_failure(r, conf, resp, 0);
+         return HTTP_UNAUTHORIZED;
+@@ -1877,7 +1876,7 @@ static int authenticate_digest_user(request_rec *r)
+     else if (return_code == AUTH_DENIED) {
+         /* authentication denied in the provider before attempting a match */
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "Digest: user `%s' in realm `%s' denied by provider: %s",
++                      "user `%s' in realm `%s' denied by provider: %s",
+                       r->user, conf->realm, r->uri);
+         note_digest_auth_failure(r, conf, resp, 0);
+         return HTTP_UNAUTHORIZED;
+@@ -1894,7 +1893,7 @@ static int authenticate_digest_user(request_rec *r)
+         /* old (rfc-2069) style digest */
+         if (strcmp(resp->digest, old_digest(r, resp, conf->ha1))) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: user %s: password mismatch: %s", r->user,
++                          "user %s: password mismatch: %s", r->user,
+                           r->uri);
+             note_digest_auth_failure(r, conf, resp, 0);
+             return HTTP_UNAUTHORIZED;
+@@ -1914,7 +1913,7 @@ static int authenticate_digest_user(request_rec *r)
+             && !(conf->qop_list[0] == NULL
+                  && !strcasecmp(resp->message_qop, "auth"))) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: invalid qop `%s' received: %s",
++                          "invalid qop `%s' received: %s",
+                           resp->message_qop, r->uri);
+             note_digest_auth_failure(r, conf, resp, 0);
+             return HTTP_UNAUTHORIZED;
+@@ -1927,7 +1926,7 @@ static int authenticate_digest_user(request_rec *r)
+         }
+         if (strcmp(resp->digest, exp_digest)) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: user %s: password mismatch: %s", r->user,
++                          "user %s: password mismatch: %s", r->user,
+                           r->uri);
+             note_digest_auth_failure(r, conf, resp, 0);
+             return HTTP_UNAUTHORIZED;
+@@ -2007,7 +2006,7 @@ static int add_auth_info(request_rec *r)
+             ha1 = get_session_HA1(r, resp, conf, 0);
+             if (!ha1) {
+                 ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                              "Digest: internal error: couldn't find session "
++                              "internal error: couldn't find session "
+                               "info for user %s", resp->username);
+                 return !OK;
+             }
+diff --git a/modules/arch/win32/mod_isapi.c b/modules/arch/win32/mod_isapi.c
+index 4a370c3..a81dea0 100644
+--- a/modules/arch/win32/mod_isapi.c
++++ b/modules/arch/win32/mod_isapi.c
+@@ -137,18 +137,18 @@ static const char *isapi_cmd_cachefile(cmd_parms *cmd, void *dummy,
+     fspec = ap_server_root_relative(cmd->pool, filename);
+     if (!fspec) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, APR_EBADPATH, cmd->server,
+-                     "ISAPI: invalid module path, skipping %s", filename);
++                     "invalid module path, skipping %s", filename);
+         return NULL;
+     }
+     if ((rv = apr_stat(&tmp, fspec, APR_FINFO_TYPE,
+                       cmd->temp_pool)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, rv, cmd->server,
+-            "ISAPI: unable to stat, skipping %s", fspec);
++                     "unable to stat, skipping %s", fspec);
+         return NULL;
+     }
+     if (tmp.filetype != APR_REG) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, 0, cmd->server,
+-            "ISAPI: not a regular file, skipping %s", fspec);
++                     "not a regular file, skipping %s", fspec);
+         return NULL;
+     }
+ 
+@@ -156,7 +156,7 @@ static const char *isapi_cmd_cachefile(cmd_parms *cmd, void *dummy,
+     rv = isapi_lookup(cmd->pool, cmd->server, NULL, fspec, &isa);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, rv, cmd->server,
+-                     "ISAPI: unable to cache, skipping %s", fspec);
++                     "unable to cache, skipping %s", fspec);
+         return NULL;
+     }
+ 
+@@ -272,7 +272,7 @@ static apr_status_t isapi_load(apr_pool_t *p, server_rec *s, isapi_loaded *isa)
+     if (rv)
+     {
+         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+-                     "ISAPI: failed to load %s", isa->filename);
++                     "failed to load %s", isa->filename);
+         isa->handle = NULL;
+         return rv;
+     }
+@@ -282,7 +282,7 @@ static apr_status_t isapi_load(apr_pool_t *p, server_rec *s, isapi_loaded *isa)
+     if (rv)
+     {
+         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+-                     "ISAPI: missing GetExtensionVersion() in %s",
++                     "missing GetExtensionVersion() in %s",
+                      isa->filename);
+         apr_dso_unload(isa->handle);
+         isa->handle = NULL;
+@@ -294,7 +294,7 @@ static apr_status_t isapi_load(apr_pool_t *p, server_rec *s, isapi_loaded *isa)
+     if (rv)
+     {
+         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+-                     "ISAPI: missing HttpExtensionProc() in %s",
++                     "missing HttpExtensionProc() in %s",
+                      isa->filename);
+         apr_dso_unload(isa->handle);
+         isa->handle = NULL;
+@@ -310,7 +310,7 @@ static apr_status_t isapi_load(apr_pool_t *p, server_rec *s, isapi_loaded *isa)
+     if (!(isa->GetExtensionVersion)(isa->isapi_version)) {
+         apr_status_t rv = apr_get_os_error();
+         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+-                     "ISAPI: failed call to GetExtensionVersion() in %s",
++                     "failed call to GetExtensionVersion() in %s",
+                      isa->filename);
+         apr_dso_unload(isa->handle);
+         isa->handle = NULL;
+@@ -772,7 +772,7 @@ static apr_ssize_t send_response_header(isapi_cid *cid,
+         cid->r->status_line = ap_get_status_line(cid->r->status);
+         cid->ecb->dwHttpStatusCode = cid->r->status;
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, cid->r,
+-                "ISAPI: Could not determine HTTP response code; using %d",
++                "Could not determine HTTP response code; using %d",
+                 cid->r->status);
+     }
+ 
+@@ -843,8 +843,8 @@ static int APR_THREAD_FUNC regfnWriteClient(isapi_cid    *cid,
+         cid->response_sent = 1;
+         if (rv != APR_SUCCESS)
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r,
+-                          "ISAPI: WriteClient ap_pass_brigade "
+-                          "failed: %s", r->filename);
++                          "WriteClient ap_pass_brigade failed: %s",
++                          r->filename);
+     }
+ 
+     if ((flags & HSE_IO_ASYNC) && cid->completion) {
+@@ -934,7 +934,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+             cid->response_sent = 1;
+             if (rv != APR_SUCCESS)
+                 ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r,
+-                              "ISAPI: ServerSupport function "
++                              "ServerSupport function "
+                               "HSE_REQ_SEND_RESPONSE_HEADER "
+                               "ap_pass_brigade failed: %s", r->filename);
+             return (rv == APR_SUCCESS);
+@@ -956,7 +956,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+         }
+         else if (cid->dconf.log_unsupported) {
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: ServerSupportFunction "
++                          "ServerSupportFunction "
+                           "HSE_REQ_DONE_WITH_SESSION is not supported: %s",
+                           r->filename);
+         }
+@@ -1001,7 +1001,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+     case HSE_REQ_GET_SSPI_INFO:
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                           "ISAPI: ServerSupportFunction HSE_REQ_GET_SSPI_INFO "
++                           "ServerSupportFunction HSE_REQ_GET_SSPI_INFO "
+                            "is not supported: %s", r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+         return 0;
+@@ -1018,7 +1018,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+         }
+         if (cid->dconf.log_to_errlog)
+             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+-                          "ISAPI: %s: %s", cid->r->filename,
++                          "%s: %s", cid->r->filename,
+                           (char*) buf_data);
+         return 1;
+ 
+@@ -1036,7 +1036,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+         }
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                      "ISAPI: ServerSupportFunction HSE_REQ_IO_COMPLETION "
++                      "ServerSupportFunction HSE_REQ_IO_COMPLETION "
+                       "is not supported: %s", r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+         return 0;
+@@ -1056,7 +1056,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+         if (!cid->dconf.fake_async && (tf->dwFlags & HSE_IO_ASYNC)) {
+             if (cid->dconf.log_unsupported)
+                 ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                         "ISAPI: ServerSupportFunction HSE_REQ_TRANSMIT_FILE "
++                         "ServerSupportFunction HSE_REQ_TRANSMIT_FILE "
+                          "as HSE_IO_ASYNC is not supported: %s", r->filename);
+             apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+             return 0;
+@@ -1136,7 +1136,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+         cid->response_sent = 1;
+         if (rv != APR_SUCCESS)
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r,
+-                          "ISAPI: ServerSupport function "
++                          "ServerSupport function "
+                           "HSE_REQ_TRANSMIT_FILE "
+                           "ap_pass_brigade failed: %s", r->filename);
+ 
+@@ -1171,7 +1171,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+     case HSE_REQ_REFRESH_ISAPI_ACL:
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: ServerSupportFunction "
++                          "ServerSupportFunction "
+                           "HSE_REQ_REFRESH_ISAPI_ACL "
+                           "is not supported: %s", r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+@@ -1188,7 +1188,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+         if (!cid->dconf.fake_async) {
+             if (cid->dconf.log_unsupported)
+                 ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                            "ISAPI: asynchronous I/O not supported: %s",
++                            "asynchronous I/O not supported: %s",
+                             r->filename);
+             apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+             return 0;
+@@ -1228,7 +1228,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+     case HSE_REQ_GET_IMPERSONATION_TOKEN:  /* Added in ISAPI 4.0 */
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: ServerSupportFunction "
++                          "ServerSupportFunction "
+                           "HSE_REQ_GET_IMPERSONATION_TOKEN "
+                           "is not supported: %s", r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+@@ -1307,7 +1307,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+     case HSE_REQ_ABORTIVE_CLOSE:
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: ServerSupportFunction HSE_REQ_ABORTIVE_CLOSE"
++                          "ServerSupportFunction HSE_REQ_ABORTIVE_CLOSE"
+                           " is not supported: %s", r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+         return 0;
+@@ -1315,7 +1315,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+     case HSE_REQ_GET_CERT_INFO_EX:  /* Added in ISAPI 4.0 */
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: ServerSupportFunction "
++                          "ServerSupportFunction "
+                           "HSE_REQ_GET_CERT_INFO_EX "
+                           "is not supported: %s", r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+@@ -1349,7 +1349,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+             cid->response_sent = 1;
+             if (rv != APR_SUCCESS)
+                 ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r,
+-                              "ISAPI: ServerSupport function "
++                              "ServerSupport function "
+                               "HSE_REQ_SEND_RESPONSE_HEADER_EX "
+                               "ap_pass_brigade failed: %s", r->filename);
+             return (rv == APR_SUCCESS);
+@@ -1364,7 +1364,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+     case HSE_REQ_CLOSE_CONNECTION:  /* Added after ISAPI 4.0 */
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: ServerSupportFunction "
++                          "ServerSupportFunction "
+                           "HSE_REQ_CLOSE_CONNECTION "
+                           "is not supported: %s", r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+@@ -1382,7 +1382,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+          */
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: ServerSupportFunction "
++                          "ServerSupportFunction "
+                           "HSE_REQ_EXTENSION_TRIGGER "
+                           "is not supported: %s", r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+@@ -1391,7 +1391,7 @@ static int APR_THREAD_FUNC regfnServerSupportFunction(isapi_cid    *cid,
+     default:
+         if (cid->dconf.log_unsupported)
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: ServerSupportFunction (%d) not supported: "
++                          "ServerSupportFunction (%d) not supported: "
+                           "%s", HSE_code, r->filename);
+         apr_set_os_error(APR_FROM_OS_ERROR(ERROR_INVALID_PARAMETER));
+         return 0;
+@@ -1573,7 +1573,7 @@ static apr_status_t isapi_handler (request_rec *r)
+ 
+         if (!cid->completed || (rv != APR_SUCCESS)) {
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                          "ISAPI: Failed to create completion mutex");
++                          "Failed to create completion mutex");
+             return HTTP_INTERNAL_SERVER_ERROR;
+         }
+     }
+@@ -1584,7 +1584,7 @@ static apr_status_t isapi_handler (request_rec *r)
+     /* Check for a log message - and log it */
+     if (cid->ecb->lpszLogData && *cid->ecb->lpszLogData)
+         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+-                      "ISAPI: %s: %s", r->filename, cid->ecb->lpszLogData);
++                      "%s: %s", r->filename, cid->ecb->lpszLogData);
+ 
+     switch(rv) {
+         case 0:  /* Strange, but MS isapi accepts this as success */
+@@ -1615,7 +1615,7 @@ static apr_status_t isapi_handler (request_rec *r)
+             }
+             else if (cid->dconf.log_unsupported) {
+                  ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+-                               "ISAPI: asynch I/O result HSE_STATUS_PENDING "
++                               "asynch I/O result HSE_STATUS_PENDING "
+                                "from HttpExtensionProc() is not supported: %s",
+                                r->filename);
+                  r->status = HTTP_INTERNAL_SERVER_ERROR;
+@@ -1626,14 +1626,14 @@ static apr_status_t isapi_handler (request_rec *r)
+             /* end response if we have yet to do so.
+              */
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, apr_get_os_error(), r,
+-                          "ISAPI: HSE_STATUS_ERROR result from "
++                          "HSE_STATUS_ERROR result from "
+                           "HttpExtensionProc(): %s", r->filename);
+             r->status = HTTP_INTERNAL_SERVER_ERROR;
+             break;
+ 
+         default:
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, apr_get_os_error(), r,
+-                          "ISAPI: unrecognized result code %d "
++                          "unrecognized result code %d "
+                           "from HttpExtensionProc(): %s ",
+                           rv, r->filename);
+             r->status = HTTP_INTERNAL_SERVER_ERROR;
+@@ -1655,7 +1655,7 @@ static apr_status_t isapi_handler (request_rec *r)
+ 
+         if (rv != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rv, r,
+-                          "ISAPI: ap_pass_brigade failed to "
++                          "ap_pass_brigade failed to "
+                           "complete the response: %s ", r->filename);
+         }
+ 
+@@ -1688,14 +1688,14 @@ static int isapi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *pte
+     apr_pool_create_ex(&loaded.pool, pconf, NULL, NULL);
+     if (!loaded.pool) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, NULL,
+-                     "ISAPI: could not create the isapi cache pool");
++                     "could not create the isapi cache pool");
+         return APR_EGENERAL;
+     }
+ 
+     loaded.hash = apr_hash_make(loaded.pool);
+     if (!loaded.hash) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+-                     "ISAPI: Failed to create module cache");
++                     "Failed to create module cache");
+         return APR_EGENERAL;
+     }
+ 
+@@ -1703,7 +1703,7 @@ static int isapi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *pte
+                                  loaded.pool);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, rv, 0, NULL,
+-                     "ISAPI: Failed to create module cache lock");
++                     "Failed to create module cache lock");
+         return rv;
+     }
+     return OK;
+diff --git a/modules/cache/mod_cache_disk.c b/modules/cache/mod_cache_disk.c
+index e750b87..0ccfe22 100644
+--- a/modules/cache/mod_cache_disk.c
++++ b/modules/cache/mod_cache_disk.c
+@@ -174,7 +174,7 @@ static apr_status_t file_cache_el_final(disk_cache_conf *conf, disk_cache_file_t
+         rv = safe_file_rename(conf, file->tempfile, file->file, file->pool);
+         if (rv != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                    "cache_disk: rename tempfile to file failed:"
++                    "rename tempfile to file failed:"
+                     " %s -> %s", file->tempfile, file->file);
+             apr_file_remove(file->tempfile, file->pool);
+         }
+@@ -351,7 +351,7 @@ static int create_entity(cache_handle_t *h, request_rec *r, const char *key, apr
+     /* we don't support caching of range requests (yet) */
+     if (r->status == HTTP_PARTIAL_CONTENT) {
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                "cache_disk: URL %s partial content response not cached",
++                "URL %s partial content response not cached",
+                 key);
+         return DECLINED;
+     }
+@@ -359,14 +359,14 @@ static int create_entity(cache_handle_t *h, request_rec *r, const char *key, apr
+     /* Note, len is -1 if unknown so don't trust it too hard */
+     if (len > dconf->maxfs) {
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                "cache_disk: URL %s failed the size check "
++                "URL %s failed the size check "
+                 "(%" APR_OFF_T_FMT " > %" APR_OFF_T_FMT ")",
+                 key, len, dconf->maxfs);
+         return DECLINED;
+     }
+     if (len >= 0 && len < dconf->minfs) {
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                "cache_disk: URL %s failed the size check "
++                "URL %s failed the size check "
+                 "(%" APR_OFF_T_FMT " < %" APR_OFF_T_FMT ")",
+                 key, len, dconf->minfs);
+         return DECLINED;
+@@ -425,7 +425,7 @@ static int open_entity(cache_handle_t *h, request_rec *r, const char *key)
+         if (!error_logged) {
+             error_logged = 1;
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                    "cache_disk: Cannot cache files to disk without a CacheRoot specified.");
++                    "Cannot cache files to disk without a CacheRoot specified.");
+         }
+         return DECLINED;
+     }
+@@ -465,7 +465,7 @@ static int open_entity(cache_handle_t *h, request_rec *r, const char *key)
+         rc = read_array(r, varray, dobj->vary.fd);
+         if (rc != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+-                    "cache_disk: Cannot parse vary header file: %s",
++                    "Cannot parse vary header file: %s",
+                     dobj->vary.file);
+             apr_file_close(dobj->vary.fd);
+             return DECLINED;
+@@ -486,7 +486,7 @@ static int open_entity(cache_handle_t *h, request_rec *r, const char *key)
+     }
+     else if (format != DISK_FORMAT_VERSION) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                "cache_disk: File '%s' has a version mismatch. File had version: %d.",
++                "File '%s' has a version mismatch. File had version: %d.",
+                 dobj->vary.file, format);
+         apr_file_close(dobj->vary.fd);
+         return DECLINED;
+@@ -522,7 +522,7 @@ static int open_entity(cache_handle_t *h, request_rec *r, const char *key)
+     rc = file_cache_recall_mydata(dobj->hdrs.fd, info, dobj, r);
+     if (rc != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+-                "cache_disk: Cannot read header file %s", dobj->hdrs.file);
++                "Cannot read header file %s", dobj->hdrs.file);
+         apr_file_close(dobj->hdrs.fd);
+         return DECLINED;
+     }
+@@ -532,7 +532,7 @@ static int open_entity(cache_handle_t *h, request_rec *r, const char *key)
+     /* Is this a cached HEAD request? */
+     if (dobj->disk_info.header_only && !r->header_only) {
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, r,
+-                "cache_disk: HEAD request cached, non-HEAD requested, ignoring: %s",
++                "HEAD request cached, non-HEAD requested, ignoring: %s",
+                 dobj->hdrs.file);
+         return DECLINED;
+     }
+@@ -550,7 +550,7 @@ static int open_entity(cache_handle_t *h, request_rec *r, const char *key)
+         rc = apr_file_open(&dobj->data.fd, dobj->data.file, flags, 0, r->pool);
+         if (rc != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+-                    "cache_disk: Cannot open data file %s", dobj->data.file);
++                    "Cannot open data file %s", dobj->data.file);
+             apr_file_close(dobj->hdrs.fd);
+             return DECLINED;
+         }
+@@ -567,7 +567,7 @@ static int open_entity(cache_handle_t *h, request_rec *r, const char *key)
+ 
+             /* Initialize the cache_handle callback functions */
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                    "cache_disk: Recalled cached URL info header %s", dobj->name);
++                    "Recalled cached URL info header %s", dobj->name);
+ 
+             /* make the configuration stick */
+             h->cache_obj = obj;
+@@ -588,7 +588,7 @@ static int open_entity(cache_handle_t *h, request_rec *r, const char *key)
+ 
+     /* Oh dear, no luck matching header to the body */
+     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-            "cache_disk: Cached URL info header '%s' didn't match body, ignoring this entry",
++            "Cached URL info header '%s' didn't match body, ignoring this entry",
+             dobj->name);
+ 
+     return DECLINED;
+@@ -615,7 +615,7 @@ static int remove_url(cache_handle_t *h, request_rec *r)
+     /* Delete headers file */
+     if (dobj->hdrs.file) {
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                "cache_disk: Deleting %s from cache.", dobj->hdrs.file);
++                "Deleting %s from cache.", dobj->hdrs.file);
+ 
+         rc = apr_file_remove(dobj->hdrs.file, r->pool);
+         if ((rc != APR_SUCCESS) && !APR_STATUS_IS_ENOENT(rc)) {
+@@ -623,7 +623,7 @@ static int remove_url(cache_handle_t *h, request_rec *r)
+              * For reason see log_error_core for the case s == NULL.
+              */
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rc, r,
+-                    "cache_disk: Failed to delete headers file %s from cache.",
++                    "Failed to delete headers file %s from cache.",
+                     dobj->hdrs.file);
+             return DECLINED;
+         }
+@@ -632,7 +632,7 @@ static int remove_url(cache_handle_t *h, request_rec *r)
+     /* Delete data file */
+     if (dobj->data.file) {
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                "cache_disk: Deleting %s from cache.", dobj->data.file);
++                "Deleting %s from cache.", dobj->data.file);
+ 
+         rc = apr_file_remove(dobj->data.file, r->pool);
+         if ((rc != APR_SUCCESS) && !APR_STATUS_IS_ENOENT(rc)) {
+@@ -640,7 +640,7 @@ static int remove_url(cache_handle_t *h, request_rec *r)
+              * For reason see log_error_core for the case s == NULL.
+              */
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, rc, r,
+-                    "cache_disk: Failed to delete data file %s from cache.",
++                    "Failed to delete data file %s from cache.",
+                     dobj->data.file);
+             return DECLINED;
+         }
+@@ -672,8 +672,7 @@ static int remove_url(cache_handle_t *h, request_rec *r)
+              */
+             for (q = dir + dobj->root_len; *q ; ) {
+                  ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                        "cache_disk: Deleting directory %s from cache",
+-                        dir);
++                        "Deleting directory %s from cache", dir);
+ 
+                  rc = apr_dir_remove(dir, r->pool);
+                  if (rc != APR_SUCCESS && !APR_STATUS_IS_ENOENT(rc)) {
+@@ -850,7 +849,7 @@ static apr_status_t recall_headers(cache_handle_t *h, request_rec *r)
+     /* This case should not happen... */
+     if (!dobj->hdrs.fd) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                "cache_disk: recalling headers; but no header fd for %s", dobj->name);
++                "recalling headers; but no header fd for %s", dobj->name);
+         return APR_NOTFOUND;
+     }
+ 
+@@ -864,7 +863,7 @@ static apr_status_t recall_headers(cache_handle_t *h, request_rec *r)
+     apr_file_close(dobj->hdrs.fd);
+ 
+     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-            "cache_disk: Recalled headers for URL %s", dobj->name);
++            "Recalled headers for URL %s", dobj->name);
+     return APR_SUCCESS;
+ }
+ 
+@@ -969,7 +968,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+ 
+             if (rv != APR_SUCCESS) {
+                 ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                        "cache_disk: could not create vary file %s",
++                        "could not create vary file %s",
+                         dobj->vary.tempfile);
+                 return rv;
+             }
+@@ -978,7 +977,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+             rv = apr_file_write(dobj->vary.tempfd, &format, &amt);
+             if (rv != APR_SUCCESS) {
+                 ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                        "cache_disk: could not write to vary file %s",
++                        "could not write to vary file %s",
+                         dobj->vary.tempfile);
+                 apr_file_close(dobj->vary.tempfd);
+                 apr_pool_destroy(dobj->vary.pool);
+@@ -990,7 +989,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+                     &amt);
+             if (rv != APR_SUCCESS) {
+                 ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                        "cache_disk: could not write to vary file %s",
++                        "could not write to vary file %s",
+                         dobj->vary.tempfile);
+                 apr_file_close(dobj->vary.tempfd);
+                 apr_pool_destroy(dobj->vary.pool);
+@@ -1005,7 +1004,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+             rv = apr_file_close(dobj->vary.tempfd);
+             if (rv != APR_SUCCESS) {
+                 ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                        "cache_disk: could not close vary file %s",
++                        "could not close vary file %s",
+                         dobj->vary.tempfile);
+                 apr_pool_destroy(dobj->vary.pool);
+                 return rv;
+@@ -1026,7 +1025,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+ 
+     if (rv != APR_SUCCESS) {
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                "cache_disk: could not create header file %s",
++                "could not create header file %s",
+                 dobj->hdrs.tempfile);
+         return rv;
+     }
+@@ -1055,7 +1054,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+     rv = apr_file_writev(dobj->hdrs.tempfd, (const struct iovec *) &iov, 2, &amt);
+     if (rv != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                "cache_disk: could not write info to header file %s",
++                "could not write info to header file %s",
+                 dobj->hdrs.tempfile);
+         apr_file_close(dobj->hdrs.tempfd);
+         apr_pool_destroy(dobj->hdrs.pool);
+@@ -1066,7 +1065,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+         rv = store_table(dobj->hdrs.tempfd, dobj->headers_out);
+         if (rv != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                    "cache_disk: could not write out-headers to header file %s",
++                    "could not write out-headers to header file %s",
+                     dobj->hdrs.tempfile);
+             apr_file_close(dobj->hdrs.tempfd);
+             apr_pool_destroy(dobj->hdrs.pool);
+@@ -1080,7 +1079,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+         rv = store_table(dobj->hdrs.tempfd, dobj->headers_in);
+         if (rv != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                    "cache_disk: could not write in-headers to header file %s",
++                    "could not write in-headers to header file %s",
+                     dobj->hdrs.tempfile);
+             apr_file_close(dobj->hdrs.tempfd);
+             apr_pool_destroy(dobj->hdrs.pool);
+@@ -1091,7 +1090,7 @@ static apr_status_t write_headers(cache_handle_t *h, request_rec *r)
+     rv = apr_file_close(dobj->hdrs.tempfd); /* flush and close */
+     if (rv != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_WARNING, rv, r,
+-                "cache_disk: could not close header file %s",
++                "could not close header file %s",
+                 dobj->hdrs.tempfile);
+         apr_pool_destroy(dobj->hdrs.pool);
+         return rv;
+@@ -1162,7 +1161,7 @@ static apr_status_t store_body(cache_handle_t *h, request_rec *r,
+         APR_BRIGADE_INSERT_TAIL(out, e);
+         if (rv != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                    "cache_disk: Error when reading bucket for URL %s",
++                    "Error when reading bucket for URL %s",
+                     h->cache_obj->key);
+             /* Remove the intermediate cache file and return non-APR_SUCCESS */
+             apr_pool_destroy(dobj->data.pool);
+@@ -1202,7 +1201,7 @@ static apr_status_t store_body(cache_handle_t *h, request_rec *r,
+         rv = apr_file_write_full(dobj->data.tempfd, str, length, &written);
+         if (rv != APR_SUCCESS) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                    "cache_disk: Error when writing cache file for URL %s",
++                    "Error when writing cache file for URL %s",
+                     h->cache_obj->key);
+             /* Remove the intermediate cache file and return non-APR_SUCCESS */
+             apr_pool_destroy(dobj->data.pool);
+@@ -1211,7 +1210,7 @@ static apr_status_t store_body(cache_handle_t *h, request_rec *r,
+         dobj->file_size += written;
+         if (dobj->file_size > dconf->maxfs) {
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                    "cache_disk: URL %s failed the size check "
++                    "URL %s failed the size check "
+                     "(%" APR_OFF_T_FMT ">%" APR_OFF_T_FMT ")",
+                     h->cache_obj->key, dobj->file_size, dconf->maxfs);
+             /* Remove the intermediate cache file and return non-APR_SUCCESS */
+@@ -1253,7 +1252,7 @@ static apr_status_t store_body(cache_handle_t *h, request_rec *r,
+ 
+         if (r->connection->aborted || r->no_cache) {
+             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+-                    "cache_disk: Discarding body for URL %s "
++                    "Discarding body for URL %s "
+                     "because connection has been aborted.",
+                     h->cache_obj->key);
+             /* Remove the intermediate cache file and return non-APR_SUCCESS */
+@@ -1262,7 +1261,7 @@ static apr_status_t store_body(cache_handle_t *h, request_rec *r,
+         }
+         if (dobj->file_size < dconf->minfs) {
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                    "cache_disk: URL %s failed the size check "
++                    "URL %s failed the size check "
+                     "(%" APR_OFF_T_FMT "<%" APR_OFF_T_FMT ")",
+                     h->cache_obj->key, dobj->file_size, dconf->minfs);
+             /* Remove the intermediate cache file and return non-APR_SUCCESS */
+@@ -1273,7 +1272,7 @@ static apr_status_t store_body(cache_handle_t *h, request_rec *r,
+             apr_int64_t cl = apr_atoi64(cl_header);
+             if ((errno == 0) && (dobj->file_size != cl)) {
+                 ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                        "cache_disk: URL %s didn't receive complete response, not caching",
++                        "URL %s didn't receive complete response, not caching",
+                         h->cache_obj->key);
+                 /* Remove the intermediate cache file and return non-APR_SUCCESS */
+                 apr_pool_destroy(dobj->data.pool);
+@@ -1312,12 +1311,12 @@ static apr_status_t commit_entity(cache_handle_t *h, request_rec *r)
+     if (APR_SUCCESS != rv) {
+         remove_url(h, r);
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                "cache_disk: commit_entity: URL '%s' not cached due to earlier disk error.",
++                "commit_entity: URL '%s' not cached due to earlier disk error.",
+                 dobj->name);
+     }
+     else {
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+-                "cache_disk: commit_entity: Headers and body for URL %s cached.",
++                "commit_entity: Headers and body for URL %s cached.",
+                 dobj->name);
+     }
+ 
+diff --git a/modules/cache/mod_file_cache.c b/modules/cache/mod_file_cache.c
+index 42f5844..5eb3055 100644
+--- a/modules/cache/mod_file_cache.c
++++ b/modules/cache/mod_file_cache.c
+@@ -134,24 +134,24 @@ static void cache_the_file(cmd_parms *cmd, const char *filename, int mmap)
+     fspec = ap_server_root_relative(cmd->pool, filename);
+     if (!fspec) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, APR_EBADPATH, cmd->server,
+-                     "mod_file_cache: invalid file path "
++                     "invalid file path "
+                      "%s, skipping", filename);
+         return;
+     }
+     if ((rc = apr_stat(&tmp.finfo, fspec, APR_FINFO_MIN,
+                                  cmd->temp_pool)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, rc, cmd->server,
+-            "mod_file_cache: unable to stat(%s), skipping", fspec);
++                     "unable to stat(%s), skipping", fspec);
+         return;
+     }
+     if (tmp.finfo.filetype != APR_REG) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, 0, cmd->server,
+-            "mod_file_cache: %s isn't a regular file, skipping", fspec);
++                     "%s isn't a regular file, skipping", fspec);
+         return;
+     }
+     if (tmp.finfo.size > AP_MAX_SENDFILE) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, 0, cmd->server,
+-            "mod_file_cache: %s is too large to cache, skipping", fspec);
++                     "%s is too large to cache, skipping", fspec);
+         return;
+     }
+ 
+@@ -159,7 +159,7 @@ static void cache_the_file(cmd_parms *cmd, const char *filename, int mmap)
+                        APR_OS_DEFAULT, cmd->pool);
+     if (rc != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, rc, cmd->server,
+-                     "mod_file_cache: unable to open(%s, O_RDONLY), skipping", fspec);
++                     "unable to open(%s, O_RDONLY), skipping", fspec);
+         return;
+     }
+     apr_file_inherit_set(fd);
+@@ -179,7 +179,7 @@ static void cache_the_file(cmd_parms *cmd, const char *filename, int mmap)
+                                   APR_MMAP_READ, cmd->pool)) != APR_SUCCESS) {
+             apr_file_close(fd);
+             ap_log_error(APLOG_MARK, APLOG_WARNING, rc, cmd->server,
+-                         "mod_file_cache: unable to mmap %s, skipping", filename);
++                         "unable to mmap %s, skipping", filename);
+             return;
+         }
+         apr_file_close(fd);
+@@ -210,7 +210,7 @@ static const char *cachefilehandle(cmd_parms *cmd, void *dummy, const char *file
+ #else
+     /* Sendfile not supported by this OS */
+     ap_log_error(APLOG_MARK, APLOG_WARNING, 0, cmd->server,
+-                 "mod_file_cache: unable to cache file: %s. Sendfile is not supported on this OS", filename);
++                 "unable to cache file: %s. Sendfile is not supported on this OS", filename);
+ #endif
+     return NULL;
+ }
+@@ -221,7 +221,7 @@ static const char *cachefilemmap(cmd_parms *cmd, void *dummy, const char *filena
+ #else
+     /* MMAP not supported by this OS */
+     ap_log_error(APLOG_MARK, APLOG_WARNING, 0, cmd->server,
+-                 "mod_file_cache: unable to cache file: %s. MMAP is not supported by this OS", filename);
++                 "unable to cache file: %s. MMAP is not supported by this OS", filename);
+ #endif
+     return NULL;
+ }
+diff --git a/modules/cache/mod_socache_memcache.c b/modules/cache/mod_socache_memcache.c
+index 5376eeb..3f1b250 100644
+--- a/modules/cache/mod_socache_memcache.c
++++ b/modules/cache/mod_socache_memcache.c
+@@ -103,7 +103,7 @@ static apr_status_t socache_mc_init(ap_socache_instance_t *ctx,
+     rv = apr_memcache_create(p, nservers, 0, &ctx->mc);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                     "socache: Failed to create Memcache Object of '%d' size.",
++                     "Failed to create Memcache Object of '%d' size.",
+                      nservers);
+         return rv;
+     }
+@@ -120,13 +120,13 @@ static apr_status_t socache_mc_init(ap_socache_instance_t *ctx,
+         rv = apr_parse_addr_port(&host_str, &scope_id, &port, split, p);
+         if (rv != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                         "socache: Failed to Parse memcache Server: '%s'", split);
++                         "Failed to Parse memcache Server: '%s'", split);
+             return rv;
+         }
+ 
+         if (host_str == NULL) {
+             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                         "socache: Failed to Parse Server, "
++                         "Failed to Parse Server, "
+                          "no hostname specified: '%s'", split);
+             return APR_EINVAL;
+         }
+@@ -144,7 +144,7 @@ static apr_status_t socache_mc_init(ap_socache_instance_t *ctx,
+                                         &st);
+         if (rv != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                         "socache: Failed to Create memcache Server: %s:%d",
++                         "Failed to Create memcache Server: %s:%d",
+                          host_str, port);
+             return rv;
+         }
+@@ -152,7 +152,7 @@ static apr_status_t socache_mc_init(ap_socache_instance_t *ctx,
+         rv = apr_memcache_add_server(ctx->mc, st);
+         if (rv != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                         "socache: Failed to Add memcache Server: %s:%d",
++                         "Failed to Add memcache Server: %s:%d",
+                          host_str, port);
+             return rv;
+         }
+diff --git a/modules/cluster/mod_heartmonitor.c b/modules/cluster/mod_heartmonitor.c
+index cc516ae..3c2b414 100644
+--- a/modules/cluster/mod_heartmonitor.c
++++ b/modules/cluster/mod_heartmonitor.c
+@@ -82,14 +82,14 @@ static apr_status_t hm_listen(hm_ctx_t *ctx)
+ 
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Failed to create listening socket.");
++                     "Failed to create listening socket.");
+         return rv;
+     }
+ 
+     rv = apr_socket_opt_set(ctx->sock, APR_SO_REUSEADDR, 1);
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Failed to set APR_SO_REUSEADDR to 1 on socket.");
++                     "Failed to set APR_SO_REUSEADDR to 1 on socket.");
+         return rv;
+     }
+ 
+@@ -97,14 +97,14 @@ static apr_status_t hm_listen(hm_ctx_t *ctx)
+     rv = apr_socket_opt_set(ctx->sock, APR_SO_NONBLOCK, 1);
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Failed to set APR_SO_NONBLOCK to 1 on socket.");
++                     "Failed to set APR_SO_NONBLOCK to 1 on socket.");
+         return rv;
+     }
+ 
+     rv = apr_socket_bind(ctx->sock, ctx->mcast_addr);
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Failed to bind on socket.");
++                     "Failed to bind on socket.");
+         return rv;
+     }
+ 
+@@ -112,14 +112,14 @@ static apr_status_t hm_listen(hm_ctx_t *ctx)
+ 
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Failed to join multicast group");
++                     "Failed to join multicast group");
+         return rv;
+     }
+ 
+     rv = apr_mcast_loopback(ctx->sock, 1);
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Failed to accept localhost mulitcast on socket.");
++                     "Failed to accept localhost mulitcast on socket.");
+         return rv;
+     }
+ 
+@@ -241,7 +241,7 @@ static apr_status_t hm_file_update_stat(hm_ctx_t *ctx, hm_server_t *s, apr_pool_
+ 
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Unable to open tmp file: %s", path);
++                     "Unable to open tmp file: %s", path);
+         return rv;
+     }
+     rv = apr_file_open(&fpin, ctx->storage_path, APR_READ|APR_BINARY|APR_BUFFERED,
+@@ -258,7 +258,7 @@ static apr_status_t hm_file_update_stat(hm_ctx_t *ctx, hm_server_t *s, apr_pool_
+         rv = apr_file_info_get(&fi, APR_FINFO_SIZE | APR_FINFO_MTIME, fpin);
+         if (rv) {
+             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                         "Heartmonitor: Unable to read file: %s", ctx->storage_path);
++                         "Unable to read file: %s", ctx->storage_path);
+             return rv;
+         }
+ 
+@@ -281,7 +281,7 @@ static apr_status_t hm_file_update_stat(hm_ctx_t *ctx, hm_server_t *s, apr_pool_
+ 
+             if (rv) {
+                 ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                             "Heartmonitor: Unable to read from file: %s", ctx->storage_path);
++                             "Unable to read from file: %s", ctx->storage_path);
+                 return rv;
+             }
+ 
+@@ -351,14 +351,14 @@ static apr_status_t hm_file_update_stat(hm_ctx_t *ctx, hm_server_t *s, apr_pool_
+     rv = apr_file_flush(fp);
+     if (rv) {
+       ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                   "Heartmonitor: Unable to flush file: %s", path);
++                   "Unable to flush file: %s", path);
+       return rv;
+     }
+ 
+     rv = apr_file_close(fp);
+     if (rv) {
+       ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                   "Heartmonitor: Unable to close file: %s", path);
++                   "Unable to close file: %s", path);
+       return rv;
+     }
+ 
+@@ -367,7 +367,7 @@ static apr_status_t hm_file_update_stat(hm_ctx_t *ctx, hm_server_t *s, apr_pool_
+                             APR_FPROT_WREAD);
+     if (rv && rv != APR_INCOMPLETE && rv != APR_ENOTIMPL) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Unable to set file permissions on %s",
++                     "Unable to set file permissions on %s",
+                      path);
+         return rv;
+     }
+@@ -376,7 +376,7 @@ static apr_status_t hm_file_update_stat(hm_ctx_t *ctx, hm_server_t *s, apr_pool_
+ 
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Unable to move file: %s -> %s", path,
++                     "Unable to move file: %s -> %s", path,
+                      ctx->storage_path);
+         return rv;
+     }
+@@ -404,7 +404,7 @@ static apr_status_t hm_file_update_stats(hm_ctx_t *ctx, apr_pool_t *p)
+ 
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Unable to open tmp file: %s", path);
++                     "Unable to open tmp file: %s", path);
+         return rv;
+     }
+ 
+@@ -430,14 +430,14 @@ static apr_status_t hm_file_update_stats(hm_ctx_t *ctx, apr_pool_t *p)
+     rv = apr_file_flush(fp);
+     if (rv) {
+       ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                   "Heartmonitor: Unable to flush file: %s", path);
++                   "Unable to flush file: %s", path);
+       return rv;
+     }
+ 
+     rv = apr_file_close(fp);
+     if (rv) {
+       ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                   "Heartmonitor: Unable to close file: %s", path);
++                   "Unable to close file: %s", path);
+       return rv;
+     }
+ 
+@@ -446,7 +446,7 @@ static apr_status_t hm_file_update_stats(hm_ctx_t *ctx, apr_pool_t *p)
+                             APR_FPROT_WREAD);
+     if (rv && rv != APR_INCOMPLETE && rv != APR_ENOTIMPL) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Unable to set file permissions on %s",
++                     "Unable to set file permissions on %s",
+                      path);
+         return rv;
+     }
+@@ -455,7 +455,7 @@ static apr_status_t hm_file_update_stats(hm_ctx_t *ctx, apr_pool_t *p)
+ 
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: Unable to move file: %s -> %s", path,
++                     "Unable to move file: %s -> %s", path,
+                      ctx->storage_path);
+         return rv;
+     }
+@@ -535,7 +535,7 @@ static void hm_processmsg(hm_ctx_t *ctx, apr_pool_t *p,
+         hm_server_t *s;
+         /* TODO: REMOVE ME BEFORE PRODUCTION (????) */
+         ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, ctx->s,
+-                     "Heartmonitor: %pI busy=%s ready=%s", from,
++                     "%pI busy=%s ready=%s", from,
+                      apr_table_get(tbl, "busy"), apr_table_get(tbl, "ready"));
+ 
+         apr_sockaddr_ip_get(&ip, from);
+@@ -551,7 +551,7 @@ static void hm_processmsg(hm_ctx_t *ctx, apr_pool_t *p,
+     }
+     else {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, 0, ctx->s,
+-                     "Heartmonitor: malformed message from %pI",
++                     "malformed message from %pI",
+                      from);
+     }
+ 
+@@ -570,13 +570,11 @@ static apr_status_t hm_recv(hm_ctx_t *ctx, apr_pool_t *p)
+     rv = apr_socket_recvfrom(&from, ctx->sock, 0, buf, &len);
+ 
+     if (APR_STATUS_IS_EAGAIN(rv)) {
+-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: would block");
++        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s, "would block");
+         return APR_SUCCESS;
+     }
+     else if (rv) {
+-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                     "Heartmonitor: recvfrom failed");
++        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s, "recvfrom failed");
+         return rv;
+     }
+ 
+@@ -602,12 +600,12 @@ static apr_status_t hm_watchdog_callback(int state, void *data,
+             if (rv) {
+                 ctx->status = rv;
+                 ap_log_error(APLOG_MARK, APLOG_CRIT, rv, ctx->s,
+-                             "Heartmonitor: Unable to listen for connections!");
++                             "Unable to listen for connections!");
+             }
+             else {
+                 ctx->keep_running = 1;
+                 ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, ctx->s,
+-                             "Heartmonitor: %s listener started.",
++                             "%s listener started.",
+                              HM_WATHCHDOG_NAME);
+             }
+         break;
+@@ -649,7 +647,7 @@ static apr_status_t hm_watchdog_callback(int state, void *data,
+         break;
+         case AP_WATCHDOG_STATE_STOPPING:
+             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, ctx->s,
+-                         "Heartmonitor: stopping %s listener.",
++                         "stopping %s listener.",
+                          HM_WATHCHDOG_NAME);
+ 
+             ctx->keep_running = 0;
+@@ -675,7 +673,7 @@ static int hm_post_config(apr_pool_t *p, apr_pool_t *plog,
+     hm_watchdog_register_callback = APR_RETRIEVE_OPTIONAL_FN(ap_watchdog_register_callback);
+     if (!hm_watchdog_get_instance || !hm_watchdog_register_callback) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, 0, s,
+-                     "Heartmonitor: mod_watchdog is required");
++                     "mod_watchdog is required");
+         return !OK;
+     }
+ 
+@@ -705,8 +703,8 @@ static int hm_post_config(apr_pool_t *p, apr_pool_t *plog,
+                                   0, 1, p);
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                     "Heartmonitor: Failed to create watchdog "
+-                     "instance (%s)", HM_WATHCHDOG_NAME);
++                     "Failed to create watchdog instance (%s)",
++                     HM_WATHCHDOG_NAME);
+         return !OK;
+     }
+     /* Register a callback with zero interval. */
+@@ -716,12 +714,12 @@ static int hm_post_config(apr_pool_t *p, apr_pool_t *plog,
+                                        hm_watchdog_callback);
+     if (rv) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                     "Heartmonitor: Failed to register watchdog "
+-                     "callback (%s)", HM_WATHCHDOG_NAME);
++                     "Failed to register watchdog callback (%s)",
++                     HM_WATHCHDOG_NAME);
+         return !OK;
+     }
+     ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+-                 "Heartmonitor: wd callback %s", HM_WATHCHDOG_NAME);
++                 "wd callback %s", HM_WATHCHDOG_NAME);
+     return OK;
+ }
+ 
+diff --git a/modules/database/mod_dbd.c b/modules/database/mod_dbd.c
+index e21297c..69206cd 100644
+--- a/modules/database/mod_dbd.c
++++ b/modules/database/mod_dbd.c
+@@ -175,20 +175,20 @@ static const char *dbd_param(cmd_parms *cmd, void *dconf, const char *val)
+          */
+         rv = apr_dbd_get_driver(cmd->pool, cfg->name, &driver);
+         if (APR_STATUS_IS_ENOTIMPL(rv)) {
+-            return apr_psprintf(cmd->pool, "DBD: No driver for %s", cfg->name);
++            return apr_psprintf(cmd->pool, "No driver for %s", cfg->name);
+         }
+         else if (APR_STATUS_IS_EDSOOPEN(rv)) {
+             return apr_psprintf(cmd->pool,
+ #ifdef NETWARE
+-                                "DBD: Can't load driver file dbd%s.nlm",
++                                "Can't load driver file dbd%s.nlm",
+ #else
+-                                "DBD: Can't load driver file apr_dbd_%s.so",
++                                "Can't load driver file apr_dbd_%s.so",
+ #endif
+                                 cfg->name);
+         }
+         else if (APR_STATUS_IS_ESYMNOTFOUND(rv)) {
+             return apr_psprintf(cmd->pool,
+-                                "DBD: Failed to load driver apr_dbd_%s_driver",
++                                "Failed to load driver apr_dbd_%s_driver",
+                                 cfg->name);
+         }
+         break;
+@@ -522,7 +522,7 @@ static apr_status_t dbd_construct(void **data_ptr,
+     rv = apr_pool_create(&rec_pool, pool);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, cfg->server,
+-                     "DBD: Failed to create memory pool");
++                     "Failed to create memory pool");
+         return rv;
+     }
+ 
+@@ -539,20 +539,20 @@ static apr_status_t dbd_construct(void **data_ptr,
+     if (rv != APR_SUCCESS) {
+         if (APR_STATUS_IS_ENOTIMPL(rv)) {
+             ap_log_error(APLOG_MARK, APLOG_ERR, rv, cfg->server,
+-                         "DBD: driver for %s not available", cfg->name);
++                         "driver for %s not available", cfg->name);
+         }
+         else if (APR_STATUS_IS_EDSOOPEN(rv)) {
+             ap_log_error(APLOG_MARK, APLOG_ERR, rv, cfg->server,
+-                         "DBD: can't find driver for %s", cfg->name);
++                         "can't find driver for %s", cfg->name);
+         }
+         else if (APR_STATUS_IS_ESYMNOTFOUND(rv)) {
+             ap_log_error(APLOG_MARK, APLOG_ERR, rv, cfg->server,
+-                         "DBD: driver for %s is invalid or corrupted",
++                         "driver for %s is invalid or corrupted",
+                          cfg->name);
+         }
+         else {
+             ap_log_error(APLOG_MARK, APLOG_ERR, rv, cfg->server,
+-                         "DBD: mod_dbd not compatible with APR in get_driver");
++                         "mod_dbd not compatible with APR in get_driver");
+         }
+         apr_pool_destroy(rec->pool);
+         return rv;
+@@ -563,11 +563,11 @@ static apr_status_t dbd_construct(void **data_ptr,
+         switch (rv) {
+         case APR_EGENERAL:
+             ap_log_error(APLOG_MARK, APLOG_ERR, rv, cfg->server,
+-                         "DBD: Can't connect to %s: %s", cfg->name, err);
++                         "Can't connect to %s: %s", cfg->name, err);
+             break;
+         default:
+             ap_log_error(APLOG_MARK, APLOG_ERR, rv, cfg->server,
+-                         "DBD: mod_dbd not compatible with APR in open");
++                         "mod_dbd not compatible with APR in open");
+             break;
+         }
+ 
+@@ -584,7 +584,7 @@ static apr_status_t dbd_construct(void **data_ptr,
+     rv = apr_pool_create(&prepared_pool, rec->pool);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, cfg->server,
+-                     "DBD: Failed to create memory pool");
++                     "Failed to create memory pool");
+ 
+         apr_pool_destroy(rec->pool);
+         return rv;
+@@ -594,7 +594,7 @@ static apr_status_t dbd_construct(void **data_ptr,
+     if (rv != APR_SUCCESS) {
+         const char *errmsg = apr_dbd_error(rec->driver, rec->handle, rv);
+         ap_log_error(APLOG_MARK, APLOG_ERR, rv, cfg->server,
+-                     "DBD: failed to prepare SQL statements: %s",
++                     "failed to prepare SQL statements: %s",
+                      (errmsg ? errmsg : "[???]"));
+ 
+         apr_pool_destroy(rec->pool);
+@@ -648,7 +648,7 @@ static apr_status_t dbd_setup(server_rec *s, dbd_group_t *group)
+                             group->pool);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+-                     "DBD: failed to initialise");
++                     "failed to initialise");
+         return rv;
+     }
+ 
+@@ -670,7 +670,7 @@ static apr_status_t dbd_setup_init(apr_pool_t *pool, server_rec *s)
+         rv2 = apr_pool_create(&group->pool, pool);
+         if (rv2 != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_CRIT, rv2, s,
+-                         "DBD: Failed to create reslist cleanup memory pool");
++                         "Failed to create reslist cleanup memory pool");
+             return rv2;
+         }
+ 
+@@ -690,7 +690,7 @@ static apr_status_t dbd_setup_init(apr_pool_t *pool, server_rec *s)
+                                       APR_THREAD_MUTEX_DEFAULT, pool);
+         if (rv2 != APR_SUCCESS) {
+              ap_log_error(APLOG_MARK, APLOG_CRIT, rv2, s,
+-                          "DBD: Failed to create thread mutex");
++                          "Failed to create thread mutex");
+              return rv2;
+         }
+ #endif
+@@ -704,7 +704,7 @@ static void dbd_child_init(apr_pool_t *p, server_rec *s)
+   apr_status_t rv = dbd_setup_init(p, s);
+   if (rv) {
+     ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                 "DBD: child init failed!");
++                 "child init failed!");
+   }
+ }
+ 
+@@ -724,7 +724,7 @@ static apr_status_t dbd_setup_lock(server_rec *s, dbd_group_t *group)
+     rv2 = apr_thread_mutex_lock(group->mutex);
+     if (rv2 != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, rv2, s,
+-                     "DBD: Failed to acquire thread mutex");
++                     "Failed to acquire thread mutex");
+         return rv2;
+     }
+ 
+@@ -735,7 +735,7 @@ static apr_status_t dbd_setup_lock(server_rec *s, dbd_group_t *group)
+     rv2 = apr_thread_mutex_unlock(group->mutex);
+     if (rv2 != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, rv2, s,
+-                     "DBD: Failed to release thread mutex");
++                     "Failed to release thread mutex");
+         if (rv == APR_SUCCESS) {
+             rv = rv2;
+         }
+@@ -799,7 +799,7 @@ DBD_DECLARE_NONSTD(ap_dbd_t*) ap_dbd_open(apr_pool_t *pool, server_rec *s)
+ 
+     /* If nothing is configured, we shouldn't be here */
+     if (cfg->name == no_dbdriver) {
+-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s, "DBD: not configured");
++        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s, "not configured");
+         return NULL;
+     }
+ 
+diff --git a/modules/generators/mod_cgi.c b/modules/generators/mod_cgi.c
+index ac85515..db45295 100644
+--- a/modules/generators/mod_cgi.c
++++ b/modules/generators/mod_cgi.c
+@@ -588,7 +588,7 @@ static apr_bucket *cgi_bucket_create(request_rec *r,
+     rv = apr_pollset_create(&data->pollset, 2, r->pool, 0);
+     if (rv != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
+-                     "cgi: apr_pollset_create(); check system or user limits");
++                     "apr_pollset_create(); check system or user limits");
+         return NULL;
+     }
+ 
+@@ -600,7 +600,7 @@ static apr_bucket *cgi_bucket_create(request_rec *r,
+     rv = apr_pollset_add(data->pollset, &fd);
+     if (rv != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
+-                     "cgi: apr_pollset_add(); check system or user limits");
++                     "apr_pollset_add(); check system or user limits");
+         return NULL;
+     }
+ 
+@@ -609,7 +609,7 @@ static apr_bucket *cgi_bucket_create(request_rec *r,
+     rv = apr_pollset_add(data->pollset, &fd);
+     if (rv != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
+-                     "cgi: apr_pollset_add(); check system or user limits");
++                     "apr_pollset_add(); check system or user limits");
+         return NULL;
+     }
+ 
+diff --git a/modules/metadata/mod_unique_id.c b/modules/metadata/mod_unique_id.c
+index b710f7f..d28ecaa 100644
+--- a/modules/metadata/mod_unique_id.c
++++ b/modules/metadata/mod_unique_id.c
+@@ -172,7 +172,7 @@ static int unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *pt
+      */
+     if ((rv = apr_gethostname(str, sizeof(str) - 1, p)) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ALERT, rv, main_server,
+-          "mod_unique_id: unable to find hostname of the server");
++          "unable to find hostname of the server");
+         return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+@@ -181,14 +181,14 @@ static int unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *pt
+     }
+     else {
+         ap_log_error(APLOG_MARK, APLOG_ALERT, rv, main_server,
+-                    "mod_unique_id: unable to find IPv4 address of \"%s\"", str);
++                    "unable to find IPv4 address of \"%s\"", str);
+ #if APR_HAVE_IPV6
+         if ((rv = apr_sockaddr_info_get(&sockaddr, str, AF_INET6, 0, 0, p)) == APR_SUCCESS) {
+             memcpy(&global_in_addr,
+                    (char *)sockaddr->ipaddr_ptr + sockaddr->ipaddr_len - sizeof(global_in_addr),
+                    sizeof(global_in_addr));
+             ap_log_error(APLOG_MARK, APLOG_ALERT, rv, main_server,
+-                         "mod_unique_id: using low-order bits of IPv6 address "
++                         "using low-order bits of IPv6 address "
+                          "as if they were unique");
+         }
+         else
+@@ -197,8 +197,7 @@ static int unique_id_global_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *pt
+     }
+ 
+     apr_sockaddr_ip_get(&ipaddrstr, sockaddr);
+-    ap_log_error(APLOG_MARK, APLOG_INFO, 0, main_server,
+-                "mod_unique_id: using ip addr %s",
++    ap_log_error(APLOG_MARK, APLOG_INFO, 0, main_server, "using ip addr %s",
+                  ipaddrstr);
+ 
+     /*
+diff --git a/modules/proxy/mod_serf.c b/modules/proxy/mod_serf.c
+index 3f899e2..063a14d 100644
+--- a/modules/proxy/mod_serf.c
++++ b/modules/proxy/mod_serf.c
+@@ -533,7 +533,7 @@ static int drive_serf(request_rec *r, serf_config_t *conf)
+ 
+         rv = apr_file_mktemp(&fp, "mod_serf_buffer.XXXXXX", 0, pool);
+         if (rv != APR_SUCCESS) {
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, "mod_serf: Unable to create temp request body buffer file.");
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, "Unable to create temp request body buffer file.");
+             return HTTP_INTERNAL_SERVER_ERROR;
+         }
+ 
+@@ -543,14 +543,14 @@ static int drive_serf(request_rec *r, serf_config_t *conf)
+             if (rv > 0) {
+                 rv = apr_file_write_full(fp, buf, rv, NULL);
+                 if (rv) {
+-                    ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, "mod_serf: failed to read request body");
++                    ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, "failed to read request body");
+                     return HTTP_INTERNAL_SERVER_ERROR;
+                 }
+             }
+         } while(rv > 0);
+ 
+         if (rv < 0) {
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, "mod_serf: failed to read request body");
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r, "failed to read request body");
+             return HTTP_INTERNAL_SERVER_ERROR;
+         }
+ 
+@@ -626,11 +626,11 @@ static const char *add_pass(cmd_parms *cmd, void *vconf,
+     rv = apr_uri_parse(cmd->pool, argv[0], &conf->url);
+ 
+     if (rv != APR_SUCCESS) {
+-        return "mod_serf: Unable to parse SerfPass url.";
++        return "Unable to parse SerfPass url.";
+     }
+ 
+     if (!conf->url.scheme) {
+-        return "mod_serf: Need scheme part in url.";
++        return "Need scheme part in url.";
+     }
+ 
+     /* XXXX: These are bugs in apr_uri_parse. Fixme. */

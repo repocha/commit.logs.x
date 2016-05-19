@@ -1,0 +1,5314 @@
+commit e032292cdb9908ce1d7977f6b5f08fc5367919cf
+Author: Justin Erenkrantz <jerenkrantz@apache.org>
+Date:   Tue Sep 10 00:15:39 2002 +0000
+
+    Stage #1 of the aaa rewrite - refactoring modules.
+    
+    All modules are reorganized under the following scheme:
+    - mod_auth_*:   Front-end (basic, digest)
+    - mod_authn_*:  Authentication (anon, dbm, default, file)
+    - mod_authz_*:  Authorization (dbm, default, groupfile, host, user)
+    
+    This passes the httpd-test suite when it accounts for the renaming of
+    aaa modules.
+    
+    Originally written by: Dirk-Willem van Gulik
+    Completed by: Justin Erenkrantz
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@96728 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index dcc8bda..7b8ea56 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,5 +1,8 @@
+ Changes with Apache 2.0.41
+ 
++  *) Rewrite of aaa modules to an authn/authz model.
++     [Dirk-Willem van Gulik, Justin Erenkrantz]
++  
+   *) Update OpenSSL detection to work on Darwin.
+      [Sander Temme <sctemme@covalent.net>]
+ 
+diff --git a/modules/aaa/NWGNUauthanon b/modules/aaa/NWGNUauthanon
+deleted file mode 100644
+index 1847e7d..0000000
+--- a/modules/aaa/NWGNUauthanon
++++ /dev/null
+@@ -1,250 +0,0 @@
+-#
+-# Make sure all needed macro's are defined
+-#
+-
+-#
+-# Get the 'head' of the build environment if necessary.  This includes default
+-# targets and paths to tools
+-#
+-
+-ifndef EnvironmentDefined
+-include $(AP_WORK)\build\NWGNUhead.inc
+-endif
+-
+-#
+-# These directories will be at the beginning of the include list, followed by
+-# INCDIRS
+-#
+-XINCDIRS	+= \
+-			$(AP_WORK)/include \
+-			$(NWOS) \
+-			$(AP_WORK)/modules/arch/netware \
+-			$(AP_WORK)/srclib/apr/include \
+-			$(AP_WORK)/srclib/apr-util/include \
+-			$(AP_WORK)/srclib/apr \
+-			$(EOLIST)
+-
+-#
+-# These flags will come after CFLAGS
+-#
+-XCFLAGS		+= \
+-			-prefix pre_nw.h \
+-			$(EOLIST)
+-
+-#
+-# These defines will come after DEFINES
+-#
+-XDEFINES	+= \
+-			$(EOLIST)
+-
+-#
+-# These flags will be added to the link.opt file
+-#
+-XLFLAGS		+= \
+-			$(EOLIST)
+-
+-#
+-# These values will be appended to the correct variables based on the value of
+-# RELEASE
+-#
+-ifeq "$(RELEASE)" "debug"
+-XINCDIRS	+= \
+-			$(EOLIST)
+-
+-XCFLAGS		+= \
+-			$(EOLIST)
+-
+-XDEFINES	+= \
+-			$(EOLIST)
+-
+-XLFLAGS		+= \
+-		   	$(EOLIST)
+-endif
+-
+-ifeq "$(RELEASE)" "noopt"
+-XINCDIRS	+= \
+-			$(EOLIST)
+-
+-XCFLAGS		+= \
+-			$(EOLIST)
+-
+-XDEFINES	+= \
+-			$(EOLIST)
+-
+-XLFLAGS		+= \
+-		   	$(EOLIST)
+-endif
+-
+-ifeq "$(RELEASE)" "release"
+-XINCDIRS	+= \
+-			$(EOLIST)
+-
+-XCFLAGS		+= \
+-			$(EOLIST)
+-
+-XDEFINES	+= \
+-			$(EOLIST)
+-
+-XLFLAGS		+= \
+-			$(EOLIST)
+-endif
+-
+-#
+-# These are used by the link target if an NLM is being generated
+-# This is used by the link 'name' directive to name the nlm.  If left blank
+-# TARGET_nlm (see below) will be used.
+-#
+-NLM_NAME		= authanon
+-
+-#
+-# This is used by the link '-desc ' directive. 
+-# If left blank, NLM_NAME will be used.
+-#
+-NLM_DESCRIPTION	= Authentication Anonymous Module
+-
+-#
+-# This is used by the '-threadname' directive.  If left blank,
+-# NLM_NAME Thread will be used.
+-#
+-NLM_THREAD_NAME	= AuthAnon Module
+-
+-#
+-# If this is specified, it will override VERSION value in 
+-# $(AP_WORK)\build\NWGNUenvironment.inc
+-#
+-NLM_VERSION		=
+-
+-#
+-# If this is specified, it will override the default of 64K
+-#
+-NLM_STACK_SIZE	= 8192
+-
+-
+-#
+-# If this is specified it will be used by the link '-entry' directive
+-#
+-NLM_ENTRY_SYM	= _LibCPrelude
+-
+-#
+-# If this is specified it will be used by the link '-exit' directive
+-#
+-NLM_EXIT_SYM	= _LibCPostlude
+-
+-#
+-# If this is specified it will be used by the link '-check' directive
+-#
+-NLM_CHECK_SYM	=
+-
+-#
+-# If these are specified it will be used by the link '-flags' directive
+-#
+-NLM_FLAGS		=  AUTOUNLOAD, PSEUDOPREEMPTION
+-
+-#
+-# If this is specified it will be linked in with the XDCData option in the def 
+-# file instead of the default of $(NWOS)/apache.xdc.  XDCData can be disabled
+-# by setting APACHE_UNIPROC in the environment
+-#
+-XDCDATA         = 
+-
+-#
+-# If there is an NLM target, put it here
+-#
+-TARGET_nlm = \
+-	$(OBJDIR)/authanon.nlm \
+-	$(EOLIST)
+-
+-#
+-# If there is an LIB target, put it here
+-#
+-TARGET_lib = \
+-	$(EOLIST)
+-
+-#
+-# These are the OBJ files needed to create the NLM target above.
+-# Paths must all use the '/' character
+-#
+-FILES_nlm_objs = \
+-	$(OBJDIR)/mod_auth_anon.o \
+-	$(EOLIST)
+-
+-#
+-# These are the LIB files needed to create the NLM target above.
+-# These will be added as a library command in the link.opt file.
+-#
+-FILES_nlm_libs = \
+-   	libcpre.o \
+-	$(EOLIST)
+-
+-#
+-# These are the modules that the above NLM target depends on to load.
+-# These will be added as a module command in the link.opt file.
+-#
+-FILES_nlm_modules = \
+-	aprlib \
+-	libc \
+-	$(EOLIST)
+-
+-#
+-# If the nlm has a msg file, put it's path here
+-#
+-FILE_nlm_msg =
+- 
+-#
+-# If the nlm has a hlp file put it's path here
+-#
+-FILE_nlm_hlp =
+-
+-#
+-# If this is specified, it will override $(NWOS)\copyright.txt.
+-#
+-FILE_nlm_copyright =
+-
+-#
+-# Any additional imports go here
+-#
+-FILES_nlm_Ximports = \
+-	@$(APR)/aprlib.imp \
+-	@$(NWOS)/httpd.imp \
+-	@libc.imp \
+-	$(EOLIST)
+- 
+-#   
+-# Any symbols exported to here
+-#
+-FILES_nlm_exports = \
+-	auth_anon_module \
+-	$(EOLIST)
+-	
+-#   
+-# These are the OBJ files needed to create the LIB target above.
+-# Paths must all use the '/' character
+-#
+-FILES_lib_objs = \
+-		$(EOLIST)
+-
+-#
+-# implement targets and dependancies (leave this section alone)
+-#
+-
+-libs :: $(OBJDIR) $(TARGET_lib)
+-
+-nlms :: libs $(TARGET_nlm)
+-
+-#
+-# Updated this target to create necessary directories and copy files to the 
+-# correct place.  (See $(AP_WORK)\build\NWGNUhead.inc for examples)
+-#
+-install :: nlms FORCE
+-
+-#
+-# Any specialized rules here
+-#
+-
+-#
+-# Include the 'tail' makefile that has targets that depend on variables defined
+-# in this makefile
+-#
+-
+-include $(AP_WORK)\build\NWGNUtail.inc
+-
+diff --git a/modules/aaa/NWGNUauthdbm b/modules/aaa/NWGNUauthdbm
+deleted file mode 100644
+index a64e7ec..0000000
+--- a/modules/aaa/NWGNUauthdbm
++++ /dev/null
+@@ -1,249 +0,0 @@
+-#
+-# Make sure all needed macro's are defined
+-#
+-
+-#
+-# Get the 'head' of the build environment if necessary.  This includes default
+-# targets and paths to tools
+-#
+-
+-ifndef EnvironmentDefined
+-include $(AP_WORK)\build\NWGNUhead.inc
+-endif
+-
+-#
+-# These directories will be at the beginning of the include list, followed by
+-# INCDIRS
+-#
+-XINCDIRS	+= \
+-			$(AP_WORK)/include \
+-			$(NWOS) \
+-			$(AP_WORK)/modules/arch/netware \
+-			$(AP_WORK)/srclib/apr/include \
+-			$(AP_WORK)/srclib/apr-util/include \
+-			$(AP_WORK)/srclib/apr \
+-			$(EOLIST)
+-
+-#
+-# These flags will come after CFLAGS
+-#
+-XCFLAGS		+= \
+-			$(EOLIST)
+-
+-#
+-# These defines will come after DEFINES
+-#
+-XDEFINES	+= \
+-			$(EOLIST)
+-
+-#
+-# These flags will be added to the link.opt file
+-#
+-XLFLAGS		+= \
+-			$(EOLIST)
+-
+-#
+-# These values will be appended to the correct variables based on the value of
+-# RELEASE
+-#
+-ifeq "$(RELEASE)" "debug"
+-XINCDIRS	+= \
+-			$(EOLIST)
+-
+-XCFLAGS		+= \
+-			$(EOLIST)
+-
+-XDEFINES	+= \
+-			$(EOLIST)
+-
+-XLFLAGS		+= \
+-		   	$(EOLIST)
+-endif
+-
+-ifeq "$(RELEASE)" "noopt"
+-XINCDIRS	+= \
+-			$(EOLIST)
+-
+-XCFLAGS		+= \
+-			$(EOLIST)
+-
+-XDEFINES	+= \
+-			$(EOLIST)
+-
+-XLFLAGS		+= \
+-		   	$(EOLIST)
+-endif
+-
+-ifeq "$(RELEASE)" "release"
+-XINCDIRS	+= \
+-			$(EOLIST)
+-
+-XCFLAGS		+= \
+-			$(EOLIST)
+-
+-XDEFINES	+= \
+-			$(EOLIST)
+-
+-XLFLAGS		+= \
+-			$(EOLIST)
+-endif
+-
+-#
+-# These are used by the link target if an NLM is being generated
+-# This is used by the link 'name' directive to name the nlm.  If left blank
+-# TARGET_nlm (see below) will be used.
+-#
+-NLM_NAME		= authdbm
+-
+-#
+-# This is used by the link '-desc ' directive. 
+-# If left blank, NLM_NAME will be used.
+-#
+-NLM_DESCRIPTION	= Database Authentication Module
+-
+-#
+-# This is used by the '-threadname' directive.  If left blank,
+-# NLM_NAME Thread will be used.
+-#
+-NLM_THREAD_NAME	= AuthDBM Module
+-
+-#
+-# If this is specified, it will override VERSION value in 
+-# $(AP_WORK)\build\NWGNUenvironment.inc
+-#
+-NLM_VERSION		=
+-
+-#
+-# If this is specified, it will override the default of 64K
+-#
+-NLM_STACK_SIZE	= 8192
+-
+-
+-#
+-# If this is specified it will be used by the link '-entry' directive
+-#
+-NLM_ENTRY_SYM	= _LibCPrelude
+-
+-#
+-# If this is specified it will be used by the link '-exit' directive
+-#
+-NLM_EXIT_SYM	= _LibCPostlude
+-
+-#
+-# If this is specified it will be used by the link '-check' directive
+-#
+-NLM_CHECK_SYM	=
+-
+-#
+-# If these are specified it will be used by the link '-flags' directive
+-#
+-NLM_FLAGS		=  AUTOUNLOAD, PSEUDOPREEMPTION
+-
+-#
+-# If this is specified it will be linked in with the XDCData option in the def 
+-# file instead of the default of $(NWOS)/apache.xdc.  XDCData can be disabled
+-# by setting APACHE_UNIPROC in the environment
+-#
+-XDCDATA         = 
+-
+-#
+-# If there is an NLM target, put it here
+-#
+-TARGET_nlm = \
+-	$(OBJDIR)/authdbm.nlm \
+-	$(EOLIST)
+-
+-#
+-# If there is an LIB target, put it here
+-#
+-TARGET_lib = \
+-	$(EOLIST)
+-
+-#
+-# These are the OBJ files needed to create the NLM target above.
+-# Paths must all use the '/' character
+-#
+-FILES_nlm_objs = \
+-	$(OBJDIR)/mod_auth_dbm.o \
+-	$(EOLIST)
+-
+-#
+-# These are the LIB files needed to create the NLM target above.
+-# These will be added as a library command in the link.opt file.
+-#
+-FILES_nlm_libs = \
+-   	libcpre.o \
+-	$(EOLIST)
+-
+-#
+-# These are the modules that the above NLM target depends on to load.
+-# These will be added as a module command in the link.opt file.
+-#
+-FILES_nlm_modules = \
+-	aprlib \
+-	libc \
+-	$(EOLIST)
+-
+-#
+-# If the nlm has a msg file, put it's path here
+-#
+-FILE_nlm_msg =
+- 
+-#
+-# If the nlm has a hlp file put it's path here
+-#
+-FILE_nlm_hlp =
+-
+-#
+-# If this is specified, it will override $(NWOS)\copyright.txt.
+-#
+-FILE_nlm_copyright =
+-
+-#
+-# Any additional imports go here
+-#
+-FILES_nlm_Ximports = \
+-	@$(APR)/aprlib.imp \
+-	@$(NWOS)/httpd.imp \
+-	@libc.imp \
+-	$(EOLIST)
+- 
+-#   
+-# Any symbols exported to here
+-#
+-FILES_nlm_exports = \
+-	auth_dbm_module \
+-	$(EOLIST)
+-	
+-#   
+-# These are the OBJ files needed to create the LIB target above.
+-# Paths must all use the '/' character
+-#
+-FILES_lib_objs = \
+-		$(EOLIST)
+-
+-#
+-# implement targets and dependancies (leave this section alone)
+-#
+-
+-libs :: $(OBJDIR) $(TARGET_lib)
+-
+-nlms :: libs $(TARGET_nlm)
+-
+-#
+-# Updated this target to create necessary directories and copy files to the 
+-# correct place.  (See $(AP_WORK)\build\NWGNUhead.inc for examples)
+-#
+-install :: nlms FORCE
+-
+-#
+-# Any specialized rules here
+-#
+-
+-#
+-# Include the 'tail' makefile that has targets that depend on variables defined
+-# in this makefile
+-#
+-
+-include $(AP_WORK)\build\NWGNUtail.inc
+-
+diff --git a/modules/aaa/config.m4 b/modules/aaa/config.m4
+index 525e79d..fa1df7a 100644
+--- a/modules/aaa/config.m4
++++ b/modules/aaa/config.m4
+@@ -1,22 +1,45 @@
+ dnl modules enabled in this directory by default
+ 
++dnl Authentication (authn), Access, and Authorization (authz)
++
+ dnl APACHE_MODULE(name, helptext[, objects[, structname[, default[, config]]]])
+ 
+ APACHE_MODPATH_INIT(aaa)
+ 
+-APACHE_MODULE(access, host-based access control, , , yes)
+-APACHE_MODULE(auth, user-based access control, , , yes)
+-APACHE_MODULE(auth_anon, anonymous user access, , , most)
+-APACHE_MODULE(auth_dbm, DBM-based access databases, , , most)
++dnl Authentication modules; modules checking a username and password against a
++dnl file, database, or other similar magic.
++dnl
++APACHE_MODULE(authn_file, file-based authentication control, , , yes)
++APACHE_MODULE(authn_dbm, DBM-based authentication control, , , most)
++APACHE_MODULE(authn_anon, anonymous user authentication control, , , most)
++
++dnl - and just in case all of the above punt; a default handler to
++dnl keep the bad guys out.
++APACHE_MODULE(authn_default, authentication backstopper, , , yes)
++
++dnl Authorization modules: modules which verify a certain property such as
++dnl membership of a group, value of the IP address against a list of pre
++dnl configured directives (e.g. require, allow) or against an external file
++dnl or database.
++dnl
++APACHE_MODULE(authz_host, host-based authorization control, , , yes)
++APACHE_MODULE(authz_groupfile, 'require group' authorization control, , , yes)
++APACHE_MODULE(authz_user, 'require user' authorization control, , , yes)
++APACHE_MODULE(authz_dbm, DBM-based authorization control, , , most)
++
++dnl - and just in case all of the above punt; a default handler to
++dnl keep the bad guys out.
++APACHE_MODULE(authz_default, authorization control backstopper, , , yes)
+ 
++dnl these are the front-end authentication modules
++APACHE_MODULE(auth_basic, basic authentication, , , yes)
+ APACHE_MODULE(auth_digest, RFC2617 Digest authentication, , , most, [
+   ap_old_cppflags=$CPPFLAGS
+   CPPFLAGS="$CPPFLAGS -I$APR_SOURCE_DIR/include -I$abs_builddir/srclib/apr/include"
+-  AC_TRY_COMPILE([#include <apr.h>], 
+-                 [#if !APR_HAS_RANDOM 
+-                  #error You need APR random support to use auth_digest. 
+-                  #endif],,
+-                 enable_auth_digest=no)
++  AC_TRY_COMPILE([#include <apr.h>], [
++#if !APR_HAS_RANDOM 
++#error You need APR random support to use mod_auth_digest. 
++#endif], , enable_auth_digest=no)
+   CPPFLAGS=$ap_old_cppflags
+ ])
+ 
+diff --git a/modules/aaa/mod_access.c b/modules/aaa/mod_access.c
+deleted file mode 100644
+index af377aa..0000000
+--- a/modules/aaa/mod_access.c
++++ /dev/null
+@@ -1,346 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- *
+- * Portions of this software are based upon public domain software
+- * originally written at the National Center for Supercomputing Applications,
+- * University of Illinois, Urbana-Champaign.
+- */
+-
+-/*
+- * Security options etc.
+- * 
+- * Module derived from code originally written by Rob McCool
+- * 
+- */
+-
+-#include "apr_strings.h"
+-#include "apr_network_io.h"
+-#include "apr_lib.h"
+-
+-#define APR_WANT_STRFUNC
+-#define APR_WANT_BYTEFUNC
+-#include "apr_want.h"
+-
+-#include "ap_config.h"
+-#include "httpd.h"
+-#include "http_core.h"
+-#include "http_config.h"
+-#include "http_log.h"
+-#include "http_request.h"
+-
+-#if APR_HAVE_NETINET_IN_H
+-#include <netinet/in.h>
+-#endif
+-
+-enum allowdeny_type {
+-    T_ENV,
+-    T_ALL,
+-    T_IP,
+-    T_HOST,
+-    T_FAIL
+-};
+-
+-typedef struct {
+-    apr_int64_t limited;
+-    union {
+-        char *from;
+-        apr_ipsubnet_t *ip;
+-    } x;
+-    enum allowdeny_type type;
+-} allowdeny;
+-
+-/* things in the 'order' array */
+-#define DENY_THEN_ALLOW 0
+-#define ALLOW_THEN_DENY 1
+-#define MUTUAL_FAILURE 2
+-
+-typedef struct {
+-    int order[METHODS];
+-    apr_array_header_t *allows;
+-    apr_array_header_t *denys;
+-} access_dir_conf;
+-
+-module AP_MODULE_DECLARE_DATA access_module;
+-
+-static void *create_access_dir_config(apr_pool_t *p, char *dummy)
+-{
+-    int i;
+-    access_dir_conf *conf =
+-        (access_dir_conf *)apr_pcalloc(p, sizeof(access_dir_conf));
+-
+-    for (i = 0; i < METHODS; ++i) {
+-        conf->order[i] = DENY_THEN_ALLOW;
+-    }
+-    conf->allows = apr_array_make(p, 1, sizeof(allowdeny));
+-    conf->denys = apr_array_make(p, 1, sizeof(allowdeny));
+-
+-    return (void *)conf;
+-}
+-
+-static const char *order(cmd_parms *cmd, void *dv, const char *arg)
+-{
+-    access_dir_conf *d = (access_dir_conf *) dv;
+-    int i, o;
+-
+-    if (!strcasecmp(arg, "allow,deny"))
+-	o = ALLOW_THEN_DENY;
+-    else if (!strcasecmp(arg, "deny,allow"))
+-	o = DENY_THEN_ALLOW;
+-    else if (!strcasecmp(arg, "mutual-failure"))
+-	o = MUTUAL_FAILURE;
+-    else
+-	return "unknown order";
+-
+-    for (i = 0; i < METHODS; ++i)
+-	if (cmd->limited & (AP_METHOD_BIT << i))
+-	    d->order[i] = o;
+-
+-    return NULL;
+-}
+-
+-static const char *allow_cmd(cmd_parms *cmd, void *dv, const char *from, 
+-                             const char *where_c)
+-{
+-    access_dir_conf *d = (access_dir_conf *) dv;
+-    allowdeny *a;
+-    char *where = apr_pstrdup(cmd->pool, where_c);
+-    char *s;
+-    char msgbuf[120];
+-    apr_status_t rv;
+-
+-    if (strcasecmp(from, "from"))
+-	return "allow and deny must be followed by 'from'";
+-
+-    a = (allowdeny *) apr_array_push(cmd->info ? d->allows : d->denys);
+-    a->x.from = where;
+-    a->limited = cmd->limited;
+-
+-    if (!strncasecmp(where, "env=", 4)) {
+-	a->type = T_ENV;
+-	a->x.from += 4;
+-
+-    }
+-    else if (!strcasecmp(where, "all")) {
+-	a->type = T_ALL;
+-    }
+-    else if ((s = strchr(where, '/'))) {
+-        *s++ = '\0';
+-        rv = apr_ipsubnet_create(&a->x.ip, where, s, cmd->pool);
+-        if(APR_STATUS_IS_EINVAL(rv)) {
+-            /* looked nothing like an IP address */
+-            return "An IP address was expected";
+-        }
+-        else if (rv != APR_SUCCESS) {
+-            apr_strerror(rv, msgbuf, sizeof msgbuf);
+-            return apr_pstrdup(cmd->pool, msgbuf);
+-        }
+-        a->type = T_IP;
+-    }
+-    else if (!APR_STATUS_IS_EINVAL(rv = apr_ipsubnet_create(&a->x.ip, where, NULL, cmd->pool))) {
+-        if (rv != APR_SUCCESS) {
+-            apr_strerror(rv, msgbuf, sizeof msgbuf);
+-            return apr_pstrdup(cmd->pool, msgbuf);
+-        }
+-        a->type = T_IP;
+-    }
+-    else { /* no slash, didn't look like an IP address => must be a host */
+-	a->type = T_HOST;
+-    }
+-
+-    return NULL;
+-}
+-
+-static char its_an_allow;
+-
+-static const command_rec access_cmds[] =
+-{
+-    AP_INIT_TAKE1("order", order, NULL, OR_LIMIT,
+-                  "'allow,deny', 'deny,allow', or 'mutual-failure'"),
+-    AP_INIT_ITERATE2("allow", allow_cmd, &its_an_allow, OR_LIMIT,
+-                     "'from' followed by hostnames or IP-address wildcards"),
+-    AP_INIT_ITERATE2("deny", allow_cmd, NULL, OR_LIMIT,
+-                     "'from' followed by hostnames or IP-address wildcards"),
+-    {NULL}
+-};
+-
+-static int in_domain(const char *domain, const char *what)
+-{
+-    int dl = strlen(domain);
+-    int wl = strlen(what);
+-
+-    if ((wl - dl) >= 0) {
+-	if (strcasecmp(domain, &what[wl - dl]) != 0)
+-	    return 0;
+-
+-	/* Make sure we matched an *entire* subdomain --- if the user
+-	 * said 'allow from good.com', we don't want people from nogood.com
+-	 * to be able to get in.
+-	 */
+-
+-	if (wl == dl)
+-	    return 1;		/* matched whole thing */
+-	else
+-	    return (domain[0] == '.' || what[wl - dl - 1] == '.');
+-    }
+-    else
+-	return 0;
+-}
+-
+-static int find_allowdeny(request_rec *r, apr_array_header_t *a, int method)
+-{
+-
+-    allowdeny *ap = (allowdeny *) a->elts;
+-    apr_int64_t mmask = (AP_METHOD_BIT << method);
+-    int i;
+-    int gothost = 0;
+-    const char *remotehost = NULL;
+-
+-    for (i = 0; i < a->nelts; ++i) {
+-	if (!(mmask & ap[i].limited))
+-	    continue;
+-
+-	switch (ap[i].type) {
+-	case T_ENV:
+-	    if (apr_table_get(r->subprocess_env, ap[i].x.from)) {
+-		return 1;
+-	    }
+-	    break;
+-
+-	case T_ALL:
+-	    return 1;
+-
+-	case T_IP:
+-            if (apr_ipsubnet_test(ap[i].x.ip, r->connection->remote_addr)) {
+-                return 1;
+-            }
+-            break;
+-
+-	case T_HOST:
+-	    if (!gothost) {
+-                int remotehost_is_ip;
+-
+-		remotehost = ap_get_remote_host(r->connection, r->per_dir_config,
+-                                                REMOTE_DOUBLE_REV, &remotehost_is_ip);
+-
+-		if ((remotehost == NULL) || remotehost_is_ip)
+-		    gothost = 1;
+-		else
+-		    gothost = 2;
+-	    }
+-
+-	    if ((gothost == 2) && in_domain(ap[i].x.from, remotehost))
+-		return 1;
+-	    break;
+-
+-	case T_FAIL:
+-	    /* do nothing? */
+-	    break;
+-	}
+-    }
+-
+-    return 0;
+-}
+-
+-static int check_dir_access(request_rec *r)
+-{
+-    int method = r->method_number;
+-    int ret = OK;
+-    access_dir_conf *a = (access_dir_conf *)
+-        ap_get_module_config(r->per_dir_config, &access_module);
+-
+-    if (a->order[method] == ALLOW_THEN_DENY) {
+-        ret = HTTP_FORBIDDEN;
+-        if (find_allowdeny(r, a->allows, method))
+-            ret = OK;
+-        if (find_allowdeny(r, a->denys, method))
+-            ret = HTTP_FORBIDDEN;
+-    }
+-    else if (a->order[method] == DENY_THEN_ALLOW) {
+-        if (find_allowdeny(r, a->denys, method))
+-            ret = HTTP_FORBIDDEN;
+-        if (find_allowdeny(r, a->allows, method))
+-            ret = OK;
+-    }
+-    else {
+-        if (find_allowdeny(r, a->allows, method)
+-            && !find_allowdeny(r, a->denys, method))
+-            ret = OK;
+-        else
+-            ret = HTTP_FORBIDDEN;
+-    }
+-
+-    if (ret == HTTP_FORBIDDEN
+-        && (ap_satisfies(r) != SATISFY_ANY || !ap_some_auth_required(r))) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-            "client denied by server configuration: %s",
+-            r->filename);
+-    }
+-
+-    return ret;
+-}
+-
+-static void register_hooks(apr_pool_t *p)
+-{
+-    ap_hook_access_checker(check_dir_access,NULL,NULL,APR_HOOK_MIDDLE);
+-}
+-
+-module AP_MODULE_DECLARE_DATA access_module =
+-{
+-    STANDARD20_MODULE_STUFF,
+-    create_access_dir_config,	/* dir config creater */
+-    NULL,			/* dir merger --- default is to override */
+-    NULL,			/* server config */
+-    NULL,			/* merge server config */
+-    access_cmds,
+-    register_hooks		/* register hooks */
+-};
+diff --git a/modules/aaa/mod_access.dsp b/modules/aaa/mod_access.dsp
+deleted file mode 100644
+index ee1118b..0000000
+--- a/modules/aaa/mod_access.dsp
++++ /dev/null
+@@ -1,128 +0,0 @@
+-# Microsoft Developer Studio Project File - Name="mod_access" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
+-# ** DO NOT EDIT **
+-
+-# TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+-
+-CFG=mod_access - Win32 Release
+-!MESSAGE This is not a valid makefile. To build this project using NMAKE,
+-!MESSAGE use the Export Makefile command and run
+-!MESSAGE 
+-!MESSAGE NMAKE /f "mod_access.mak".
+-!MESSAGE 
+-!MESSAGE You can specify a configuration when running NMAKE
+-!MESSAGE by defining the macro CFG on the command line. For example:
+-!MESSAGE 
+-!MESSAGE NMAKE /f "mod_access.mak" CFG="mod_access - Win32 Release"
+-!MESSAGE 
+-!MESSAGE Possible choices for configuration are:
+-!MESSAGE 
+-!MESSAGE "mod_access - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE "mod_access - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE 
+-
+-# Begin Project
+-# PROP AllowPerConfigDependencies 0
+-# PROP Scc_ProjName ""
+-# PROP Scc_LocalPath ""
+-CPP=cl.exe
+-MTL=midl.exe
+-RSC=rc.exe
+-
+-!IF  "$(CFG)" == "mod_access - Win32 Release"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "Release"
+-# PROP BASE Intermediate_Dir "Release"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 0
+-# PROP Output_Dir "Release"
+-# PROP Intermediate_Dir "Release"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MD /W3 /O2 /I "../../include" /I "../../srclib/apr/include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_access" /FD /c
+-# ADD BASE MTL /nologo /D "NDEBUG" /win32
+-# ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "NDEBUG"
+-# ADD RSC /l 0x409 /d "NDEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:"Release/mod_access.so" /base:@..\..\os\win32\BaseAddr.ref,mod_access
+-# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:"Release/mod_access.so" /base:@..\..\os\win32\BaseAddr.ref,mod_access
+-
+-!ELSEIF  "$(CFG)" == "mod_access - Win32 Debug"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "Debug"
+-# PROP BASE Intermediate_Dir "Debug"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 1
+-# PROP Output_Dir "Debug"
+-# PROP Intermediate_Dir "Debug"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../../include" /I "../../srclib/apr/include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_access" /FD /c
+-# ADD BASE MTL /nologo /D "_DEBUG" /win32
+-# ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "_DEBUG"
+-# ADD RSC /l 0x409 /d "_DEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /out:"Debug/mod_access.so" /base:@..\..\os\win32\BaseAddr.ref,mod_access
+-# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /out:"Debug/mod_access.so" /base:@..\..\os\win32\BaseAddr.ref,mod_access
+-
+-!ENDIF 
+-
+-# Begin Target
+-
+-# Name "mod_access - Win32 Release"
+-# Name "mod_access - Win32 Debug"
+-# Begin Source File
+-
+-SOURCE=.\mod_access.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\mod_access.rc
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=..\..\build\win32\win32ver.awk
+-
+-!IF  "$(CFG)" == "mod_access - Win32 Release"
+-
+-# PROP Ignore_Default_Tool 1
+-# Begin Custom Build - Creating Version Resource
+-InputPath=..\..\build\win32\win32ver.awk
+-
+-".\mod_access.rc" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	awk -f ../../build/win32/win32ver.awk mod_access  "access_module for Apache" ../../include/ap_release.h > .\mod_access.rc
+-
+-# End Custom Build
+-
+-!ELSEIF  "$(CFG)" == "mod_access - Win32 Debug"
+-
+-# PROP Ignore_Default_Tool 1
+-# Begin Custom Build - Creating Version Resource
+-InputPath=..\..\build\win32\win32ver.awk
+-
+-".\mod_access.rc" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	awk -f ../../build/win32/win32ver.awk mod_access  "access_module for Apache" ../../include/ap_release.h > .\mod_access.rc
+-
+-# End Custom Build
+-
+-!ENDIF 
+-
+-# End Source File
+-# End Target
+-# End Project
+diff --git a/modules/aaa/mod_access.exp b/modules/aaa/mod_access.exp
+deleted file mode 100644
+index f8aff33..0000000
+--- a/modules/aaa/mod_access.exp
++++ /dev/null
+@@ -1 +0,0 @@
+-access_module
+diff --git a/modules/aaa/mod_auth.c b/modules/aaa/mod_auth.c
+deleted file mode 100644
+index ed349bd..0000000
+--- a/modules/aaa/mod_auth.c
++++ /dev/null
+@@ -1,356 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- *
+- * Portions of this software are based upon public domain software
+- * originally written at the National Center for Supercomputing Applications,
+- * University of Illinois, Urbana-Champaign.
+- */
+-
+-/*
+- * http_auth: authentication
+- * 
+- * Rob McCool
+- * 
+- * Adapted to Apache by rst.
+- *
+- * dirkx - Added Authoritative control to allow passing on to lower
+- *         modules if and only if the userid is not known to this
+- *         module. A known user with a faulty or absent password still
+- *         causes an AuthRequired. The default is 'Authoritative', i.e.
+- *         no control is passed along.
+- */
+-
+-#include "apr_strings.h"
+-#include "apr_md5.h"            /* for apr_password_validate */
+-
+-#include "ap_config.h"
+-#include "httpd.h"
+-#include "http_config.h"
+-#include "http_core.h"
+-#include "http_log.h"
+-#include "http_protocol.h"
+-#include "http_request.h"
+-
+-
+-typedef struct {
+-    char *auth_pwfile;
+-    char *auth_grpfile;
+-    int auth_authoritative;
+-} auth_config_rec;
+-
+-static void *create_auth_dir_config(apr_pool_t *p, char *d)
+-{
+-    auth_config_rec *conf = apr_palloc(p, sizeof(*conf));
+-
+-    conf->auth_pwfile = NULL;     /* just to illustrate the default really */
+-    conf->auth_grpfile = NULL;    /* unless you have a broken HP cc */
+-    conf->auth_authoritative = 1; /* keep the fortress secure by default */
+-    return conf;
+-}
+-
+-static const char *set_auth_slot(cmd_parms *cmd, void *offset, const char *f, 
+-                                 const char *t)
+-{
+-    if (t && strcmp(t, "standard")) {
+-        return apr_pstrcat(cmd->pool, "Invalid auth file type: ", t, NULL);
+-    }
+-
+-    return ap_set_file_slot(cmd, offset, f);
+-}
+-
+-static const command_rec auth_cmds[] =
+-{
+-    AP_INIT_TAKE12("AuthUserFile", set_auth_slot,
+-                   (void *)APR_OFFSETOF(auth_config_rec, auth_pwfile),
+-                   OR_AUTHCFG, "text file containing user IDs and passwords"),
+-    AP_INIT_TAKE12("AuthGroupFile", set_auth_slot,
+-                   (void *)APR_OFFSETOF(auth_config_rec, auth_grpfile),
+-                   OR_AUTHCFG,
+-                   "text file containing group names and member user IDs"),
+-    AP_INIT_FLAG("AuthAuthoritative", ap_set_flag_slot,
+-                 (void *)APR_OFFSETOF(auth_config_rec, auth_authoritative),
+-                 OR_AUTHCFG,
+-                 "Set to 'no' to allow access control to be passed along to "
+-                 "lower modules if the UserID is not known to this module"),
+-    {NULL}
+-};
+-
+-module AP_MODULE_DECLARE_DATA auth_module;
+-
+-static char *get_pw(request_rec *r, char *user, char *auth_pwfile)
+-{
+-    ap_configfile_t *f;
+-    char l[MAX_STRING_LEN];
+-    const char *rpw, *w;
+-    apr_status_t status;
+-
+-    if ((status = ap_pcfg_openfile(&f, r->pool, auth_pwfile)) != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+-                      "Could not open password file: %s", auth_pwfile);
+-        return NULL;
+-    }
+-    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
+-        if ((l[0] == '#') || (!l[0])) {
+-            continue;
+-        }
+-        rpw = l;
+-        w = ap_getword(r->pool, &rpw, ':');
+-
+-        if (!strcmp(user, w)) {
+-            ap_cfg_closefile(f);
+-            return ap_getword(r->pool, &rpw, ':');
+-        }
+-    }
+-    ap_cfg_closefile(f);
+-    return NULL;
+-}
+-
+-static apr_table_t *groups_for_user(apr_pool_t *p, char *user, char *grpfile)
+-{
+-    ap_configfile_t *f;
+-    apr_table_t *grps = apr_table_make(p, 15);
+-    apr_pool_t *sp;
+-    char l[MAX_STRING_LEN];
+-    const char *group_name, *ll, *w;
+-    apr_status_t status;
+-
+-    if ((status = ap_pcfg_openfile(&f, p, grpfile)) != APR_SUCCESS) {
+-/*add?  aplog_error(APLOG_MARK, APLOG_ERR, NULL,
+-                    "Could not open group file: %s", grpfile);*/
+-        return NULL;
+-    }
+-
+-    apr_pool_create(&sp, p);
+-
+-    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
+-        if ((l[0] == '#') || (!l[0])) {
+-            continue;
+-        }
+-        ll = l;
+-        apr_pool_clear(sp);
+-
+-        group_name = ap_getword(sp, &ll, ':');
+-
+-        while (ll[0]) {
+-            w = ap_getword_conf(sp, &ll);
+-            if (!strcmp(w, user)) {
+-                apr_table_setn(grps, apr_pstrdup(p, group_name), "in");
+-                break;
+-            }
+-        }
+-    }
+-    ap_cfg_closefile(f);
+-    apr_pool_destroy(sp);
+-    return grps;
+-}
+-
+-/* These functions return 0 if client is OK, and proper error status
+- * if not... either HTTP_UNAUTHORIZED, if we made a check, and it failed, or
+- * HTTP_INTERNAL_SERVER_ERROR, if things are so totally confused that we
+- * couldn't figure out how to tell if the client is authorized or not.
+- *
+- * If they return DECLINED, and all other modules also decline, that's
+- * treated by the server core as a configuration error, logged and
+- * reported as such.
+- */
+-
+-/* Determine user ID, and check if it really is that user, for HTTP
+- * basic authentication...
+- */
+-
+-static int authenticate_basic_user(request_rec *r)
+-{
+-    auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                 &auth_module);
+-    const char *sent_pw;
+-    char *real_pw;
+-    apr_status_t invalid_pw;
+-    int res;
+-
+-    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
+-        return res;
+-    }
+-
+-    if (!conf->auth_pwfile) {
+-        return DECLINED;
+-    }
+-
+-    if (!(real_pw = get_pw(r, r->user, conf->auth_pwfile))) {
+-        if (!(conf->auth_authoritative)) {
+-            return DECLINED;
+-        }
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "user %s not found: %s", r->user, r->uri);
+-        ap_note_basic_auth_failure(r);
+-        return HTTP_UNAUTHORIZED;
+-    }
+-    invalid_pw = apr_password_validate(sent_pw, real_pw);
+-    if (invalid_pw != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "user %s: authentication failure for \"%s\": "
+-                      "Password Mismatch",
+-                      r->user, r->uri);
+-        ap_note_basic_auth_failure(r);
+-        return HTTP_UNAUTHORIZED;
+-    }
+-    return OK;
+-}
+-
+-/* Checking ID */
+-
+-static int check_user_access(request_rec *r)
+-{
+-    auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                 &auth_module);
+-    char *user = r->user;
+-    int m = r->method_number;
+-    int method_restricted = 0;
+-    register int x;
+-    const char *t, *w;
+-    apr_table_t *grpstatus;
+-    const apr_array_header_t *reqs_arr = ap_requires(r);
+-    require_line *reqs;
+-
+-    /* BUG FIX: tadc, 11-Nov-1995.  If there is no "requires" directive, 
+-     * then any user will do.
+-     */
+-    if (!reqs_arr) {
+-        return OK;
+-    }
+-    reqs = (require_line *)reqs_arr->elts;
+-
+-    if (conf->auth_grpfile) {
+-        grpstatus = groups_for_user(r->pool, user, conf->auth_grpfile);
+-    }
+-    else {
+-        grpstatus = NULL;
+-    }
+-
+-    for (x = 0; x < reqs_arr->nelts; x++) {
+-
+-        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m))) {
+-            continue;
+-        }
+-
+-        method_restricted = 1;
+-
+-        t = reqs[x].requirement;
+-        w = ap_getword_white(r->pool, &t);
+-        if (!strcmp(w, "valid-user")) {
+-            return OK;
+-        }
+-        if (!strcmp(w, "user")) {
+-            while (t[0]) {
+-                w = ap_getword_conf(r->pool, &t);
+-                if (!strcmp(user, w)) {
+-                    return OK;
+-                }
+-            }
+-        }
+-        else if (!strcmp(w, "group")) {
+-            if (!grpstatus) {
+-                return DECLINED;        /* DBM group?  Something else? */
+-            }
+-
+-            while (t[0]) {
+-                w = ap_getword_conf(r->pool, &t);
+-                if (apr_table_get(grpstatus, w)) {
+-                    return OK;
+-                }
+-            }
+-        }
+-        else if (conf->auth_authoritative) {
+-            /* if we aren't authoritative, any require directive could be
+-             * valid even if we don't grok it.  However, if we are 
+-             * authoritative, we can warn the user they did something wrong.
+-             * That something could be a missing "AuthAuthoritative off", but
+-             * more likely is a typo in the require directive.
+-             */
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "access to %s failed, reason: unknown require "
+-                          "directive:\"%s\"", r->uri, reqs[x].requirement);
+-        }
+-    }
+-
+-    if (!method_restricted) {
+-        return OK;
+-    }
+-
+-    if (!(conf->auth_authoritative)) {
+-        return DECLINED;
+-    }
+-
+-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                  "access to %s failed, reason: user %s not allowed access",
+-                  r->uri, user);
+-        
+-    ap_note_basic_auth_failure(r);
+-    return HTTP_UNAUTHORIZED;
+-}
+-
+-static void register_hooks(apr_pool_t *p)
+-{
+-    ap_hook_check_user_id(authenticate_basic_user,NULL,NULL,APR_HOOK_MIDDLE);
+-    ap_hook_auth_checker(check_user_access,NULL,NULL,APR_HOOK_MIDDLE);
+-}
+-
+-module AP_MODULE_DECLARE_DATA auth_module =
+-{
+-    STANDARD20_MODULE_STUFF,
+-    create_auth_dir_config,     /* dir config creater */
+-    NULL,                       /* dir merger --- default is to override */
+-    NULL,                       /* server config */
+-    NULL,                       /* merge server config */
+-    auth_cmds,                  /* command apr_table_t */
+-    register_hooks              /* register hooks */
+-};
+diff --git a/modules/aaa/mod_auth.dsp b/modules/aaa/mod_auth.dsp
+deleted file mode 100644
+index b2d6863..0000000
+--- a/modules/aaa/mod_auth.dsp
++++ /dev/null
+@@ -1,128 +0,0 @@
+-# Microsoft Developer Studio Project File - Name="mod_auth" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
+-# ** DO NOT EDIT **
+-
+-# TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+-
+-CFG=mod_auth - Win32 Release
+-!MESSAGE This is not a valid makefile. To build this project using NMAKE,
+-!MESSAGE use the Export Makefile command and run
+-!MESSAGE 
+-!MESSAGE NMAKE /f "mod_auth.mak".
+-!MESSAGE 
+-!MESSAGE You can specify a configuration when running NMAKE
+-!MESSAGE by defining the macro CFG on the command line. For example:
+-!MESSAGE 
+-!MESSAGE NMAKE /f "mod_auth.mak" CFG="mod_auth - Win32 Release"
+-!MESSAGE 
+-!MESSAGE Possible choices for configuration are:
+-!MESSAGE 
+-!MESSAGE "mod_auth - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE "mod_auth - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE 
+-
+-# Begin Project
+-# PROP AllowPerConfigDependencies 0
+-# PROP Scc_ProjName ""
+-# PROP Scc_LocalPath ""
+-CPP=cl.exe
+-MTL=midl.exe
+-RSC=rc.exe
+-
+-!IF  "$(CFG)" == "mod_auth - Win32 Release"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "Release"
+-# PROP BASE Intermediate_Dir "Release"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 0
+-# PROP Output_Dir "Release"
+-# PROP Intermediate_Dir "Release"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MD /W3 /O2 /I "../../include" /I "../../srclib/apr/include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_auth" /FD /c
+-# ADD BASE MTL /nologo /D "NDEBUG" /win32
+-# ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "NDEBUG"
+-# ADD RSC /l 0x409 /d "NDEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:"Release/mod_auth.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth
+-# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:"Release/mod_auth.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth
+-
+-!ELSEIF  "$(CFG)" == "mod_auth - Win32 Debug"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "Debug"
+-# PROP BASE Intermediate_Dir "Debug"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 1
+-# PROP Output_Dir "Debug"
+-# PROP Intermediate_Dir "Debug"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../../include" /I "../../srclib/apr/include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_auth" /FD /c
+-# ADD BASE MTL /nologo /D "_DEBUG" /win32
+-# ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "_DEBUG"
+-# ADD RSC /l 0x409 /d "_DEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /out:"Debug/mod_auth.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth
+-# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /out:"Debug/mod_auth.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth
+-
+-!ENDIF 
+-
+-# Begin Target
+-
+-# Name "mod_auth - Win32 Release"
+-# Name "mod_auth - Win32 Debug"
+-# Begin Source File
+-
+-SOURCE=.\mod_auth.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\mod_auth.rc
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=..\..\build\win32\win32ver.awk
+-
+-!IF  "$(CFG)" == "mod_auth - Win32 Release"
+-
+-# PROP Ignore_Default_Tool 1
+-# Begin Custom Build - Creating Version Resource
+-InputPath=..\..\build\win32\win32ver.awk
+-
+-".\mod_auth.rc" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	awk -f ../../build/win32/win32ver.awk mod_auth  "auth_module for Apache" ../../include/ap_release.h > .\mod_auth.rc
+-
+-# End Custom Build
+-
+-!ELSEIF  "$(CFG)" == "mod_auth - Win32 Debug"
+-
+-# PROP Ignore_Default_Tool 1
+-# Begin Custom Build - Creating Version Resource
+-InputPath=..\..\build\win32\win32ver.awk
+-
+-".\mod_auth.rc" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	awk -f ../../build/win32/win32ver.awk mod_auth  "auth_module for Apache" ../../include/ap_release.h > .\mod_auth.rc
+-
+-# End Custom Build
+-
+-!ENDIF 
+-
+-# End Source File
+-# End Target
+-# End Project
+diff --git a/modules/aaa/mod_auth.exp b/modules/aaa/mod_auth.exp
+deleted file mode 100644
+index 76adad0..0000000
+--- a/modules/aaa/mod_auth.exp
++++ /dev/null
+@@ -1 +0,0 @@
+-auth_module
+diff --git a/modules/aaa/mod_auth_anon.c b/modules/aaa/mod_auth_anon.c
+deleted file mode 100644
+index 0726e9f..0000000
+--- a/modules/aaa/mod_auth_anon.c
++++ /dev/null
+@@ -1,280 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- *
+- * Portions of this software are based upon public domain software
+- * originally written at the National Center for Supercomputing Applications,
+- * University of Illinois, Urbana-Champaign.
+- */
+-
+-/*
+- * http_auth: authentication
+- * 
+- * Rob McCool & Brian Behlendorf.
+- * 
+- * Adapted to Apache by rst.
+- *
+- * Version 0.5 May 1996
+- *
+- * Modified by Dirk.vanGulik@jrc.it to
+- * 
+- * Adapted to allow anonymous logins, just like with Anon-FTP, when
+- * one gives the magic user name 'anonymous' and ones email address
+- * as the password.
+- *
+- * Just add the following tokes to your <directory> setup:
+- * 
+- * Anonymous                    magic-userid [magic-userid]...
+- *
+- * Anonymous_MustGiveEmail      [ on | off ] default = on
+- * Anonymous_LogEmail           [ on | off ] default = on
+- * Anonymous_VerifyEmail        [ on | off ] default = off
+- * Anonymous_NoUserId           [ on | off ] default = off
+- * Anonymous_Authoritative      [ on | off ] default = off
+- *
+- * The magic user id is something like 'anonymous', it is NOT case sensitive. 
+- * 
+- * The MustGiveEmail flag can be used to force users to enter something
+- * in the password field (like an email address). Default is on.
+- *
+- * Furthermore the 'NoUserID' flag can be set to allow completely empty
+- * usernames in as well; this can be is convenient as a single return
+- * in broken GUIs like W95 is often given by the user. The Default is off.
+- *
+- * Dirk.vanGulik@jrc.it; http://ewse.ceo.org; http://me-www.jrc.it/~dirkx
+- * 
+- */
+-
+-#include "apr_strings.h"
+-
+-#define APR_WANT_STRFUNC
+-#include "apr_want.h"
+-
+-#include "httpd.h"
+-#include "http_config.h"
+-#include "http_core.h"
+-#include "http_log.h"
+-#include "http_request.h"
+-#include "http_protocol.h"
+-
+-typedef struct anon_auth {
+-    char *password;
+-    struct anon_auth *next;
+-} anon_auth;
+-
+-typedef struct {
+-    anon_auth *anon_auth_passwords;
+-    int anon_auth_nouserid;
+-    int anon_auth_logemail;
+-    int anon_auth_verifyemail;
+-    int anon_auth_mustemail;
+-    int anon_auth_authoritative;
+-} anon_auth_config_rec;
+-
+-static void *create_anon_auth_dir_config(apr_pool_t *p, char *d)
+-{
+-    anon_auth_config_rec *conf = apr_palloc(p, sizeof(*conf));
+-
+-    /* just to illustrate the defaults really. */
+-    conf->anon_auth_passwords = NULL;
+-
+-    conf->anon_auth_nouserid = 0;
+-    conf->anon_auth_logemail = 1;
+-    conf->anon_auth_verifyemail = 0;
+-    conf->anon_auth_mustemail = 1;
+-    conf->anon_auth_authoritative = 0;
+-    return conf;
+-}
+-
+-static const char *anon_set_string_slots(cmd_parms *cmd,
+-                                         void *my_config, const char *arg)
+-{
+-    anon_auth_config_rec *conf = my_config;
+-    anon_auth *first;
+-
+-    if (!(*arg))
+-        return "Anonymous string cannot be empty, use Anonymous_NoUserId instead";
+-
+-    /* squeeze in a record */
+-    first = conf->anon_auth_passwords;
+-
+-    if (!(conf->anon_auth_passwords = apr_palloc(cmd->pool, sizeof(anon_auth))) ||
+-       !(conf->anon_auth_passwords->password = apr_pstrdup(cmd->pool, arg)))
+-             return "Failed to claim memory for an anonymous password...";
+-
+-    /* and repair the next */
+-    conf->anon_auth_passwords->next = first;
+-
+-    return NULL;
+-}
+-
+-static const command_rec anon_auth_cmds[] =
+-{
+-    AP_INIT_ITERATE("Anonymous", anon_set_string_slots, NULL, OR_AUTHCFG, 
+-     "a space-separated list of user IDs"),
+-    AP_INIT_FLAG("Anonymous_MustGiveEmail", ap_set_flag_slot,
+-     (void *)APR_OFFSETOF(anon_auth_config_rec, anon_auth_mustemail),
+-     OR_AUTHCFG, "Limited to 'on' or 'off'"),
+-    AP_INIT_FLAG("Anonymous_NoUserId", ap_set_flag_slot,
+-     (void *)APR_OFFSETOF(anon_auth_config_rec, anon_auth_nouserid),
+-     OR_AUTHCFG, "Limited to 'on' or 'off'"),
+-    AP_INIT_FLAG("Anonymous_VerifyEmail", ap_set_flag_slot,
+-     (void *)APR_OFFSETOF(anon_auth_config_rec, anon_auth_verifyemail),
+-     OR_AUTHCFG, "Limited to 'on' or 'off'"),
+-    AP_INIT_FLAG("Anonymous_LogEmail", ap_set_flag_slot,
+-     (void *)APR_OFFSETOF(anon_auth_config_rec, anon_auth_logemail),
+-     OR_AUTHCFG, "Limited to 'on' or 'off'"),
+-    AP_INIT_FLAG("Anonymous_Authoritative", ap_set_flag_slot,
+-     (void *)APR_OFFSETOF(anon_auth_config_rec, anon_auth_authoritative),
+-     OR_AUTHCFG, "Limited to 'on' or 'off'"),
+-    {NULL}
+-};
+-
+-module AP_MODULE_DECLARE_DATA auth_anon_module;
+-
+-static int anon_authenticate_basic_user(request_rec *r)
+-{
+-    anon_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                      &auth_anon_module);
+-    const char *sent_pw;
+-    int res = DECLINED;
+-
+-    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
+-        return res;
+-    }
+-
+-    /* Ignore if we are not configured */
+-    if (!conf->anon_auth_passwords) {
+-        return DECLINED;
+-    }
+-
+-    /* Do we allow an empty userID and/or is it the magic one
+-     */
+-
+-    if ((!(r->user[0])) && (conf->anon_auth_nouserid)) {
+-        res = OK;
+-    }
+-    else {
+-        anon_auth *p = conf->anon_auth_passwords;
+-        res = DECLINED;
+-        while ((res == DECLINED) && (p != NULL)) {
+-            if (!(strcasecmp(r->user, p->password))) {
+-                res = OK;
+-            }
+-            p = p->next;
+-        }
+-    }
+-    if (
+-        /* username is OK */
+-        (res == OK)
+-        /* password been filled out ? */
+-           && ((!conf->anon_auth_mustemail) || strlen(sent_pw))
+-        /* does the password look like an email address ? */
+-           && ((!conf->anon_auth_verifyemail)
+-               || ((strpbrk("@", sent_pw) != NULL)
+-                   && (strpbrk(".", sent_pw) != NULL)))) {
+-        if (conf->anon_auth_logemail && ap_is_initial_req(r)) {
+-            ap_log_rerror(APLOG_MARK, APLOG_INFO, APR_SUCCESS, r,
+-                        "Anonymous: Passwd <%s> Accepted",
+-                        sent_pw ? sent_pw : "\'none\'");
+-        }
+-        return OK;
+-    }
+-    else {
+-        if (conf->anon_auth_authoritative) {
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_SUCCESS, r,
+-                        "Anonymous: Authoritative, Passwd <%s> not accepted",
+-                        sent_pw ? sent_pw : "\'none\'");
+-            return HTTP_UNAUTHORIZED;
+-        }
+-        /* Drop out the bottom to return DECLINED */
+-    }
+-
+-    return DECLINED;
+-}
+-
+-static int check_anon_access(request_rec *r)
+-{
+-#ifdef NOTYET
+-    conn_rec *c = r->connection;
+-    anon_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                      &auth_anon_module);
+-
+-    if (!conf->anon_auth) {
+-        return DECLINED;
+-    }
+-
+-    if (strcasecmp(r->connection->user, conf->anon_auth)) {
+-        return DECLINED;
+-    }
+-
+-    return OK;
+-#endif
+-    return DECLINED;
+-}
+-
+-static void register_hooks(apr_pool_t *p)
+-{
+-    ap_hook_check_user_id(anon_authenticate_basic_user,NULL,NULL,APR_HOOK_MIDDLE);
+-    ap_hook_auth_checker(check_anon_access,NULL,NULL,APR_HOOK_MIDDLE);
+-}
+-
+-module AP_MODULE_DECLARE_DATA auth_anon_module =
+-{
+-    STANDARD20_MODULE_STUFF,
+-    create_anon_auth_dir_config,    /* dir config creater */
+-    NULL,                           /* dir merger ensure strictness */
+-    NULL,                           /* server config */
+-    NULL,                           /* merge server config */
+-    anon_auth_cmds,                 /* command apr_table_t */
+-    register_hooks                  /* register hooks */
+-};
+diff --git a/modules/aaa/mod_auth_anon.dsp b/modules/aaa/mod_auth_anon.dsp
+deleted file mode 100644
+index 9f2cd2d..0000000
+--- a/modules/aaa/mod_auth_anon.dsp
++++ /dev/null
+@@ -1,128 +0,0 @@
+-# Microsoft Developer Studio Project File - Name="mod_auth_anon" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
+-# ** DO NOT EDIT **
+-
+-# TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+-
+-CFG=mod_auth_anon - Win32 Release
+-!MESSAGE This is not a valid makefile. To build this project using NMAKE,
+-!MESSAGE use the Export Makefile command and run
+-!MESSAGE 
+-!MESSAGE NMAKE /f "mod_auth_anon.mak".
+-!MESSAGE 
+-!MESSAGE You can specify a configuration when running NMAKE
+-!MESSAGE by defining the macro CFG on the command line. For example:
+-!MESSAGE 
+-!MESSAGE NMAKE /f "mod_auth_anon.mak" CFG="mod_auth_anon - Win32 Release"
+-!MESSAGE 
+-!MESSAGE Possible choices for configuration are:
+-!MESSAGE 
+-!MESSAGE "mod_auth_anon - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE "mod_auth_anon - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE 
+-
+-# Begin Project
+-# PROP AllowPerConfigDependencies 0
+-# PROP Scc_ProjName ""
+-# PROP Scc_LocalPath ""
+-CPP=cl.exe
+-MTL=midl.exe
+-RSC=rc.exe
+-
+-!IF  "$(CFG)" == "mod_auth_anon - Win32 Release"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "Release"
+-# PROP BASE Intermediate_Dir "Release"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 0
+-# PROP Output_Dir "Release"
+-# PROP Intermediate_Dir "Release"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MD /W3 /O2 /I "../../include" /I "../../srclib/apr/include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_auth_anon" /FD /c
+-# ADD BASE MTL /nologo /D "NDEBUG" /win32
+-# ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "NDEBUG"
+-# ADD RSC /l 0x409 /d "NDEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:"Release/mod_auth_anon.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+-# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:"Release/mod_auth_anon.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+-
+-!ELSEIF  "$(CFG)" == "mod_auth_anon - Win32 Debug"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "Debug"
+-# PROP BASE Intermediate_Dir "Debug"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 1
+-# PROP Output_Dir "Debug"
+-# PROP Intermediate_Dir "Debug"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../../include" /I "../../srclib/apr/include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_auth_anon" /FD /c
+-# ADD BASE MTL /nologo /D "_DEBUG" /win32
+-# ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "_DEBUG"
+-# ADD RSC /l 0x409 /d "_DEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /out:"Debug/mod_auth_anon.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+-# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /out:"Debug/mod_auth_anon.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+-
+-!ENDIF 
+-
+-# Begin Target
+-
+-# Name "mod_auth_anon - Win32 Release"
+-# Name "mod_auth_anon - Win32 Debug"
+-# Begin Source File
+-
+-SOURCE=.\mod_auth_anon.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\mod_auth_anon.rc
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=..\..\build\win32\win32ver.awk
+-
+-!IF  "$(CFG)" == "mod_auth_anon - Win32 Release"
+-
+-# PROP Ignore_Default_Tool 1
+-# Begin Custom Build - Creating Version Resource
+-InputPath=..\..\build\win32\win32ver.awk
+-
+-".\mod_auth_anon.rc" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	awk -f ../../build/win32/win32ver.awk mod_auth_anon  "auth_anon_module for Apache" ../../include/ap_release.h > .\mod_auth_anon.rc
+-
+-# End Custom Build
+-
+-!ELSEIF  "$(CFG)" == "mod_auth_anon - Win32 Debug"
+-
+-# PROP Ignore_Default_Tool 1
+-# Begin Custom Build - Creating Version Resource
+-InputPath=..\..\build\win32\win32ver.awk
+-
+-".\mod_auth_anon.rc" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	awk -f ../../build/win32/win32ver.awk mod_auth_anon  "auth_anon_module for Apache" ../../include/ap_release.h > .\mod_auth_anon.rc
+-
+-# End Custom Build
+-
+-!ENDIF 
+-
+-# End Source File
+-# End Target
+-# End Project
+diff --git a/modules/aaa/mod_auth_anon.exp b/modules/aaa/mod_auth_anon.exp
+deleted file mode 100644
+index 6328253..0000000
+--- a/modules/aaa/mod_auth_anon.exp
++++ /dev/null
+@@ -1 +0,0 @@
+-auth_anon_module
+diff --git a/modules/aaa/mod_auth_basic.c b/modules/aaa/mod_auth_basic.c
+new file mode 100644
+index 0000000..1350283
+--- /dev/null
++++ b/modules/aaa/mod_auth_basic.c
+@@ -0,0 +1,356 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/*
++ * http_auth: authentication
++ * 
++ * Rob McCool
++ * 
++ * Adapted to Apache by rst.
++ *
++ * dirkx - Added Authoritative control to allow passing on to lower
++ *         modules if and only if the userid is not known to this
++ *         module. A known user with a faulty or absent password still
++ *         causes an AuthRequired. The default is 'Authoritative', i.e.
++ *         no control is passed along.
++ */
++
++#include "apr_strings.h"
++#include "apr_md5.h"            /* for apr_password_validate */
++
++#include "ap_config.h"
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"
++
++
++typedef struct {
++    char *auth_pwfile;
++    char *auth_grpfile;
++    int authoritative;
++} auth_config_rec;
++
++static void *create_auth_dir_config(apr_pool_t *p, char *d)
++{
++    auth_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    conf->auth_pwfile = NULL;     /* just to illustrate the default really */
++    conf->auth_grpfile = NULL;    /* unless you have a broken HP cc */
++    conf->authoritative = 1; /* keep the fortress secure by default */
++    return conf;
++}
++
++static const char *set_auth_slot(cmd_parms *cmd, void *offset, const char *f, 
++                                 const char *t)
++{
++    if (t && strcmp(t, "standard")) {
++        return apr_pstrcat(cmd->pool, "Invalid auth file type: ", t, NULL);
++    }
++
++    return ap_set_file_slot(cmd, offset, f);
++}
++
++static const command_rec auth_basic_cmds[] =
++{
++    AP_INIT_TAKE12("AuthUserFile", set_auth_slot,
++                   (void *)APR_OFFSETOF(auth_config_rec, auth_pwfile),
++                   OR_AUTHCFG, "text file containing user IDs and passwords"),
++    AP_INIT_TAKE12("AuthGroupFile", set_auth_slot,
++                   (void *)APR_OFFSETOF(auth_config_rec, auth_grpfile),
++                   OR_AUTHCFG,
++                   "text file containing group names and member user IDs"),
++    AP_INIT_FLAG("AuthAuthoritative", ap_set_flag_slot,
++                 (void *)APR_OFFSETOF(auth_config_rec, authoritative),
++                 OR_AUTHCFG,
++                 "Set to 'no' to allow access control to be passed along to "
++                 "lower modules if the UserID is not known to this module"),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA auth_basic_module;
++
++static char *get_pw(request_rec *r, char *user, char *auth_pwfile)
++{
++    ap_configfile_t *f;
++    char l[MAX_STRING_LEN];
++    const char *rpw, *w;
++    apr_status_t status;
++
++    if ((status = ap_pcfg_openfile(&f, r->pool, auth_pwfile)) != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
++                      "Could not open password file: %s", auth_pwfile);
++        return NULL;
++    }
++    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
++        if ((l[0] == '#') || (!l[0])) {
++            continue;
++        }
++        rpw = l;
++        w = ap_getword(r->pool, &rpw, ':');
++
++        if (!strcmp(user, w)) {
++            ap_cfg_closefile(f);
++            return ap_getword(r->pool, &rpw, ':');
++        }
++    }
++    ap_cfg_closefile(f);
++    return NULL;
++}
++
++static apr_table_t *groups_for_user(apr_pool_t *p, char *user, char *grpfile)
++{
++    ap_configfile_t *f;
++    apr_table_t *grps = apr_table_make(p, 15);
++    apr_pool_t *sp;
++    char l[MAX_STRING_LEN];
++    const char *group_name, *ll, *w;
++    apr_status_t status;
++
++    if ((status = ap_pcfg_openfile(&f, p, grpfile)) != APR_SUCCESS) {
++/*add?  aplog_error(APLOG_MARK, APLOG_ERR, NULL,
++                    "Could not open group file: %s", grpfile);*/
++        return NULL;
++    }
++
++    apr_pool_create(&sp, p);
++
++    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
++        if ((l[0] == '#') || (!l[0])) {
++            continue;
++        }
++        ll = l;
++        apr_pool_clear(sp);
++
++        group_name = ap_getword(sp, &ll, ':');
++
++        while (ll[0]) {
++            w = ap_getword_conf(sp, &ll);
++            if (!strcmp(w, user)) {
++                apr_table_setn(grps, apr_pstrdup(p, group_name), "in");
++                break;
++            }
++        }
++    }
++    ap_cfg_closefile(f);
++    apr_pool_destroy(sp);
++    return grps;
++}
++
++/* These functions return 0 if client is OK, and proper error status
++ * if not... either HTTP_UNAUTHORIZED, if we made a check, and it failed, or
++ * HTTP_INTERNAL_SERVER_ERROR, if things are so totally confused that we
++ * couldn't figure out how to tell if the client is authorized or not.
++ *
++ * If they return DECLINED, and all other modules also decline, that's
++ * treated by the server core as a configuration error, logged and
++ * reported as such.
++ */
++
++/* Determine user ID, and check if it really is that user, for HTTP
++ * basic authentication...
++ */
++
++static int authenticate_basic_user(request_rec *r)
++{
++    auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                 &auth_basic_module);
++    const char *sent_pw;
++    char *real_pw;
++    apr_status_t invalid_pw;
++    int res;
++
++    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
++        return res;
++    }
++
++    if (!conf->auth_pwfile) {
++        return DECLINED;
++    }
++
++    if (!(real_pw = get_pw(r, r->user, conf->auth_pwfile))) {
++        if (!conf->authoritative) {
++            return DECLINED;
++        }
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "user %s not found: %s", r->user, r->uri);
++        ap_note_basic_auth_failure(r);
++        return HTTP_UNAUTHORIZED;
++    }
++    invalid_pw = apr_password_validate(sent_pw, real_pw);
++    if (invalid_pw != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "user %s: authentication failure for \"%s\": "
++                      "Password Mismatch",
++                      r->user, r->uri);
++        ap_note_basic_auth_failure(r);
++        return HTTP_UNAUTHORIZED;
++    }
++    return OK;
++}
++
++/* Checking ID */
++
++static int check_user_access(request_rec *r)
++{
++    auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                 &auth_basic_module);
++    char *user = r->user;
++    int m = r->method_number;
++    int method_restricted = 0;
++    register int x;
++    const char *t, *w;
++    apr_table_t *grpstatus;
++    const apr_array_header_t *reqs_arr = ap_requires(r);
++    require_line *reqs;
++
++    /* BUG FIX: tadc, 11-Nov-1995.  If there is no "requires" directive, 
++     * then any user will do.
++     */
++    if (!reqs_arr) {
++        return OK;
++    }
++    reqs = (require_line *)reqs_arr->elts;
++
++    if (conf->auth_grpfile) {
++        grpstatus = groups_for_user(r->pool, user, conf->auth_grpfile);
++    }
++    else {
++        grpstatus = NULL;
++    }
++
++    for (x = 0; x < reqs_arr->nelts; x++) {
++
++        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m))) {
++            continue;
++        }
++
++        method_restricted = 1;
++
++        t = reqs[x].requirement;
++        w = ap_getword_white(r->pool, &t);
++        if (!strcmp(w, "valid-user")) {
++            return OK;
++        }
++        if (!strcmp(w, "user")) {
++            while (t[0]) {
++                w = ap_getword_conf(r->pool, &t);
++                if (!strcmp(user, w)) {
++                    return OK;
++                }
++            }
++        }
++        else if (!strcmp(w, "group")) {
++            if (!grpstatus) {
++                return DECLINED;        /* DBM group?  Something else? */
++            }
++
++            while (t[0]) {
++                w = ap_getword_conf(r->pool, &t);
++                if (apr_table_get(grpstatus, w)) {
++                    return OK;
++                }
++            }
++        }
++        else if (conf->authoritative) {
++            /* if we aren't authoritative, any require directive could be
++             * valid even if we don't grok it.  However, if we are 
++             * authoritative, we can warn the user they did something wrong.
++             * That something could be a missing "AuthAuthoritative off", but
++             * more likely is a typo in the require directive.
++             */
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                          "access to %s failed, reason: unknown require "
++                          "directive:\"%s\"", r->uri, reqs[x].requirement);
++        }
++    }
++
++    if (!method_restricted) {
++        return OK;
++    }
++
++    if (!conf->authoritative) {
++        return DECLINED;
++    }
++
++    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                  "access to %s failed, reason: user %s not allowed access",
++                  r->uri, user);
++        
++    ap_note_basic_auth_failure(r);
++    return HTTP_UNAUTHORIZED;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_check_user_id(authenticate_basic_user,NULL,NULL,APR_HOOK_MIDDLE);
++    ap_hook_auth_checker(check_user_access,NULL,NULL,APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA auth_basic_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_auth_dir_config,     /* dir config creater */
++    NULL,                       /* dir merger --- default is to override */
++    NULL,                       /* server config */
++    NULL,                       /* merge server config */
++    auth_basic_cmds,            /* command apr_table_t */
++    register_hooks              /* register hooks */
++};
+diff --git a/modules/aaa/mod_auth_dbm.c b/modules/aaa/mod_auth_dbm.c
+deleted file mode 100644
+index c14e5fa..0000000
+--- a/modules/aaa/mod_auth_dbm.c
++++ /dev/null
+@@ -1,335 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- *
+- * Portions of this software are based upon public domain software
+- * originally written at the National Center for Supercomputing Applications,
+- * University of Illinois, Urbana-Champaign.
+- */
+-
+-/*
+- * http_auth: authentication
+- * 
+- * Rob McCool & Brian Behlendorf.
+- * 
+- * Adapted to Apache by rst.
+- *
+- * dirkx - Added Authoritative control to allow passing on to lower  
+- *         modules if and only if the userid is not known to this
+- *         module. A known user with a faulty or absent password still
+- *         causes an AuthRequired. The default is 'Authoritative', i.e.
+- *         no control is passed along.
+- */
+-
+-#define APR_WANT_STRFUNC
+-#include "apr_want.h"
+-#include "apr_strings.h"
+-#include "apr_dbm.h"
+-#include "apr_md5.h"            /* for apr_password_validate */
+-
+-#include "httpd.h"
+-#include "http_config.h"
+-#include "http_core.h"
+-#include "http_log.h"
+-#include "http_protocol.h"
+-#include "http_request.h"   /* for ap_hook_(check_user_id | auth_checker)*/
+-
+-
+-typedef struct {
+-    char *auth_dbmpwfile;
+-    char *auth_dbmgrpfile;
+-    char *auth_dbmtype;
+-    int auth_dbmauthoritative;
+-} dbm_auth_config_rec;
+-
+-static void *create_dbm_auth_dir_config(apr_pool_t *p, char *d)
+-{
+-    dbm_auth_config_rec *conf = apr_palloc(p, sizeof(*conf));
+-
+-    conf->auth_dbmpwfile = NULL;
+-    conf->auth_dbmgrpfile = NULL;
+-    conf->auth_dbmtype = "default";
+-    conf->auth_dbmauthoritative = 1;  /* fortress is secure by default */
+-
+-    return conf;
+-}
+-
+-static const char *set_dbm_slot(cmd_parms *cmd, void *offset,
+-                                const char *f, const char *t)
+-{
+-    if (!t || strcmp(t, "dbm"))
+-        return DECLINE_CMD;
+-
+-    return ap_set_file_slot(cmd, offset, f);
+-}
+-
+-static const char *set_dbm_type(cmd_parms *cmd, 
+-                                void *dir_config, 
+-                                const char *arg)
+-{
+-    dbm_auth_config_rec *conf = dir_config;
+-   
+-    conf->auth_dbmtype = apr_pstrdup(cmd->pool, arg);
+-    return NULL;
+-}
+-
+-static const command_rec dbm_auth_cmds[] =
+-{
+-    AP_INIT_TAKE1("AuthDBMUserFile", ap_set_file_slot,
+-     (void *)APR_OFFSETOF(dbm_auth_config_rec, auth_dbmpwfile),
+-     OR_AUTHCFG, "dbm database file containing user IDs and passwords"),
+-    AP_INIT_TAKE1("AuthDBMGroupFile", ap_set_file_slot,
+-     (void *)APR_OFFSETOF(dbm_auth_config_rec, auth_dbmgrpfile),
+-     OR_AUTHCFG, "dbm database file containing group names and member user IDs"),
+-    AP_INIT_TAKE12("AuthUserFile", set_dbm_slot,
+-     (void *)APR_OFFSETOF(dbm_auth_config_rec, auth_dbmpwfile),
+-     OR_AUTHCFG, NULL),
+-    AP_INIT_TAKE12("AuthGroupFile", set_dbm_slot,
+-     (void *)APR_OFFSETOF(dbm_auth_config_rec, auth_dbmgrpfile),
+-     OR_AUTHCFG, NULL),
+-    AP_INIT_TAKE1("AuthDBMType", set_dbm_type,
+-     NULL,
+-     OR_AUTHCFG, "what type of DBM file the user file is"),
+-    AP_INIT_FLAG("AuthDBMAuthoritative", ap_set_flag_slot,
+-     (void *)APR_OFFSETOF(dbm_auth_config_rec, auth_dbmauthoritative),
+-     OR_AUTHCFG, "Set to 'no' to allow access control to be passed along to lower modules, if the UserID is not known in this module"),
+-    {NULL}
+-};
+-
+-module AP_MODULE_DECLARE_DATA auth_dbm_module;
+-
+-static char *get_dbm_pw(request_rec *r, 
+-                        char *user, 
+-                        char *auth_dbmpwfile, 
+-                        char *dbtype)
+-{
+-    apr_dbm_t *f;
+-    apr_datum_t d, q;
+-    char *pw = NULL;
+-    apr_status_t retval;
+-    q.dptr = user;
+-#ifndef NETSCAPE_DBM_COMPAT
+-    q.dsize = strlen(q.dptr);
+-#else
+-    q.dsize = strlen(q.dptr) + 1;
+-#endif
+-
+-    retval = apr_dbm_open_ex(&f, dbtype, auth_dbmpwfile, APR_DBM_READONLY, 
+-                             APR_OS_DEFAULT, r->pool);
+-    if (retval != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, retval, r,
+-                      "could not open dbm (type %s) auth file: %s", dbtype, 
+-                      auth_dbmpwfile);
+-        return NULL;
+-    }
+-    if (apr_dbm_fetch(f, q, &d) == APR_SUCCESS && d.dptr) {
+-        pw = apr_palloc(r->pool, d.dsize + 1);
+-        strncpy(pw, d.dptr, d.dsize);
+-        pw[d.dsize] = '\0'; /* Terminate the string */
+-    }
+-
+-    apr_dbm_close(f);
+-    return pw;
+-}
+-
+-/* We do something strange with the group file.  If the group file
+- * contains any : we assume the format is
+- *      key=username value=":"groupname [":"anything here is ignored]
+- * otherwise we now (0.8.14+) assume that the format is
+- *      key=username value=groupname
+- * The first allows the password and group files to be the same 
+- * physical DBM file;   key=username value=password":"groupname[":"anything]
+- *
+- * mark@telescope.org, 22Sep95
+- */
+-
+-static char *get_dbm_grp(request_rec *r, char *user, char *auth_dbmgrpfile, 
+-                         char *dbtype)
+-{
+-    char *grp_data = get_dbm_pw(r, user, auth_dbmgrpfile,dbtype);
+-    char *grp_colon;
+-    char *grp_colon2;
+-
+-    if (grp_data == NULL)
+-        return NULL;
+-
+-    if ((grp_colon = strchr(grp_data, ':')) != NULL) {
+-        grp_colon2 = strchr(++grp_colon, ':');
+-        if (grp_colon2)
+-            *grp_colon2 = '\0';
+-        return grp_colon;
+-    }
+-    return grp_data;
+-}
+-
+-static int dbm_authenticate_basic_user(request_rec *r)
+-{
+-    dbm_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                     &auth_dbm_module);
+-    const char *sent_pw;
+-    char *real_pw, *colon_pw;
+-    apr_status_t invalid_pw;
+-    int res;
+-
+-    if ((res = ap_get_basic_auth_pw(r, &sent_pw)))
+-        return res;
+-
+-    if (!conf->auth_dbmpwfile)
+-        return DECLINED;
+-
+-    if (!(real_pw = get_dbm_pw(r, r->user, conf->auth_dbmpwfile,
+-                               conf->auth_dbmtype))) {
+-        if (!(conf->auth_dbmauthoritative))
+-            return DECLINED;
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "DBM user %s not found: %s", r->user, r->filename);
+-        ap_note_basic_auth_failure(r);
+-        return HTTP_UNAUTHORIZED;
+-    }
+-    /* Password is up to first : if exists */
+-    colon_pw = strchr(real_pw, ':');
+-    if (colon_pw) {
+-        *colon_pw = '\0';
+-    }
+-    invalid_pw = apr_password_validate(sent_pw, real_pw);
+-    if (invalid_pw != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                      "DBM user %s: authentication failure for \"%s\": "
+-                      "Password Mismatch",
+-                      r->user, r->uri);
+-        ap_note_basic_auth_failure(r);
+-        return HTTP_UNAUTHORIZED;
+-    }
+-    return OK;
+-}
+-
+-/* Checking ID */
+-
+-static int dbm_check_auth(request_rec *r)
+-{
+-    dbm_auth_config_rec *conf = ap_get_module_config(r->per_dir_config,
+-                                                     &auth_dbm_module);
+-    char *user = r->user;
+-    int m = r->method_number;
+-
+-    const apr_array_header_t *reqs_arr = ap_requires(r);
+-    require_line *reqs = reqs_arr ? (require_line *) reqs_arr->elts : NULL;
+-
+-    register int x;
+-    const char *t;
+-    char *w;
+-
+-    if (!conf->auth_dbmgrpfile)
+-        return DECLINED;
+-    if (!reqs_arr)
+-        return DECLINED;
+-
+-    for (x = 0; x < reqs_arr->nelts; x++) {
+-
+-        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m)))
+-            continue;
+-
+-        t = reqs[x].requirement;
+-        w = ap_getword_white(r->pool, &t);
+-
+-        if (!strcmp(w, "group") && conf->auth_dbmgrpfile) {
+-            const char *orig_groups, *groups;
+-            char *v;
+-
+-            if (!(groups = get_dbm_grp(r, user, conf->auth_dbmgrpfile,
+-                                       conf->auth_dbmtype))) {
+-                if (!(conf->auth_dbmauthoritative))
+-                    return DECLINED;
+-                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                            "user %s not in DBM group file %s: %s",
+-                            user, conf->auth_dbmgrpfile, r->filename);
+-                ap_note_basic_auth_failure(r);
+-                return HTTP_UNAUTHORIZED;
+-            }
+-            orig_groups = groups;
+-            while (t[0]) {
+-                w = ap_getword_white(r->pool, &t);
+-                groups = orig_groups;
+-                while (groups[0]) {
+-                    v = ap_getword(r->pool, &groups, ',');
+-                    if (!strcmp(v, w))
+-                        return OK;
+-                }
+-            }
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "user %s not in right group: %s",
+-                          user, r->filename);
+-            ap_note_basic_auth_failure(r);
+-            return HTTP_UNAUTHORIZED;
+-        }
+-    }
+-
+-    return DECLINED;
+-}
+-
+-static void register_hooks(apr_pool_t *p)
+-{
+-    ap_hook_check_user_id(dbm_authenticate_basic_user, NULL, NULL,
+-                          APR_HOOK_MIDDLE);
+-    ap_hook_auth_checker(dbm_check_auth, NULL, NULL, APR_HOOK_MIDDLE);
+-}
+-
+-module AP_MODULE_DECLARE_DATA auth_dbm_module =
+-{
+-    STANDARD20_MODULE_STUFF,
+-    create_dbm_auth_dir_config, /* dir config creater */
+-    NULL,                       /* dir merger --- default is to override */
+-    NULL,                       /* server config */
+-    NULL,                       /* merge server config */
+-    dbm_auth_cmds,              /* command apr_table_t */
+-    register_hooks              /* register hooks */
+-};
+diff --git a/modules/aaa/mod_auth_dbm.dsp b/modules/aaa/mod_auth_dbm.dsp
+deleted file mode 100644
+index 59a2575..0000000
+--- a/modules/aaa/mod_auth_dbm.dsp
++++ /dev/null
+@@ -1,128 +0,0 @@
+-# Microsoft Developer Studio Project File - Name="mod_auth_dbm" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
+-# ** DO NOT EDIT **
+-
+-# TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+-
+-CFG=mod_auth_dbm - Win32 Release
+-!MESSAGE This is not a valid makefile. To build this project using NMAKE,
+-!MESSAGE use the Export Makefile command and run
+-!MESSAGE 
+-!MESSAGE NMAKE /f "mod_auth_dbm.mak".
+-!MESSAGE 
+-!MESSAGE You can specify a configuration when running NMAKE
+-!MESSAGE by defining the macro CFG on the command line. For example:
+-!MESSAGE 
+-!MESSAGE NMAKE /f "mod_auth_dbm.mak" CFG="mod_auth_dbm - Win32 Release"
+-!MESSAGE 
+-!MESSAGE Possible choices for configuration are:
+-!MESSAGE 
+-!MESSAGE "mod_auth_dbm - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE "mod_auth_dbm - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE 
+-
+-# Begin Project
+-# PROP AllowPerConfigDependencies 0
+-# PROP Scc_ProjName ""
+-# PROP Scc_LocalPath ""
+-CPP=cl.exe
+-MTL=midl.exe
+-RSC=rc.exe
+-
+-!IF  "$(CFG)" == "mod_auth_dbm - Win32 Release"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "Release"
+-# PROP BASE Intermediate_Dir "Release"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 0
+-# PROP Output_Dir "Release"
+-# PROP Intermediate_Dir "Release"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MD /W3 /O2 /I "../../include" /I "../../srclib/apr/include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_AUTH_DBM_USE_APR" /Fd"Release\mod_auth_dbm" /FD /c
+-# ADD BASE MTL /nologo /D "NDEBUG" /win32
+-# ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "NDEBUG"
+-# ADD RSC /l 0x409 /d "NDEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:"Release/mod_auth_dbm.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+-# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:"Release/mod_auth_dbm.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+-
+-!ELSEIF  "$(CFG)" == "mod_auth_dbm - Win32 Debug"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "Debug"
+-# PROP BASE Intermediate_Dir "Debug"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 1
+-# PROP Output_Dir "Debug"
+-# PROP Intermediate_Dir "Debug"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../../include" /I "../../srclib/apr/include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_AUTH_DBM_USE_APR" /Fd"Debug\mod_auth_dbm" /FD /c
+-# ADD BASE MTL /nologo /D "_DEBUG" /win32
+-# ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "_DEBUG"
+-# ADD RSC /l 0x409 /d "_DEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /out:"Debug/mod_auth_dbm.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+-# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /out:"Debug/mod_auth_dbm.so" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+-
+-!ENDIF 
+-
+-# Begin Target
+-
+-# Name "mod_auth_dbm - Win32 Release"
+-# Name "mod_auth_dbm - Win32 Debug"
+-# Begin Source File
+-
+-SOURCE=.\mod_auth_dbm.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\mod_auth_dbm.rc
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=..\..\build\win32\win32ver.awk
+-
+-!IF  "$(CFG)" == "mod_auth_dbm - Win32 Release"
+-
+-# PROP Ignore_Default_Tool 1
+-# Begin Custom Build - Creating Version Resource
+-InputPath=..\..\build\win32\win32ver.awk
+-
+-".\mod_auth_dbm.rc" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	awk -f ../../build/win32/win32ver.awk mod_auth_dbm  "auth_dbm_module for Apache" ../../include/ap_release.h > .\mod_auth_dbm.rc
+-
+-# End Custom Build
+-
+-!ELSEIF  "$(CFG)" == "mod_auth_dbm - Win32 Debug"
+-
+-# PROP Ignore_Default_Tool 1
+-# Begin Custom Build - Creating Version Resource
+-InputPath=..\..\build\win32\win32ver.awk
+-
+-".\mod_auth_dbm.rc" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	awk -f ../../build/win32/win32ver.awk mod_auth_dbm  "auth_dbm_module for Apache" ../../include/ap_release.h > .\mod_auth_dbm.rc
+-
+-# End Custom Build
+-
+-!ENDIF 
+-
+-# End Source File
+-# End Target
+-# End Project
+diff --git a/modules/aaa/mod_auth_dbm.exp b/modules/aaa/mod_auth_dbm.exp
+deleted file mode 100644
+index 7038e80..0000000
+--- a/modules/aaa/mod_auth_dbm.exp
++++ /dev/null
+@@ -1 +0,0 @@
+-auth_dbm_module
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 2ea178f..0545f14 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -130,7 +130,6 @@
+ typedef struct digest_config_struct {
+     const char  *dir_name;
+     const char  *pwfile;
+-    const char  *grpfile;
+     const char  *realm;
+     char **qop_list;
+     apr_sha1_ctx_t  nonce_ctx;
+@@ -487,13 +486,6 @@ static const char *set_digest_file(cmd_parms *cmd, void *config,
+     return NULL;
+ }
+ 
+-static const char *set_group_file(cmd_parms *cmd, void *config,
+-                                  const char *file)
+-{
+-    ((digest_config_rec *) config)->grpfile = file;
+-    return NULL;
+-}
+-
+ static const char *set_qop(cmd_parms *cmd, void *config, const char *op)
+ {
+     digest_config_rec *conf = (digest_config_rec *) config;
+@@ -645,8 +637,6 @@ static const command_rec digest_cmds[] =
+      "The authentication realm (e.g. \"Members Only\")"),
+     AP_INIT_TAKE1("AuthDigestFile", set_digest_file, NULL, OR_AUTHCFG, 
+      "The name of the file containing the usernames and password hashes"),
+-    AP_INIT_TAKE1("AuthDigestGroupFile", set_group_file, NULL, OR_AUTHCFG, 
+-     "The name of the file containing the group names and members"),
+     AP_INIT_ITERATE("AuthDigestQop", set_qop, NULL, OR_AUTHCFG, 
+      "A list of quality-of-protection options"),
+     AP_INIT_TAKE1("AuthDigestNonceLifetime", set_nonce_lifetime, NULL, OR_AUTHCFG, 
+@@ -1882,146 +1872,6 @@ static int authenticate_digest_user(request_rec *r)
+     return OK;
+ }
+ 
+-
+-/*
+- * Checking ID
+- */
+-
+-static apr_table_t *groups_for_user(request_rec *r, const char *user,
+-                                    const char *grpfile)
+-{
+-    ap_configfile_t *f;
+-    apr_table_t *grps = apr_table_make(r->pool, 15);
+-    apr_pool_t *sp;
+-    char l[MAX_STRING_LEN];
+-    const char *group_name, *ll, *w;
+-    apr_status_t sts;
+-
+-    if ((sts = ap_pcfg_openfile(&f, r->pool, grpfile)) != APR_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR, sts, r,
+-                      "Digest: Could not open group file: %s", grpfile);
+-        return NULL;
+-    }
+-
+-    if (apr_pool_create(&sp, r->pool) != APR_SUCCESS) {
+-        return NULL;
+-    }
+-
+-    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
+-        if ((l[0] == '#') || (!l[0])) {
+-            continue;
+-        }
+-        ll = l;
+-        apr_pool_clear(sp);
+-
+-        group_name = ap_getword(sp, &ll, ':');
+-
+-        while (ll[0]) {
+-            w = ap_getword_conf(sp, &ll);
+-            if (!strcmp(w, user)) {
+-                apr_table_setn(grps, apr_pstrdup(r->pool, group_name), "in");
+-                break;
+-            }
+-        }
+-    }
+-
+-    ap_cfg_closefile(f);
+-    apr_pool_destroy(sp);
+-    return grps;
+-}
+-
+-
+-static int digest_check_auth(request_rec *r)
+-{
+-    const digest_config_rec *conf =
+-                (digest_config_rec *) ap_get_module_config(r->per_dir_config,
+-                                                           &auth_digest_module);
+-    const char *user = r->user;
+-    int m = r->method_number;
+-    int method_restricted = 0;
+-    register int x;
+-    const char *t, *w;
+-    apr_table_t *grpstatus;
+-    const apr_array_header_t *reqs_arr;
+-    require_line *reqs;
+-
+-    if (!(t = ap_auth_type(r)) || strcasecmp(t, "Digest")) {
+-        return DECLINED;
+-    }
+-
+-    reqs_arr = ap_requires(r);
+-    /* If there is no "requires" directive, then any user will do.
+-     */
+-    if (!reqs_arr) {
+-        return OK;
+-    }
+-    reqs = (require_line *) reqs_arr->elts;
+-
+-    if (conf->grpfile) {
+-        grpstatus = groups_for_user(r, user, conf->grpfile);
+-    }
+-    else {
+-        grpstatus = NULL;
+-    }
+-
+-    for (x = 0; x < reqs_arr->nelts; x++) {
+-
+-        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m))) {
+-            continue;
+-        }
+-
+-        method_restricted = 1;
+-
+-        t = reqs[x].requirement;
+-        w = ap_getword_white(r->pool, &t);
+-        if (!strcasecmp(w, "valid-user")) {
+-            return OK;
+-        }
+-        else if (!strcasecmp(w, "user")) {
+-            while (t[0]) {
+-                w = ap_getword_conf(r->pool, &t);
+-                if (!strcmp(user, w)) {
+-                    return OK;
+-                }
+-            }
+-        }
+-        else if (!strcasecmp(w, "group")) {
+-            if (!grpstatus) {
+-                return DECLINED;
+-            }
+-
+-            while (t[0]) {
+-                w = ap_getword_conf(r->pool, &t);
+-                if (apr_table_get(grpstatus, w)) {
+-                    return OK;
+-                }
+-            }
+-        }
+-        else {
+-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                          "Digest: access to %s failed, reason: unknown "
+-                          "require directive \"%s\"",
+-                          r->uri, reqs[x].requirement);
+-            return DECLINED;
+-        }
+-    }
+-
+-    if (!method_restricted) {
+-        return OK;
+-    }
+-
+-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+-                  "Digest: access to %s failed, reason: user %s not "
+-                  "allowed access", r->uri, user);
+-
+-    note_digest_auth_failure(r, conf,
+-        (digest_header_rec *) ap_get_module_config(r->request_config,
+-                                                   &auth_digest_module),
+-        0);
+-    return HTTP_UNAUTHORIZED;
+-}
+-
+-
+ /*
+  * Authorization-Info header code
+  */
+@@ -2207,7 +2057,7 @@ static void register_hooks(apr_pool_t *p)
+     ap_hook_child_init(initialize_child, NULL, NULL, APR_HOOK_MIDDLE);
+     ap_hook_post_read_request(parse_hdr_and_update_nc, parsePre, NULL, APR_HOOK_MIDDLE);
+     ap_hook_check_user_id(authenticate_digest_user, NULL, NULL, APR_HOOK_MIDDLE);
+-    ap_hook_auth_checker(digest_check_auth, NULL, NULL, APR_HOOK_MIDDLE);
++
+     ap_hook_fixups(add_auth_info, NULL, NULL, APR_HOOK_MIDDLE);
+ }
+ 
+diff --git a/modules/aaa/mod_authn_anon.c b/modules/aaa/mod_authn_anon.c
+new file mode 100644
+index 0000000..28c1c81
+--- /dev/null
++++ b/modules/aaa/mod_authn_anon.c
+@@ -0,0 +1,258 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/*
++ * http_auth: authentication
++ * 
++ * Rob McCool & Brian Behlendorf.
++ * 
++ * Adapted to Apache by rst.
++ *
++ * Version 0.5 May 1996
++ *
++ * Modified by Dirk.vanGulik@jrc.it to
++ * 
++ * Adapted to allow anonymous logins, just like with Anon-FTP, when
++ * one gives the magic user name 'anonymous' and ones email address
++ * as the password.
++ *
++ * Just add the following tokes to your <directory> setup:
++ * 
++ * Anonymous                    magic-userid [magic-userid]...
++ *
++ * Anonymous_MustGiveEmail      [ on | off ] default = on
++ * Anonymous_LogEmail           [ on | off ] default = on
++ * Anonymous_VerifyEmail        [ on | off ] default = off
++ * Anonymous_NoUserId           [ on | off ] default = off
++ * Anonymous_Authoritative      [ on | off ] default = off
++ *
++ * The magic user id is something like 'anonymous', it is NOT case sensitive. 
++ * 
++ * The MustGiveEmail flag can be used to force users to enter something
++ * in the password field (like an email address). Default is on.
++ *
++ * Furthermore the 'NoUserID' flag can be set to allow completely empty
++ * usernames in as well; this can be is convenient as a single return
++ * in broken GUIs like W95 is often given by the user. The Default is off.
++ *
++ * Dirk.vanGulik@jrc.it; http://ewse.ceo.org; http://me-www.jrc.it/~dirkx
++ * 
++ */
++
++#include "apr_strings.h"
++
++#define APR_WANT_STRFUNC
++#include "apr_want.h"
++
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_request.h"
++#include "http_protocol.h"
++
++typedef struct anon_auth_pw {
++    char *password;
++    struct anon_auth_pw *next;
++} anon_auth_pw;
++
++typedef struct {
++    anon_auth_pw *passwords;
++    int nouserid;
++    int logemail;
++    int verifyemail;
++    int mustemail;
++    int authoritative;
++} authn_anon_config_rec;
++
++static void *create_authn_anon_dir_config(apr_pool_t *p, char *d)
++{
++    authn_anon_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    /* just to illustrate the defaults really. */
++    conf->passwords = NULL;
++
++    conf->nouserid = 0;
++    conf->logemail = 1;
++    conf->verifyemail = 0;
++    conf->mustemail = 1;
++    conf->authoritative = 0;
++    return conf;
++}
++
++static const char *anon_set_string_slots(cmd_parms *cmd,
++                                         void *my_config, const char *arg)
++{
++    authn_anon_config_rec *conf = my_config;
++    anon_auth_pw *first;
++
++    if (!(*arg)) {
++        return "Anonymous string cannot be empty, use Anonymous_NoUserId";
++    }
++
++    /* squeeze in a record */
++    first = conf->passwords;
++
++    if (!(conf->passwords = apr_palloc(cmd->pool, sizeof(anon_auth_pw))) ||
++        !(conf->passwords->password = apr_pstrdup(cmd->pool, arg))) {
++        return "Failed to claim memory for an anonymous password...";
++    }
++
++    /* and repair the next */
++    conf->passwords->next = first;
++
++    return NULL;
++}
++
++static const command_rec authn_anon_cmds[] =
++{
++    AP_INIT_ITERATE("Anonymous", anon_set_string_slots, NULL, OR_AUTHCFG, 
++     "a space-separated list of user IDs"),
++    AP_INIT_FLAG("Anonymous_MustGiveEmail", ap_set_flag_slot,
++     (void *)APR_OFFSETOF(authn_anon_config_rec, mustemail),
++     OR_AUTHCFG, "Limited to 'on' or 'off'"),
++    AP_INIT_FLAG("Anonymous_NoUserId", ap_set_flag_slot,
++     (void *)APR_OFFSETOF(authn_anon_config_rec, nouserid),
++     OR_AUTHCFG, "Limited to 'on' or 'off'"),
++    AP_INIT_FLAG("Anonymous_VerifyEmail", ap_set_flag_slot,
++     (void *)APR_OFFSETOF(authn_anon_config_rec, verifyemail),
++     OR_AUTHCFG, "Limited to 'on' or 'off'"),
++    AP_INIT_FLAG("Anonymous_LogEmail", ap_set_flag_slot,
++     (void *)APR_OFFSETOF(authn_anon_config_rec, logemail),
++     OR_AUTHCFG, "Limited to 'on' or 'off'"),
++    AP_INIT_FLAG("Anonymous_Authoritative", ap_set_flag_slot,
++     (void *)APR_OFFSETOF(authn_anon_config_rec, authoritative),
++     OR_AUTHCFG, "Limited to 'on' or 'off'"),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA authn_anon_module;
++
++static int anon_authenticate_basic_user(request_rec *r)
++{
++    authn_anon_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                      &authn_anon_module);
++    const char *sent_pw;
++    int res = DECLINED;
++
++    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
++        return res;
++    }
++
++    /* Ignore if we are not configured */
++    if (!conf->passwords) {
++        return DECLINED;
++    }
++
++    /* Do we allow an empty userID and/or is it the magic one
++     */
++
++    if ((!(r->user[0])) && (conf->nouserid)) {
++        res = OK;
++    }
++    else {
++        anon_auth_pw *p = conf->passwords;
++        res = DECLINED;
++        while ((res == DECLINED) && (p != NULL)) {
++            if (!(strcasecmp(r->user, p->password))) {
++                res = OK;
++            }
++            p = p->next;
++        }
++    }
++    /* Is username is OK and password been filled out (if required) */
++    if ((res == OK) && ((!conf->mustemail) || strlen(sent_pw)) &&
++        /* does the password look like an email address ? */
++        ((!conf->verifyemail) ||
++          ((strpbrk("@", sent_pw) != NULL) && 
++           (strpbrk(".", sent_pw) != NULL)))) {
++        if (conf->logemail && ap_is_initial_req(r)) {
++            ap_log_rerror(APLOG_MARK, APLOG_INFO, APR_SUCCESS, r,
++                        "Anonymous: Passwd <%s> Accepted",
++                        sent_pw ? sent_pw : "\'none\'");
++        }
++        return OK;
++    }
++    else {
++        if (conf->authoritative) {
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_SUCCESS, r,
++                        "Anonymous: Authoritative, Passwd <%s> not accepted",
++                        sent_pw ? sent_pw : "\'none\'");
++            return HTTP_UNAUTHORIZED;
++        }
++        /* Drop out the bottom to return DECLINED */
++    }
++
++    return DECLINED;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_check_user_id(anon_authenticate_basic_user,NULL,NULL,APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA authn_anon_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authn_anon_dir_config, /* dir config creater */
++    NULL,                         /* dir merger ensure strictness */
++    NULL,                         /* server config */
++    NULL,                         /* merge server config */
++    authn_anon_cmds,              /* command apr_table_t */
++    register_hooks                /* register hooks */
++};
+diff --git a/modules/aaa/mod_authn_dbm.c b/modules/aaa/mod_authn_dbm.c
+new file mode 100644
+index 0000000..302b7fc
+--- /dev/null
++++ b/modules/aaa/mod_authn_dbm.c
+@@ -0,0 +1,248 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/*
++ * http_auth: authentication
++ * 
++ * Rob McCool & Brian Behlendorf.
++ * 
++ * Adapted to Apache by rst.
++ *
++ * dirkx - Added Authoritative control to allow passing on to lower  
++ *         modules if and only if the userid is not known to this
++ *         module. A known user with a faulty or absent password still
++ *         causes an AuthRequired. The default is 'Authoritative', i.e.
++ *         no control is passed along.
++ */
++
++#define APR_WANT_STRFUNC
++#include "apr_want.h"
++#include "apr_strings.h"
++#include "apr_dbm.h"
++#include "apr_md5.h"        /* for apr_password_validate */
++
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"   /* for ap_hook_(check_user_id | auth_checker)*/
++
++
++typedef struct {
++    char *pwfile;
++    char *dbmtype;
++    int authoritative;
++} authn_dbm_config_rec;
++
++static void *create_authn_dbm_dir_config(apr_pool_t *p, char *d)
++{
++    authn_dbm_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    conf->pwfile = NULL;
++    conf->dbmtype = "default";
++    conf->authoritative = 1;  /* fortress is secure by default */
++
++    return conf;
++}
++
++static const char *set_dbm_type(cmd_parms *cmd, 
++                                void *dir_config, 
++                                const char *arg)
++{
++    authn_dbm_config_rec *conf = dir_config;
++   
++    conf->dbmtype = apr_pstrdup(cmd->pool, arg);
++    return NULL;
++}
++
++static const command_rec authn_dbm_cmds[] =
++{
++    AP_INIT_TAKE1("AuthDBMUserFile", ap_set_file_slot,
++     (void *)APR_OFFSETOF(authn_dbm_config_rec, pwfile),
++     OR_AUTHCFG, "dbm database file containing user IDs and passwords"),
++    AP_INIT_TAKE1("AuthDBMType", set_dbm_type,
++     NULL,
++     OR_AUTHCFG, "what type of DBM file the user file is"),
++    AP_INIT_FLAG("AuthDBMAuthoritative", ap_set_flag_slot,
++     (void *)APR_OFFSETOF(authn_dbm_config_rec, authoritative),
++     OR_AUTHCFG, "Set to 'no' to allow access control to be passed along to lower modules, if the UserID is not known in this module"),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA authn_dbm_module;
++
++/* This should go into APR; perhaps with some nice
++ * caching/locking/flocking of the open dbm file.
++ *
++ * Duplicated in mod_auth_dbm.c
++ */
++static apr_status_t
++get_dbm_entry_as_str(request_rec *r, 
++                     char *user, 
++                     char *auth_dbmfile, 
++                     char *dbtype,
++                     char **str)
++{
++    apr_dbm_t *f;
++    apr_datum_t d, q;
++    char *pw = NULL;
++    apr_status_t retval;
++    q.dptr = user;
++
++#ifndef NETSCAPE_DBM_COMPAT
++    q.dsize = strlen(q.dptr);
++#else
++    q.dsize = strlen(q.dptr) + 1;
++#endif
++
++    retval = apr_dbm_open_ex(&f, dbtype, auth_dbmfile, APR_DBM_READONLY, 
++                             APR_OS_DEFAULT, r->pool);
++
++    if (retval != APR_SUCCESS) {
++        return retval;
++    }
++
++    *str = NULL;
++
++    if (apr_dbm_fetch(f, q, &d) == APR_SUCCESS && d.dptr) {
++        *str = apr_palloc(r->pool, d.dsize + 1);
++        strncpy(pw, d.dptr, d.dsize);
++        *str[d.dsize] = '\0'; /* Terminate the string */
++    }
++
++    apr_dbm_close(f);
++
++    return retval;
++}
++
++static int dbm_authenticate_basic_user(request_rec *r)
++{
++    authn_dbm_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                     &authn_dbm_module);
++    const char *sent_pw;
++    char *real_pw,*colon_pw;
++    apr_status_t status;
++    int res;
++
++    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
++        return res;
++    }
++
++    if (!conf->pwfile) {
++        return DECLINED;
++    }
++
++    status = get_dbm_entry_as_str(r, r->user, conf->pwfile,
++                                  conf->dbmtype, &real_pw);
++
++    if (status != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
++                      "could not open dbm (type %s) user auth file: %s",
++                      conf->dbmtype, 
++                      conf->pwfile);
++        return HTTP_INTERNAL_SERVER_ERROR;
++    }
++
++    if(real_pw == NULL) {
++
++        if (!conf->authoritative) {
++            return DECLINED;
++        }
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "DBM user %s not found: %s", r->user, r->filename);
++        ap_note_basic_auth_failure(r);
++
++        return HTTP_UNAUTHORIZED;
++    }
++
++    /* Password is up to first : if exists */
++    colon_pw = strchr(real_pw, ':');
++    if (colon_pw) {
++        *colon_pw = '\0';
++    }
++
++    status = apr_password_validate(sent_pw, real_pw);
++
++    if (status != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "DBM user %s: authentication failure for \"%s\": "
++                      "Password Mismatch",
++                      r->user, r->uri);
++        ap_note_basic_auth_failure(r);
++        return HTTP_UNAUTHORIZED;
++    }
++    return OK;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_check_user_id(dbm_authenticate_basic_user, NULL, NULL,
++                          APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA authn_dbm_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authn_dbm_dir_config, /* dir config creater */
++    NULL,                        /* dir merger --- default is to override */
++    NULL,                        /* server config */
++    NULL,                        /* merge server config */
++    authn_dbm_cmds,              /* command apr_table_t */
++    register_hooks               /* register hooks */
++};
+diff --git a/modules/aaa/mod_authn_default.c b/modules/aaa/mod_authn_default.c
+new file mode 100644
+index 0000000..fa6a189
+--- /dev/null
++++ b/modules/aaa/mod_authn_default.c
+@@ -0,0 +1,148 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/*
++ * http_auth: authentication
++ * 
++ * Rob McCool
++ * 
++ * Adapted to Apache by rst.
++ *
++ * dirkx - Added Authoritative control to allow passing on to lower
++ *         modules if and only if the userid is not known to this
++ *         module. A known user with a faulty or absent password still
++ *         causes an AuthRequired. The default is 'Authoritative', i.e.
++ *         no control is passed along.
++ */
++
++#include "apr_strings.h"
++#include "apr_md5.h"            /* for apr_password_validate */
++
++#include "ap_config.h"
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"
++
++typedef struct {
++    int authoritative;
++} authn_default_config_rec;
++
++static void *create_authn_default_dir_config(apr_pool_t *p, char *d)
++{
++    authn_default_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    conf->authoritative = 1; /* keep the fortress secure by default */
++    return conf;
++}
++
++static const command_rec authn_default_cmds[] =
++{
++    AP_INIT_FLAG("AuthDefaultAuthoritative", ap_set_flag_slot,
++                 (void *)APR_OFFSETOF(authn_default_config_rec,
++                                      authoritative),
++                 OR_AUTHCFG,
++                 "Set to 'no' to allow access control to be passed along to "
++                 "lower modules if the UserID is not known to this module. "
++		         "(default is yes)."),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA authn_default_module;
++
++static int authenticate_basic_user(request_rec *r)
++{
++    authn_default_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                      &authn_default_module);
++    const char *sent_pw;
++    int res;
++
++    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
++       	return res;
++    }
++
++    if (conf->authoritative == 0) {
++	    return DECLINED;
++    }
++
++    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                  "access to %s failed, reason: verification of user id '%s' "
++                  "not configured",
++                  r->uri, r->user ? r->user : "<null>");
++
++    ap_note_basic_auth_failure(r);
++    return HTTP_UNAUTHORIZED;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_check_user_id(authenticate_basic_user,NULL,NULL,APR_HOOK_LAST);
++}
++
++module AP_MODULE_DECLARE_DATA authn_default_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authn_default_dir_config,/* dir config creater */
++    NULL,                           /* dir merger --- default is to override */
++    NULL,                           /* server config */
++    NULL,                           /* merge server config */
++    authn_default_cmds,             /* command apr_table_t */
++    register_hooks                  /* register hooks */
++};
+diff --git a/modules/aaa/mod_authn_file.c b/modules/aaa/mod_authn_file.c
+new file mode 100644
+index 0000000..8f214d6
+--- /dev/null
++++ b/modules/aaa/mod_authn_file.c
+@@ -0,0 +1,232 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/*
++ * http_auth: authentication
++ * 
++ * Rob McCool
++ * 
++ * Adapted to Apache by rst.
++ *
++ * dirkx - Added Authoritative control to allow passing on to lower
++ *         modules if and only if the userid is not known to this
++ *         module. A known user with a faulty or absent password still
++ *         causes an AuthRequired. The default is 'Authoritative', i.e.
++ *         no control is passed along.
++ */
++
++#include "apr_strings.h"
++#include "apr_md5.h"            /* for apr_password_validate */
++
++#include "ap_config.h"
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"
++
++typedef struct {
++    char *pwfile;
++    int authoritative;
++} authn_file_config_rec;
++
++static void *create_authn_file_dir_config(apr_pool_t *p, char *d)
++{
++    authn_file_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    conf->pwfile = NULL;     /* just to illustrate the default really */
++    conf->authoritative = 1; /* keep the fortress secure by default */
++    return conf;
++}
++
++static const char *set_authn_file_slot(cmd_parms *cmd, void *offset,
++                                       const char *f, const char *t)
++{
++    if (t && strcmp(t, "standard")) {
++        return apr_pstrcat(cmd->pool, "Invalid auth file type: ", t, NULL);
++    }
++
++    return ap_set_file_slot(cmd, offset, f);
++}
++
++static const command_rec authn_file_cmds[] =
++{
++    AP_INIT_TAKE12("AuthUserFile", set_authn_file_slot,
++                   (void *)APR_OFFSETOF(authn_file_config_rec, pwfile),
++                   OR_AUTHCFG, "text file containing user IDs and passwords"),
++    AP_INIT_FLAG("AuthUserFileAuthoritative", ap_set_flag_slot,
++                 (void *)APR_OFFSETOF(authn_file_config_rec, authoritative),
++                 OR_AUTHCFG,
++                 "Set to 'no' to allow access control to be passed along to "
++                 "other modules if the BasicAuth username is not in "
++                 "AuthUserFile. (default is yes)." ),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA authn_file_module;
++
++static apr_status_t get_pw(request_rec *r, char *user, char *pwfile, 
++                           char ** out)
++{
++    ap_configfile_t *f;
++    char l[MAX_STRING_LEN];
++    const char *rpw, *w;
++    apr_status_t status;
++
++    *out = NULL;
++
++    if ((status = ap_pcfg_openfile(&f, r->pool, pwfile)) != APR_SUCCESS) {
++        return status;
++    }
++
++    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
++        if ((l[0] == '#') || (!l[0])) {
++            continue;
++        }
++        rpw = l;
++        w = ap_getword(r->pool, &rpw, ':');
++
++        if (!strcmp(user, w)) {
++            ap_cfg_closefile(f);
++            *out = ap_getword(r->pool, &rpw, ':');
++            return APR_SUCCESS;
++        }
++    }
++    ap_cfg_closefile(f);
++
++    return APR_SUCCESS;
++}
++
++/* These functions return 0 if client is OK, and proper error status
++ * if not... either HTTP_UNAUTHORIZED, if we made a check, and it failed, or
++ * HTTP_INTERNAL_SERVER_ERROR, if things are so totally confused that we
++ * couldn't figure out how to tell if the client is authorized or not.
++ *
++ * If they return DECLINED, and all other modules also decline, that's
++ * treated by the server core as a configuration error, logged and
++ * reported as such.
++ */
++
++/* Determine user ID, and check if it really is that user, for HTTP
++ * basic authentication...
++ */
++
++static int authenticate_basic_user(request_rec *r)
++{
++    authn_file_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                       &authn_file_module);
++    const char *sent_pw;
++    char *real_pw = NULL;
++    apr_status_t status;
++    int res;
++
++    if ((res = ap_get_basic_auth_pw(r, &sent_pw))) {
++        return res;
++    }
++
++    if (!conf->pwfile) {
++        return DECLINED;
++    }
++
++    if ((status = get_pw(r, r->user, conf->pwfile, &real_pw)) != APR_SUCCESS) 
++    {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
++                      "Could not open password file: %s", conf->pwfile);
++        return HTTP_INTERNAL_SERVER_ERROR;
++    }
++
++    if (real_pw == NULL) {
++        if (!conf->authoritative) {
++           return DECLINED;
++        } 
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "user %s not found: %s", r->user, r->uri);
++        ap_note_basic_auth_failure(r);
++        return HTTP_UNAUTHORIZED;
++    }
++
++    status = apr_password_validate(sent_pw, real_pw);
++
++    if (status != APR_SUCCESS) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                      "user %s: authentication failure for \"%s\": "
++                      "Password Mismatch",
++                      r->user, r->uri);
++        ap_note_basic_auth_failure(r);
++        return HTTP_UNAUTHORIZED;
++    }
++
++    return OK;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_check_user_id(authenticate_basic_user,NULL,NULL,APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA authn_file_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authn_file_dir_config,    /* dir config creater */
++    NULL,                            /* dir merger --- default is to override */
++    NULL,                            /* server config */
++    NULL,                            /* merge server config */
++    authn_file_cmds,                 /* command apr_table_t */
++    register_hooks                   /* register hooks */
++};
+diff --git a/modules/aaa/mod_authz_dbm.c b/modules/aaa/mod_authz_dbm.c
+new file mode 100644
+index 0000000..a41d006
+--- /dev/null
++++ b/modules/aaa/mod_authz_dbm.c
+@@ -0,0 +1,304 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/*
++ * http_auth: authentication
++ * 
++ * Rob McCool & Brian Behlendorf.
++ * 
++ * Adapted to Apache by rst.
++ *
++ * dirkx - Added Authoritative control to allow passing on to lower  
++ *         modules if and only if the userid is not known to this
++ *         module. A known user with a faulty or absent password still
++ *         causes an AuthRequired. The default is 'Authoritative', i.e.
++ *         no control is passed along.
++ */
++
++#define APR_WANT_STRFUNC
++#include "apr_want.h"
++#include "apr_strings.h"
++#include "apr_dbm.h"
++#include "apr_md5.h"
++
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"   /* for ap_hook_(check_user_id | auth_checker)*/
++
++typedef struct {
++    char *grpfile;
++    char *dbmtype;
++    int authoritative;
++} authz_dbm_config_rec;
++
++/* This should go into APR; perhaps with some nice
++ * caching/locking/flocking of the open dbm file.
++ *
++ * Duplicated in mod_auth_dbm.c
++ */
++static apr_status_t get_dbm_entry_as_str(request_rec *r, char *user,
++                                         char *auth_dbmfile, char *dbtype,
++                                         char ** str)
++{
++    apr_dbm_t *f;
++    apr_datum_t d, q;
++    char *pw = NULL;
++    apr_status_t retval;
++    q.dptr = user;
++
++#ifndef NETSCAPE_DBM_COMPAT
++    q.dsize = strlen(q.dptr);
++#else
++    q.dsize = strlen(q.dptr) + 1;
++#endif
++
++    retval = apr_dbm_open_ex(&f, dbtype, auth_dbmfile, APR_DBM_READONLY, 
++                             APR_OS_DEFAULT, r->pool);
++
++    if (retval != APR_SUCCESS) {
++        return retval;
++    }
++
++    *str = NULL;
++
++    if (apr_dbm_fetch(f, q, &d) == APR_SUCCESS && d.dptr) {
++        *str = apr_palloc(r->pool, d.dsize + 1);
++        strncpy(pw, d.dptr, d.dsize);
++        *str[d.dsize] = '\0'; /* Terminate the string */
++    }
++
++    apr_dbm_close(f);
++
++    return retval;
++}
++
++static void *create_authz_dbm_dir_config(apr_pool_t *p, char *d)
++{
++    authz_dbm_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    conf->grpfile = NULL;
++    conf->dbmtype = "default";
++    conf->authoritative = 1;  /* fortress is secure by default */
++
++    return conf;
++}
++
++static const command_rec authz_dbm_cmds[] =
++{
++    AP_INIT_TAKE1("AuthzDBMGroupFile", ap_set_file_slot,
++     (void *)APR_OFFSETOF(authz_dbm_config_rec, grpfile),
++     OR_AUTHCFG, "database file containing group names and member user IDs"),
++    AP_INIT_TAKE1("AuthzDBMType", ap_set_string_slot,
++     (void *)APR_OFFSETOF(authz_dbm_config_rec, dbmtype),
++     OR_AUTHCFG, "what type of DBM file the group file is"),
++    AP_INIT_FLAG("AuthzDBMAuthoritative", ap_set_flag_slot,
++     (void *)APR_OFFSETOF(authz_dbm_config_rec, authoritative),
++     OR_AUTHCFG, "Set to 'no' to allow access control to be passed along to "
++     "lower modules, if the group required is not found or empty, or the user "
++     " is not in the required groups. (default is yes.)"),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA authz_dbm_module;
++
++/* We do something strange with the group file.  If the group file
++ * contains any : we assume the format is
++ *      key=username value=":"groupname [":"anything here is ignored]
++ * otherwise we now (0.8.14+) assume that the format is
++ *      key=username value=groupname
++ * The first allows the password and group files to be the same 
++ * physical DBM file;   key=username value=password":"groupname[":"anything]
++ *
++ * mark@telescope.org, 22Sep95
++ */
++
++static apr_status_t get_dbm_grp(request_rec *r, char *user, char *dbmgrpfile, 
++                                char *dbtype, const char ** out)
++{
++    char *grp_data;
++    char *grp_colon;
++    char *grp_colon2;
++
++    apr_status_t status = get_dbm_entry_as_str(r, user, dbmgrpfile,
++                                               dbtype, &grp_data);
++
++    if (status != APR_SUCCESS) {
++        return status;
++    }
++
++    *out = NULL;
++
++    if (grp_data == NULL) {
++        return APR_SUCCESS;
++    }
++
++    if ((grp_colon = strchr(grp_data, ':')) != NULL) {
++        grp_colon2 = strchr(++grp_colon, ':');
++        if (grp_colon2) {
++            *grp_colon2 = '\0';
++        }
++        *out = grp_colon;
++        return APR_SUCCESS;
++    }
++
++    return APR_SUCCESS;
++}
++
++/* Checking ID */
++static int dbm_check_auth(request_rec *r)
++{
++    authz_dbm_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                      &authz_dbm_module);
++    char *user = r->user;
++    int m = r->method_number;
++    int required = 0;
++    const apr_array_header_t *reqs_arr = ap_requires(r);
++    require_line *reqs = reqs_arr ? (require_line *) reqs_arr->elts : NULL;
++    register int x;
++    const char *t;
++    char *w;
++    apr_status_t status;
++
++    if (!conf->grpfile) {
++        return DECLINED;
++    }
++
++    if (!reqs_arr) {
++        return DECLINED;
++    }
++
++    for (x = 0; x < reqs_arr->nelts; x++) {
++
++        required |= 1;
++
++        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m))) {
++            continue;
++        }
++
++        t = reqs[x].requirement;
++        w = ap_getword_white(r->pool, &t);
++ 
++        if (!strcmp(w, "group")) {
++            const char *orig_groups, *groups;
++            char *v;
++
++            required |= 2;
++
++            status = get_dbm_grp(r, user, conf->grpfile, conf->dbmtype,
++                                 &groups);
++
++            if (status != APR_SUCCESS) {
++                ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
++                      "could not open dbm (type %s) group access file: %s", 
++                        conf->dbmtype, conf->grpfile);
++                return HTTP_INTERNAL_SERVER_ERROR;
++           }
++
++           if (groups == NULL) {
++                if (!conf->authoritative) {
++                    return DECLINED;
++                }
++
++                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                            "user %s not in DBM group file %s: %s",
++                            user, conf->grpfile, r->filename);
++
++                ap_note_basic_auth_failure(r);
++                return HTTP_UNAUTHORIZED;
++            }
++
++            orig_groups = groups;
++            while (t[0]) {
++                w = ap_getword_white(r->pool, &t);
++                groups = orig_groups;
++                while (groups[0]) {
++                    v = ap_getword(r->pool, &groups, ',');
++                    if (!strcmp(v, w)) {
++                        return OK;
++                    }
++                }
++            }
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                          "user %s not in right group: %s",
++                          user, r->filename);
++            ap_note_basic_auth_failure(r);
++            return HTTP_UNAUTHORIZED;
++        }
++    }
++
++    return DECLINED;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_auth_checker(dbm_check_auth, NULL, NULL, APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA authz_dbm_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authz_dbm_dir_config, /* dir config creater */
++    NULL,                        /* dir merger --- default is to override */
++    NULL,                        /* server config */
++    NULL,                        /* merge server config */
++    authz_dbm_cmds,              /* command apr_table_t */
++    register_hooks               /* register hooks */
++};
+diff --git a/modules/aaa/mod_authz_default.c b/modules/aaa/mod_authz_default.c
+new file mode 100644
+index 0000000..4fb5e66
+--- /dev/null
++++ b/modules/aaa/mod_authz_default.c
+@@ -0,0 +1,171 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/*
++ * http_auth: authentication
++ * 
++ * Rob McCool
++ * 
++ * Adapted to Apache by rst.
++ *
++ * dirkx - Added Authoritative control to allow passing on to lower
++ *         modules if and only if the userid is not known to this
++ *         module. A known user with a faulty or absent password still
++ *         causes an AuthRequired. The default is 'Authoritative', i.e.
++ *         no control is passed along.
++ */
++
++#include "apr_strings.h"
++#include "apr_md5.h"            /* for apr_password_validate */
++
++#include "ap_config.h"
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"
++
++typedef struct {
++    int authoritative;
++} authz_default_config_rec;
++
++static void *create_authz_default_dir_config(apr_pool_t *p, char *d)
++{
++    authz_default_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    conf->authoritative = 1; /* keep the fortress secure by default */
++    return conf;
++}
++
++static const command_rec authz_default_cmds[] =
++{
++    AP_INIT_FLAG("AccessAuthoritative", ap_set_flag_slot,
++                 (void *)APR_OFFSETOF(authz_default_config_rec, authoritative),
++                 OR_AUTHCFG,
++                 "Set to 'no' to allow access control to be passed along to "
++                 "lower modules. (default is yes.)"),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA authz_default_module;
++
++static int check_user_access(request_rec *r)
++{
++    authz_default_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                 &authz_default_module);
++    int m = r->method_number;
++    int method_restricted = 0;
++    register int x;
++    const apr_array_header_t *reqs_arr = ap_requires(r);
++    require_line *reqs;
++
++    /* BUG FIX: tadc, 11-Nov-1995.  If there is no "requires" directive, 
++     * then any user will do.
++     */
++    if (!reqs_arr) {
++        return OK;
++    }
++    reqs = (require_line *)reqs_arr->elts;
++
++    for (x = 0; x < reqs_arr->nelts; x++) {
++        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m))) {
++            continue;
++        }
++        method_restricted = 1;
++        break;
++    }
++
++    if (method_restricted == 0) {
++        return OK;
++    }
++
++    if (!(conf->authoritative)) {
++        return DECLINED;
++    }
++
++    /* if we aren't authoritative, any require directive could be
++     * considered valid even if noone groked it.  However, if we are 
++     * authoritative, we can warn the user they did something wrong.
++     *
++     * That something could be a missing "AuthAuthoritative off", but
++     * more likely is a typo in the require directive.
++     */
++    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                          "access to %s failed, reason: require directives "
++                          "present and no Authoritative handler.", r->uri);
++
++    ap_note_basic_auth_failure(r);
++    return HTTP_UNAUTHORIZED;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_auth_checker(check_user_access,NULL,NULL,APR_HOOK_LAST);
++}
++
++module AP_MODULE_DECLARE_DATA authz_default_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authz_default_dir_config, /* dir config creater */
++    NULL,                            /* dir merger --- default is to override */
++    NULL,                            /* server config */
++    NULL,                            /* merge server config */
++    authz_default_cmds,              /* command apr_table_t */
++    register_hooks                   /* register hooks */
++};
+diff --git a/modules/aaa/mod_authz_groupfile.c b/modules/aaa/mod_authz_groupfile.c
+new file mode 100644
+index 0000000..47ee1f3
+--- /dev/null
++++ b/modules/aaa/mod_authz_groupfile.c
+@@ -0,0 +1,277 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/* This module is triggered by an
++ *
++ *          AuthzGroupFile standard /path/to/file
++ *
++ * and the presense of a
++ *
++ *         require group <list-of-groups>
++ * 
++ * In an applicable limit/directory block for that method.
++ *
++ * If there are no AuthzGroupFile directives valid for 
++ * the request; we DECLINED.
++ * 
++ * If the AuthzGroupFile is defined; but somehow not
++ * accessible: we SERVER_ERROR (was DECLINED).
++ *
++ * If there are no 'require ' directives defined for
++ * this request then we DECLINED (was OK).
++ * 
++ * If there are no 'require ' directives valid for
++ * this request method then we DECLINED. (was OK)
++ *
++ * If there are any 'require group' blocks and we
++ * are not in any group - we HTTP_UNAUTHORIZE
++ * unless we are non-authoritative; in which  
++ * case we DECLINED.
++ *
++ */
++
++#include "apr_strings.h"
++#include "apr_md5.h"            /* for apr_password_validate */
++
++#include "ap_config.h"
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"
++
++typedef struct {
++    char *groupfile;
++    int authoritative;
++} authz_groupfile_config_rec;
++
++static void *create_authz_groupfile_dir_config(apr_pool_t *p, char *d)
++{
++    authz_groupfile_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    conf->groupfile = NULL;    
++    conf->authoritative = 1; /* keep the fortress secure by default */
++    return conf;
++}
++
++static const char *set_authz_groupfile_slot(cmd_parms *cmd, void *offset, const char *f, 
++                                 const char *t)
++{
++    if (t && strcmp(t, "standard")) {
++        return apr_pstrcat(cmd->pool, "Invalid auth file type: ", t, NULL);
++    }
++
++    return ap_set_file_slot(cmd, offset, f);
++}
++
++static const command_rec authz_groupfile_cmds[] =
++{
++    AP_INIT_TAKE12("AuthzGroupFile", set_authz_groupfile_slot,
++                   (void *)APR_OFFSETOF(authz_groupfile_config_rec, groupfile),
++                   OR_AUTHCFG,
++                   "text file containing group names and member user IDs"),
++    AP_INIT_FLAG("AuthzGroupFileAuthoritative", ap_set_flag_slot,
++                 (void *)APR_OFFSETOF(authz_groupfile_config_rec,
++                                      authoritative),
++                 OR_AUTHCFG,
++                 "Set to 'no' to allow access control to be passed along to "
++                 "lower modules if the 'require group' fails. (default is "
++                 "no)."),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA authz_groupfile_module;
++
++static apr_status_t groups_for_user(apr_pool_t *p, char *user, char *grpfile,
++                                    apr_table_t ** out)
++{
++    ap_configfile_t *f;
++    apr_table_t *grps = apr_table_make(p, 15);
++    apr_pool_t *sp;
++    char l[MAX_STRING_LEN];
++    const char *group_name, *ll, *w;
++    apr_status_t status;
++
++    if ((status = ap_pcfg_openfile(&f, p, grpfile)) != APR_SUCCESS) {
++        return status ;
++    }
++
++    apr_pool_create(&sp, p);
++
++    while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
++        if ((l[0] == '#') || (!l[0])) {
++            continue;
++        }
++        ll = l;
++        apr_pool_clear(sp);
++
++        group_name = ap_getword(sp, &ll, ':');
++
++        while (ll[0]) {
++            w = ap_getword_conf(sp, &ll);
++            if (!strcmp(w, user)) {
++                apr_table_setn(grps, apr_pstrdup(p, group_name), "in");
++                break;
++            }
++        }
++    }
++    ap_cfg_closefile(f);
++    apr_pool_destroy(sp);
++
++    *out = grps;
++    return APR_SUCCESS;
++}
++
++/* Checking ID */
++
++static int check_user_access(request_rec *r)
++{
++    authz_groupfile_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                      &authz_groupfile_module);
++    char *user = r->user;
++    int m = r->method_number;
++    int method_restricted = 0;
++    register int x,has_entries;
++    const char *t, *w;
++    apr_table_t *grpstatus;
++    const apr_array_header_t *reqs_arr = ap_requires(r);
++    require_line *reqs;
++    apr_status_t status;
++
++    if (!reqs_arr) {
++        return DECLINED; /* XXX change from legacy */
++    } 
++    
++    reqs = (require_line *)reqs_arr->elts;
++
++    /* If there is no group file - then we are not
++     * configured. So decline. 
++     */
++    if (!(conf->groupfile))
++         return DECLINED; 
++
++    if ((status = groups_for_user(r->pool, user, conf->groupfile,
++                                  &grpstatus)) != APR_SUCCESS) {
++         ap_log_rerror(APLOG_MARK, APLOG_ERR, NULL, r,
++                       "Could not open group file: %s", conf->groupfile);
++         return HTTP_INTERNAL_SERVER_ERROR;
++    };
++
++    has_entries = apr_table_elts(grpstatus)->nelts;
++
++    for (x = 0; x < reqs_arr->nelts; x++) {
++
++        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m))) {
++            continue;
++        }
++        method_restricted |= 1;
++
++        t = reqs[x].requirement;
++        w = ap_getword_white(r->pool, &t);
++
++        if (!strcmp(w, "group")) {
++            method_restricted |= 2;
++             if (has_entries) {
++            while (t[0]) {
++                w = ap_getword_conf(r->pool, &t);
++                if (apr_table_get(grpstatus, w)) {
++                    return OK;
++                }
++            }
++         }
++        }
++    }
++
++    /* No applicable requires for this method seen at all */
++    if (method_restricted == 0) {
++        return DECLINED; /* XXX change from legacy */
++    }
++
++    /* No applicable "requires group" for this method seen */
++    if ((method_restricted & 2) == 0) {
++        return DECLINED;
++    }
++
++    if (!(conf->authoritative)) {
++        return DECLINED;
++    }
++
++    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                  "access to %s failed, reason: user %s not part of the "
++                  "'require'ed group(s).", r->uri, user);
++        
++    ap_note_basic_auth_failure(r);
++    return HTTP_UNAUTHORIZED;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_auth_checker(check_user_access,NULL,NULL,APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA authz_groupfile_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authz_groupfile_dir_config,/* dir config creater */
++    NULL,                             /* dir merger -- default is to override */
++    NULL,                             /* server config */
++    NULL,                             /* merge server config */
++    authz_groupfile_cmds,             /* command apr_table_t */
++    register_hooks                    /* register hooks */
++};
+diff --git a/modules/aaa/mod_authz_host.c b/modules/aaa/mod_authz_host.c
+new file mode 100644
+index 0000000..5e15d9c
+--- /dev/null
++++ b/modules/aaa/mod_authz_host.c
+@@ -0,0 +1,363 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/*
++ * Security options etc.
++ * 
++ * Module derived from code originally written by Rob McCool
++ * 
++ */
++
++#include "apr_strings.h"
++#include "apr_network_io.h"
++#include "apr_md5.h"
++
++#define APR_WANT_STRFUNC
++#define APR_WANT_BYTEFUNC
++#include "apr_want.h"
++
++#include "ap_config.h"
++#include "httpd.h"
++#include "http_core.h"
++#include "http_config.h"
++#include "http_log.h"
++#include "http_request.h"
++
++#if APR_HAVE_NETINET_IN_H
++#include <netinet/in.h>
++#endif
++
++enum allowdeny_type {
++    T_ENV,
++    T_ALL,
++    T_IP,
++    T_HOST,
++    T_FAIL
++};
++
++typedef struct {
++    apr_int64_t limited;
++    union {
++        char *from;
++        apr_ipsubnet_t *ip;
++    } x;
++    enum allowdeny_type type;
++} allowdeny;
++
++/* things in the 'order' array */
++#define DENY_THEN_ALLOW 0
++#define ALLOW_THEN_DENY 1
++#define MUTUAL_FAILURE 2
++
++typedef struct {
++    int order[METHODS];
++    apr_array_header_t *allows;
++    apr_array_header_t *denys;
++} authz_host_dir_conf;
++
++module AP_MODULE_DECLARE_DATA authz_host_module;
++
++static void *create_authz_host_dir_config(apr_pool_t *p, char *dummy)
++{
++    int i;
++    authz_host_dir_conf *conf =
++        (authz_host_dir_conf *)apr_pcalloc(p, sizeof(authz_host_dir_conf));
++
++    for (i = 0; i < METHODS; ++i) {
++        conf->order[i] = DENY_THEN_ALLOW;
++    }
++    conf->allows = apr_array_make(p, 1, sizeof(allowdeny));
++    conf->denys = apr_array_make(p, 1, sizeof(allowdeny));
++
++    return (void *)conf;
++}
++
++static const char *order(cmd_parms *cmd, void *dv, const char *arg)
++{
++    authz_host_dir_conf *d = (authz_host_dir_conf *) dv;
++    int i, o;
++
++    if (!strcasecmp(arg, "allow,deny"))
++        o = ALLOW_THEN_DENY;
++    else if (!strcasecmp(arg, "deny,allow"))
++        o = DENY_THEN_ALLOW;
++    else if (!strcasecmp(arg, "mutual-failure"))
++        o = MUTUAL_FAILURE;
++    else
++        return "unknown order";
++
++    for (i = 0; i < METHODS; ++i)
++        if (cmd->limited & (AP_METHOD_BIT << i))
++            d->order[i] = o;
++
++    return NULL;
++}
++
++static const char *allow_cmd(cmd_parms *cmd, void *dv, const char *from, 
++                             const char *where_c)
++{
++    authz_host_dir_conf *d = (authz_host_dir_conf *) dv;
++    allowdeny *a;
++    char *where = apr_pstrdup(cmd->pool, where_c);
++    char *s;
++    char msgbuf[120];
++    apr_status_t rv;
++
++    if (strcasecmp(from, "from"))
++        return "allow and deny must be followed by 'from'";
++
++    a = (allowdeny *) apr_array_push(cmd->info ? d->allows : d->denys);
++    a->x.from = where;
++    a->limited = cmd->limited;
++
++    if (!strncasecmp(where, "env=", 4)) {
++        a->type = T_ENV;
++        a->x.from += 4;
++
++    }
++    else if (!strcasecmp(where, "all")) {
++        a->type = T_ALL;
++    }
++    else if ((s = strchr(where, '/'))) {
++        *s++ = '\0';
++        rv = apr_ipsubnet_create(&a->x.ip, where, s, cmd->pool);
++        if(APR_STATUS_IS_EINVAL(rv)) {
++            /* looked nothing like an IP address */
++            return "An IP address was expected";
++        }
++        else if (rv != APR_SUCCESS) {
++            apr_strerror(rv, msgbuf, sizeof msgbuf);
++            return apr_pstrdup(cmd->pool, msgbuf);
++        }
++        a->type = T_IP;
++    }
++    else if (!APR_STATUS_IS_EINVAL(rv = apr_ipsubnet_create(&a->x.ip, where, NULL, cmd->pool))) {
++        if (rv != APR_SUCCESS) {
++            apr_strerror(rv, msgbuf, sizeof msgbuf);
++            return apr_pstrdup(cmd->pool, msgbuf);
++        }
++        a->type = T_IP;
++    }
++    else { /* no slash, didn't look like an IP address => must be a host */
++        a->type = T_HOST;
++    }
++
++    return NULL;
++}
++
++static char its_an_allow;
++
++static const command_rec authz_host_cmds[] =
++{
++    AP_INIT_TAKE1("order", order, NULL, OR_LIMIT,
++                  "'allow,deny', 'deny,allow', or 'mutual-failure'"),
++    AP_INIT_ITERATE2("allow", allow_cmd, &its_an_allow, OR_LIMIT,
++                     "'from' followed by hostnames or IP-address wildcards"),
++    AP_INIT_ITERATE2("deny", allow_cmd, NULL, OR_LIMIT,
++                     "'from' followed by hostnames or IP-address wildcards"),
++    {NULL}
++};
++
++static int in_domain(const char *domain, const char *what)
++{
++    int dl = strlen(domain);
++    int wl = strlen(what);
++
++    if ((wl - dl) >= 0) {
++        if (strcasecmp(domain, &what[wl - dl]) != 0) {
++            return 0;
++        }
++
++        /* Make sure we matched an *entire* subdomain --- if the user
++         * said 'allow from good.com', we don't want people from nogood.com
++         * to be able to get in.
++         */
++
++        if (wl == dl) {
++            return 1;                /* matched whole thing */
++        }
++        else {
++            return (domain[0] == '.' || what[wl - dl - 1] == '.');
++        }
++    }
++    else {
++        return 0;
++    }
++}
++
++static int find_allowdeny(request_rec *r, apr_array_header_t *a, int method)
++{
++
++    allowdeny *ap = (allowdeny *) a->elts;
++    apr_int64_t mmask = (AP_METHOD_BIT << method);
++    int i;
++    int gothost = 0;
++    const char *remotehost = NULL;
++
++    for (i = 0; i < a->nelts; ++i) {
++        if (!(mmask & ap[i].limited)) {
++            continue;
++        }
++
++        switch (ap[i].type) {
++        case T_ENV:
++            if (apr_table_get(r->subprocess_env, ap[i].x.from)) {
++                return 1;
++            }
++            break;
++
++        case T_ALL:
++            return 1;
++
++        case T_IP:
++            if (apr_ipsubnet_test(ap[i].x.ip, r->connection->remote_addr)) {
++                return 1;
++            }
++            break;
++
++        case T_HOST:
++            if (!gothost) {
++                int remotehost_is_ip;
++
++                remotehost = ap_get_remote_host(r->connection,
++                                                r->per_dir_config,
++                                                REMOTE_DOUBLE_REV,
++                                                &remotehost_is_ip);
++
++                if ((remotehost == NULL) || remotehost_is_ip) {
++                    gothost = 1;
++                }
++                else {
++                    gothost = 2;
++                }
++            }
++
++            if ((gothost == 2) && in_domain(ap[i].x.from, remotehost)) {
++                return 1;
++            }
++            break;
++
++        case T_FAIL:
++            /* do nothing? */
++            break;
++        }
++    }
++
++    return 0;
++}
++
++static int check_dir_access(request_rec *r)
++{
++    int method = r->method_number;
++    int ret = OK;
++    authz_host_dir_conf *a = (authz_host_dir_conf *)
++        ap_get_module_config(r->per_dir_config, &authz_host_module);
++
++    if (a->order[method] == ALLOW_THEN_DENY) {
++        ret = HTTP_FORBIDDEN;
++        if (find_allowdeny(r, a->allows, method)) {
++            ret = OK;
++        }
++        if (find_allowdeny(r, a->denys, method)) {
++            ret = HTTP_FORBIDDEN;
++        }
++    }
++    else if (a->order[method] == DENY_THEN_ALLOW) {
++        if (find_allowdeny(r, a->denys, method)) {
++            ret = HTTP_FORBIDDEN;
++        }
++        if (find_allowdeny(r, a->allows, method)) {
++            ret = OK;
++        }
++    }
++    else {
++        if (find_allowdeny(r, a->allows, method)
++            && !find_allowdeny(r, a->denys, method)) {
++            ret = OK;
++        }
++        else {
++            ret = HTTP_FORBIDDEN;
++        }
++    }
++
++    if (ret == HTTP_FORBIDDEN
++        && (ap_satisfies(r) != SATISFY_ANY || !ap_some_auth_required(r))) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++            "client denied by server configuration: %s",
++            r->filename);
++    }
++
++    return ret;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    /* This can be access checker since we don't require r->user to be set. */
++    ap_hook_access_checker(check_dir_access,NULL,NULL,APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA authz_host_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authz_host_dir_config,   /* dir config creater */
++    NULL,                           /* dir merger --- default is to override */
++    NULL,                           /* server config */
++    NULL,                           /* merge server config */
++    authz_host_cmds,
++    register_hooks                  /* register hooks */
++};
+diff --git a/modules/aaa/mod_authz_user.c b/modules/aaa/mod_authz_user.c
+new file mode 100644
+index 0000000..a2befbd
+--- /dev/null
++++ b/modules/aaa/mod_authz_user.c
+@@ -0,0 +1,198 @@
++/* ====================================================================
++ * The Apache Software License, Version 1.1
++ *
++ * Copyright (c) 2000-2002 The Apache Software Foundation.  All rights
++ * reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        Apache Software Foundation (http://www.apache.org/)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The names "Apache" and "Apache Software Foundation" must
++ *    not be used to endorse or promote products derived from this
++ *    software without prior written permission. For written
++ *    permission, please contact apache@apache.org.
++ *
++ * 5. Products derived from this software may not be called "Apache",
++ *    nor may "Apache" appear in their name, without prior written
++ *    permission of the Apache Software Foundation.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the Apache Software Foundation.  For more
++ * information on the Apache Software Foundation, please see
++ * <http://www.apache.org/>.
++ *
++ * Portions of this software are based upon public domain software
++ * originally written at the National Center for Supercomputing Applications,
++ * University of Illinois, Urbana-Champaign.
++ */
++
++/* http_auth: 
++ * authentication
++ * 
++ * Rob McCool
++ * 
++ * Adapted to Apache by rst.
++ *
++ * dirkx - Added Authoritative control to allow passing on to lower
++ *         modules if and only if the userid is not known to this
++ *         module. A known user with a faulty or absent password still
++ *         causes an AuthRequired. The default is 'Authoritative', i.e.
++ *         no control is passed along.
++ */
++
++#include "apr_strings.h"
++
++#include "ap_config.h"
++#include "httpd.h"
++#include "http_config.h"
++#include "http_core.h"
++#include "http_log.h"
++#include "http_protocol.h"
++#include "http_request.h"
++
++typedef struct {
++    int authoritative;
++} authz_user_config_rec;
++
++static void *create_authz_user_dir_config(apr_pool_t *p, char *d)
++{
++    authz_user_config_rec *conf = apr_palloc(p, sizeof(*conf));
++
++    conf->authoritative = 1; /* keep the fortress secure by default */
++    return conf;
++}
++
++static const command_rec authz_user_cmds[] =
++{
++    AP_INIT_FLAG("AuthzUserAuthoritative", ap_set_flag_slot,
++                 (void *)APR_OFFSETOF(authz_user_config_rec, authoritative),
++                 OR_AUTHCFG,
++                 "Set to 'no' to allow access control to be passed along to "
++                 "lower modules if the 'require user' or 'require valid-user' "
++                 "statement is not met. (default: yes)."),
++    {NULL}
++};
++
++module AP_MODULE_DECLARE_DATA authz_user_module;
++
++static int check_user_access(request_rec *r)
++{
++    authz_user_config_rec *conf = ap_get_module_config(r->per_dir_config,
++                                                       &authz_user_module);
++    char *user = r->user;
++    int m = r->method_number;
++    int method_restricted = 0;
++    register int x;
++    const char *t, *w;
++    const apr_array_header_t *reqs_arr = ap_requires(r);
++    require_line *reqs;
++
++    /* BUG FIX: tadc, 11-Nov-1995.  If there is no "requires" directive, 
++     * then any user will do.
++     */
++    if (!reqs_arr) {
++        return DECLINED;
++    }
++    reqs = (require_line *)reqs_arr->elts;
++
++    for (x = 0; x < reqs_arr->nelts; x++) {
++
++        if (!(reqs[x].method_mask & (AP_METHOD_BIT << m))) {
++            continue;
++        }
++
++        /* Note that there are applicable requirements 
++         */
++        method_restricted |= 1;
++
++        t = reqs[x].requirement;
++        w = ap_getword_white(r->pool, &t);
++        if (!strcmp(w, "valid-user")) {
++            return OK;
++        }
++        if (!strcmp(w, "user")) {
++            /* And note that there are applicable requirements 
++             * which we consider ourselves the owner of.
++             */
++            method_restricted |= 2;
++            while (t[0]) {
++                w = ap_getword_conf(r->pool, &t);
++                if (!strcmp(user, w)) {
++                    return OK;
++                }
++            }
++        }
++    }
++
++    if (method_restricted == 0) {
++        /* no applicable requirements at all */
++        return DECLINED;
++    }
++    /* There are require methods which we do not
++     * understand. 
++     */
++    if ((method_restricted & 2) == 0) {
++        /* no requirements of which we consider ourselves
++         * the owner.
++         */
++        return DECLINED;
++    }
++
++    if (!conf->authoritative) {
++        return DECLINED;
++    }
++
++    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
++                  "access to %s failed, reason: user '%s' does not meet "
++                  "'require'ments for user/valid-user to be allowed access",
++                  r->uri, user);
++        
++    ap_note_basic_auth_failure(r);
++    return HTTP_UNAUTHORIZED;
++}
++
++static void register_hooks(apr_pool_t *p)
++{
++    ap_hook_auth_checker(check_user_access, NULL, NULL, APR_HOOK_MIDDLE);
++}
++
++module AP_MODULE_DECLARE_DATA authz_user_module =
++{
++    STANDARD20_MODULE_STUFF,
++    create_authz_user_dir_config, /* dir config creater */
++    NULL,                         /* dir merger --- default is to override */
++    NULL,                         /* server config */
++    NULL,                         /* merge server config */
++    authz_user_cmds,              /* command apr_table_t */
++    register_hooks                /* register hooks */
++};

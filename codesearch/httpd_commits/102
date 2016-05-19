@@ -1,0 +1,109 @@
+commit 09e038f6a9f18334478b0af21a4b8ae7114e9fe7
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sat Nov 20 08:59:50 2010 +0000
+
+    Log errors/infos during expression evaluation and associate the message
+    with the module that is calling ap_expr_exec()
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1037140 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index 73b13ab..2fb89c6 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -1008,6 +1008,7 @@ static const char *expr_parse_config(cmd_parms *cmd, const char *require_line,
+     if (expr_err)
+         return "Cannot parse expression in require line";
+ 
++    expr->module_index = APLOG_MODULE_INDEX;
+     *parsed_require_line = expr;
+ 
+     return NULL;
+diff --git a/modules/filters/mod_filter.c b/modules/filters/mod_filter.c
+index 250c02d..eb81bff 100644
+--- a/modules/filters/mod_filter.c
++++ b/modules/filters/mod_filter.c
+@@ -433,6 +433,7 @@ static const char *filter_provider(cmd_parms *cmd, void *CFG,
+                            "Error parsing FilterProvider expression:", err,
+                            NULL);
+     }
++    node->module_index = APLOG_MODULE_INDEX;
+ 
+     provider = apr_palloc(cmd->pool, sizeof(ap_filter_provider_t));
+     provider->expr = node;
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 2225aef..0b6c6f5 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -1256,6 +1256,7 @@ static const char *add_custom_log(cmd_parms *cmd, void *dummy, const char *fn,
+                                                     NULL);
+             if (err)
+                 return err;
++	    cls->condition_expr->module_index = APLOG_MODULE_INDEX;
+         }
+         else {
+             return "error in condition clause";
+diff --git a/modules/metadata/mod_headers.c b/modules/metadata/mod_headers.c
+index 505cb06..b1948e0 100644
+--- a/modules/metadata/mod_headers.c
++++ b/modules/metadata/mod_headers.c
+@@ -498,6 +498,7 @@ static APR_INLINE const char *header_inout_cmd(cmd_parms *cmd,
+                                    "Can't parse envclause/expression: ", err,
+                                    NULL);
+             }
++            expr->module_index = APLOG_MODULE_INDEX;
+         }
+     }
+ 
+diff --git a/modules/ssl/ssl_engine_config.c b/modules/ssl/ssl_engine_config.c
+index 0ed5044..4bccfe7 100644
+--- a/modules/ssl/ssl_engine_config.c
++++ b/modules/ssl/ssl_engine_config.c
+@@ -1154,6 +1154,7 @@ const char *ssl_cmd_SSLRequire(cmd_parms *cmd,
+     info->flags = AP_EXPR_FLAGS_SSL_EXPR_COMPAT;
+     info->filename = cmd->directive->filename;
+     info->line_number = cmd->directive->line_num;
++    info->module_index = APLOG_MODULE_INDEX;
+     errstring = ap_expr_parse(cmd->pool, cmd->temp_pool, info, arg, NULL);
+     if (errstring) {
+         return apr_pstrcat(cmd->pool, "SSLRequire: ", errstring, NULL);
+diff --git a/server/core.c b/server/core.c
+index 83d75bf..ffeb98d 100644
+--- a/server/core.c
++++ b/server/core.c
+@@ -2043,6 +2043,7 @@ static const char *ifsection(cmd_parms *cmd, void *mconfig, const char *arg)
+     if (expr_err) {
+         return apr_psprintf(cmd->pool, "Cannot parse condition clause: %s", expr_err);
+     }
++    conf->condition->module_index = APLOG_MODULE_INDEX;
+ 
+     errmsg = ap_walk_config(cmd->directive->first_child, cmd, new_file_conf);
+     if (errmsg != NULL)
+diff --git a/server/util_expr_eval.c b/server/util_expr_eval.c
+index c136b50..edb1b7d 100644
+--- a/server/util_expr_eval.c
++++ b/server/util_expr_eval.c
+@@ -687,10 +687,18 @@ AP_DECLARE(int) ap_expr_exec(request_rec *r, const ap_expr_info_t *info, const c
+ 
+     *err = NULL;
+     rc = ap_expr_eval(&ctx, info->root_node);
+-    if (*err != NULL)
+-        return (-1);
+-    else
+-        return (rc ? 1 : 0);
++    if (*err != NULL) {
++        ap_log_rerror(__FILE__, __LINE__, info->module_index, APLOG_ERR, 0,
++                      r, "Evaluation of expression from %s:%d failed: %s",
++                      info->filename, info->line_number, *err);
++        return -1;
++    } else {
++        rc = rc ? 1 : 0;
++        ap_log_rerror(__FILE__, __LINE__, info->module_index, APLOG_TRACE4, 0,
++                      r, "Evaluation of expression from %s:%d gave: %d",
++                      info->filename, info->line_number, rc);
++        return rc;
++    }
+ }
+ 
+ static const char *req_table_func(ap_expr_eval_ctx *ctx, const void *data,

@@ -1,0 +1,94 @@
+commit 677e2ad15d8bb71e7be9c9d4430ec38dc138306d
+Author: Bradley Nicholes <bnicholes@apache.org>
+Date:   Sat Jan 14 05:06:39 2006 +0000
+
+    clean up some left-over debugging code and comments
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@368978 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/config.m4 b/modules/aaa/config.m4
+index c809e1a..8354519 100644
+--- a/modules/aaa/config.m4
++++ b/modules/aaa/config.m4
+@@ -48,8 +48,9 @@ dnl - and just in case all of the above punt; a default handler to
+ dnl keep the bad guys out.
+ APACHE_MODULE(authz_default, authorization control backstopper, , , yes)
+ 
+-dnl - and just in case all of the above punt; a default handler to
+-dnl keep the bad guys out.
++dnl - host access control compatibility modules. Implements Order, Allow,
++dnl Deny, Satisfy for backward compatibility.  These directives have been
++dnl deprecated in 2.4.
+ APACHE_MODULE(access_compat, mod_access compatibility, , , most)
+ 
+ dnl these are the front-end authentication modules
+diff --git a/modules/aaa/mod_access_compat.c b/modules/aaa/mod_access_compat.c
+index 1924f1a..cf608d1 100644
+--- a/modules/aaa/mod_access_compat.c
++++ b/modules/aaa/mod_access_compat.c
+@@ -370,8 +370,6 @@ static int check_dir_access(request_rec *r)
+     return ret;
+ }
+ 
+-APR_DECLARE_OPTIONAL_FN(int, ap_satisfies, (request_rec *r));
+-
+ static void register_hooks(apr_pool_t *p)
+ {
+     APR_REGISTER_OPTIONAL_FN(ap_satisfies);
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index db3453d..ce303ba 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -101,8 +101,6 @@ typedef struct {
+     authz_provider_list *providers;
+     authz_request_state req_state;
+     int req_state_level;
+-//    int some_authz;
+-//    char *path;
+ } authz_core_dir_conf;
+ 
+ typedef struct authz_core_srv_conf {
+@@ -119,7 +117,6 @@ static void *create_authz_core_dir_config(apr_pool_t *p, char *dummy)
+ 
+     conf->req_state = AUTHZ_REQSTATE_ONE;
+     conf->req_state_level = 0;
+-//    conf->some_authz = -1;
+     return (void *)conf;
+ }
+ 
+@@ -160,9 +157,6 @@ static const char *add_authz_provider(cmd_parms *cmd, void *config,
+     authz_provider_list *newp;
+     const char *t, *w;
+ 
+-//    conf->some_authz = 1;
+-//    conf->path = apr_pstrdup(cmd->pool, cmd->path);
+-
+     newp = apr_pcalloc(cmd->pool, sizeof(authz_provider_list));
+ 
+     t = arg;
+@@ -399,9 +393,6 @@ static const char *authz_require_section(cmd_parms *cmd, void *mconfig, const ch
+     const char *errmsg;
+     authz_request_state old_reqstate;
+     authz_core_dir_conf *conf = (authz_core_dir_conf*)mconfig;
+-//  authz_core_srv_conf *authcfg = 
+-//      (authz_core_srv_conf *)ap_get_module_config(cmd->server->module_config,
+-//                                                   &authz_core_module);
+ 
+     if (endp == NULL) {
+         return apr_pstrcat(cmd->pool, cmd->cmd->name,
+@@ -619,12 +610,11 @@ static int authorize_user(request_rec *r)
+ 
+         switch (auth_result) {
+             case AUTHZ_DENIED:
+-                /* XXX If the deprecated Satisfy directive is set to Any and 
+-                   authorization as denied, then check to see what
+-                   the access control stage said.  Just the if statement
++                /* XXX If the deprecated Satisfy directive is set to anything
++                   but ANY a failure in access control or authz will cause
++                   an HTTP_UNAUTHORIZED.  Just the if statement
+                    should be removed in 3.0 when the Satisfy directive
+                    goes away. */
+-//                if (!note || ((note[0] == 'N') && (ap_satisfies(r) != SATISFY_ANY))) {
+                 if (!note || (ap_satisfies(r) != SATISFY_ANY) || (note[0] == 'N')) {
+                     ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                                   "user %s: authorization failure for \"%s\": ",

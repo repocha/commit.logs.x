@@ -1,0 +1,98 @@
+commit 98b5be31963ad7cd4fc17b73c59286c20383686d
+Author: Yann Ylavic <ylavic@apache.org>
+Date:   Wed May 13 11:34:30 2015 +0000
+
+    mod_authn_dbd, mod_authz_dbd, mod_session_dbd, mod_rewrite: Fix lifetime
+    of DB lookup entries independently of the selected DB engine.  PR 46421.
+    
+    Suggested by: Michel Stam <michel reverze net>
+    Proposed by: Steven whitson <steven.whitson gmail com>
+    Reviewed/Extended/Committed by: ylavic
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1679181 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authz_dbd.c b/modules/aaa/mod_authz_dbd.c
+index 3074991..a165eb0 100644
+--- a/modules/aaa/mod_authz_dbd.c
++++ b/modules/aaa/mod_authz_dbd.c
+@@ -174,7 +174,9 @@ static int authz_dbd_login(request_rec *r, authz_dbd_cfg *cfg,
+                           action, r->user, message?message:noerror);
+                 }
+                 else if (newuri == NULL) {
+-                    newuri = apr_dbd_get_entry(dbd->driver, row, 0);
++                    newuri =
++                        apr_pstrdup(r->pool,
++                                    apr_dbd_get_entry(dbd->driver, row, 0));
+                 }
+                 /* we can't break out here or row won't get cleaned up */
+             }
+@@ -204,7 +206,6 @@ static int authz_dbd_group_query(request_rec *r, authz_dbd_cfg *cfg,
+     apr_dbd_prepared_t *query;
+     apr_dbd_results_t *res = NULL;
+     apr_dbd_row_t *row = NULL;
+-    const char **group;
+ 
+     if (cfg->query == NULL) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01649)
+@@ -224,8 +225,9 @@ static int authz_dbd_group_query(request_rec *r, authz_dbd_cfg *cfg,
+              rv != -1;
+              rv = apr_dbd_get_row(dbd->driver, r->pool, res, &row, -1)) {
+             if (rv == 0) {
+-                group = apr_array_push(groups);
+-                *group = apr_dbd_get_entry(dbd->driver, row, 0);
++                APR_ARRAY_PUSH(groups, const char *) =
++                    apr_pstrdup(r->pool,
++                                apr_dbd_get_entry(dbd->driver, row, 0));
+             }
+             else {
+                 message = apr_dbd_error(dbd->driver, dbd->handle, rv);
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index e22a280..dfe18e0 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -1384,12 +1384,14 @@ static char *lookup_map_dbd(request_rec *r, char *key, const char *label)
+     while ((rv = apr_dbd_get_row(db->driver, r->pool, res, &row, -1)) == 0) {
+         ++n;
+         if (ret == NULL) {
+-            ret = apr_dbd_get_entry(db->driver, row, 0);
++            ret = apr_pstrdup(r->pool,
++                              apr_dbd_get_entry(db->driver, row, 0));
+         }
+         else {
+             /* randomise crudely amongst multiple results */
+             if ((double)rand() < (double)RAND_MAX/(double)n) {
+-                ret = apr_dbd_get_entry(db->driver, row, 0);
++                ret = apr_pstrdup(r->pool,
++                                  apr_dbd_get_entry(db->driver, row, 0));
+             }
+         }
+     }
+@@ -1402,11 +1404,11 @@ static char *lookup_map_dbd(request_rec *r, char *key, const char *label)
+     case 0:
+         return NULL;
+     case 1:
+-        return apr_pstrdup(r->pool, ret);
++        return ret;
+     default:
+         /* what's a fair rewritelog level for this? */
+         rewritelog((r, 3, NULL, "Multiple values found for %s", key));
+-        return apr_pstrdup(r->pool, ret);
++        return ret;
+     }
+ }
+ 
+diff --git a/modules/session/mod_session_dbd.c b/modules/session/mod_session_dbd.c
+index a6ab40e..cf65e5a 100644
+--- a/modules/session/mod_session_dbd.c
++++ b/modules/session/mod_session_dbd.c
+@@ -138,7 +138,8 @@ static apr_status_t dbd_load(request_rec * r, const char *key, const char **val)
+             return APR_EGENERAL;
+         }
+         if (*val == NULL) {
+-            *val = apr_dbd_get_entry(dbd->driver, row, 0);
++            *val = apr_pstrdup(r->pool,
++                               apr_dbd_get_entry(dbd->driver, row, 0));
+         }
+         /* we can't break out here or row won't get cleaned up */
+     }

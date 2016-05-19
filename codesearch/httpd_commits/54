@@ -1,0 +1,24 @@
+commit ba39aaa25847f024f63de886ed51946b1ef64bcf
+Author: Eric Covener <covener@apache.org>
+Date:   Mon Jun 24 19:48:34 2013 +0000
+
+    Drop severity from DEBUG to trace4: "... didn't match with attr DN failed group verification."
+    
+    (This is just mod_authnz_ldap trying multiple atribbutes to discover LDAP subgroups)
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1496183 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 2c25dbc..a03436b 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -891,7 +891,7 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+             return AUTHZ_GRANTED;
+         }
+         else { 
+-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01719)
++                ap_log_rerror(APLOG_MARK, APLOG_TRACE4, 0, r, APLOGNO(01719)
+                               "auth_ldap authorize: require group \"%s\": "
+                               "didn't match with attr %s [%s][%d - %s]",
+                               t, ldc->reason, ent[i].name, result, 

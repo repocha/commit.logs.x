@@ -1,0 +1,86 @@
+commit ce6f50f9d7939867c676540c385f874e65186fc1
+Author: Bradley Nicholes <bnicholes@apache.org>
+Date:   Tue Nov 2 00:08:21 2004 +0000
+
+    Allow mod_authnz_ldap authorization functionality to be used without requiring the user to also be authenticated through mod_authnz_ldap. This allows other authentication modules to take advantage of LDAP authorization only [PR 28253]
+    
+    Submitted by: Jari Ahonen [jah progress.com]
+    Reviewed by: Brad Nicholes
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@105669 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/NWGNUauthnzldap b/modules/aaa/NWGNUauthnzldap
+index 7f72259..6c36774 100644
+--- a/modules/aaa/NWGNUauthnzldap
++++ b/modules/aaa/NWGNUauthnzldap
+@@ -206,6 +206,7 @@ FILES_nlm_Ximports = \
+ 	util_ldap_connection_find \
+ 	util_ldap_connection_close \
+ 	util_ldap_cache_checkuserid \
++	util_ldap_cache_getuserdn \
+ 	util_ldap_cache_compare \
+ 	util_ldap_cache_comparedn \
+ 	@$(APR)/aprlib.imp \
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index bfb0a6a..df80a72 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -469,6 +469,12 @@ static int authz_ldap_check_user_access(request_rec *r)
+     char *w;
+     int method_restricted = 0;
+ 
++    char filtbuf[FILTER_LENGTH];
++    const char *dn = NULL;
++    const char **vals = NULL;
++    const char *type = ap_auth_type(r);
++    char *tmpuser;
++
+ /*
+     if (!sec->enabled) {
+         return DECLINED;
+@@ -517,6 +523,44 @@ static int authz_ldap_check_user_access(request_rec *r)
+         return sec->auth_authoritative? HTTP_UNAUTHORIZED : DECLINED;
+     }
+ 
++    /*
++     * If we have been authenticated by some other module than mod_auth_ldap,
++     * the req structure needed for authorization needs to be created
++     * and populated with the userid and DN of the account in LDAP
++     */
++
++    /* Check that we have a userid to start with */
++    if ((!r->user) || (strlen(r->user) == 0)) {
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING|APLOG_NOERRNO, 0, r,
++            "ldap authorize: Userid is blank, AuthType=%s",
++            r->ap_auth_type);
++    }
++
++    if(!req) {
++        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
++            "ldap authorize: Creating LDAP req structure");
++
++        /* Build the username filter */
++        authn_ldap_build_filter(filtbuf, r, r->user, sec);
++
++        /* Search for the user DN */
++        result = util_ldap_cache_getuserdn(r, ldc, sec->url, sec->basedn,
++             sec->scope, sec->attributes, filtbuf, &dn, &vals);
++
++        /* Search failed, log error and return failure */
++        if(result != LDAP_SUCCESS) {
++            ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
++                "auth_ldap authorise: User DN not found, %s", ldc->reason);
++            return sec->auth_authoritative? HTTP_UNAUTHORIZED : DECLINED;
++        }
++
++        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
++            sizeof(authn_ldap_request_t));
++        ap_set_module_config(r->request_config, &authnz_ldap_module, req);
++        req->dn = apr_pstrdup(r->pool, dn);
++        req->user = r->user;
++    }
++
+     /* Loop through the requirements array until there's no elements
+      * left, or something causes a return from inside the loop */
+     for(x=0; x < reqs_arr->nelts; x++) {

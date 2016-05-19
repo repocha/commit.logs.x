@@ -1,0 +1,151 @@
+commit 27aa27c84055aa8bacc2fb18f3c3aaedab334b32
+Author: Graham Leggett <minfrin@apache.org>
+Date:   Mon Dec 30 09:37:17 2013 +0000
+
+    mod_authnz_dbm: Support the expression parser within the require directives.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1554170 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 8cf00cf..8b38b36 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,6 +1,9 @@
+                                                          -*- coding: utf-8 -*-
+ Changes with Apache 2.5.0
+ 
++  *) mod_authnz_dbm: Support the expression parser within the require
++     directives. [Graham Leggett]
++
+   *) mod_authnz_dbd: Support the expression parser within the require
+      directives. [Graham Leggett]
+ 
+diff --git a/docs/log-message-tags/next-number b/docs/log-message-tags/next-number
+index 198c10d..3d23d59 100644
+--- a/docs/log-message-tags/next-number
++++ b/docs/log-message-tags/next-number
+@@ -1 +1 @@
+-2591
++2592
+diff --git a/docs/manual/expr.xml b/docs/manual/expr.xml
+index 292a389..13a99d2 100644
+--- a/docs/manual/expr.xml
++++ b/docs/manual/expr.xml
+@@ -57,6 +57,7 @@
+ <seealso><a href="mod/mod_authnz_ldap.html#reqattribute">Require ldap-attribute</a></seealso>
+ <seealso><a href="mod/mod_authnz_ldap.html#reqfilter">Require ldap-filter</a></seealso>
+ <seealso><a href="mod/mod_authz_dbd.html#reqgroup">Require dbd-group</a></seealso>
++<seealso><a href="mod/mod_authz_dbm.html#reqgroup">Require dbm-group</a></seealso>
+ <seealso><directive module="mod_ssl">SSLRequire</directive></seealso>
+ <seealso><directive module="mod_log_debug">LogMessage</directive></seealso>
+ <seealso><module>mod_include</module></seealso>
+diff --git a/docs/manual/mod/mod_authz_dbm.xml b/docs/manual/mod/mod_authz_dbm.xml
+index 5f17216..12ab338 100644
+--- a/docs/manual/mod/mod_authz_dbm.xml
++++ b/docs/manual/mod/mod_authz_dbm.xml
+@@ -37,6 +37,40 @@
+ 
+ <seealso><directive module="mod_authz_core">Require</directive></seealso>
+ 
++<section id="requiredirectives"><title>The Require Directives</title>
++
++    <p>Apache's <directive module="mod_authz_core">Require</directive>
++    directives are used during the authorization phase to ensure that
++    a user is allowed to access a resource.  mod_authz_dbm extends the
++    authorization types with <code>dbm-group</code>.</p>
++
++    <p>Since v2.5.0, <a href="../expr.html">expressions</a> are supported
++    within the DBM require directives.</p>
++
++<section id="reqgroup"><title>Require dbm-group</title>
++
++    <p>This directive specifies group membership that is required for the
++    user to gain access.</p>
++
++    <highlight language="config">
++      Require dbm-group admin
++    </highlight>
++
++</section>
++
++<section id="reqfilegroup"><title>Require dbm-file-group</title>
++
++    <p>When this directive is specified, the user must be a member of the group
++    assigned to the file being accessed.</p>
++
++    <highlight language="config">
++      Require dbm-file-group
++    </highlight>
++
++</section>
++
++</section>
++
+ <section id="examples">
+ <title>Example usage</title>
+ <p><em>Note that using mod_authz_dbm requires you to require <code>dbm-group</code> 
+diff --git a/modules/aaa/mod_authz_dbm.c b/modules/aaa/mod_authz_dbm.c
+index 53c9152..b35e55f 100644
+--- a/modules/aaa/mod_authz_dbm.c
++++ b/modules/aaa/mod_authz_dbm.c
+@@ -136,6 +136,11 @@ static authz_status dbmgroup_check_authorization(request_rec *r,
+     authz_dbm_config_rec *conf = ap_get_module_config(r->per_dir_config,
+                                                       &authz_dbm_module);
+     char *user = r->user;
++
++    const char *err = NULL;
++    const ap_expr_info_t *expr = parsed_require_args;
++    const char *require;
++
+     const char *t;
+     char *w;
+     const char *orig_groups = NULL;
+@@ -179,7 +184,15 @@ static authz_status dbmgroup_check_authorization(request_rec *r,
+         orig_groups = groups;
+     }
+ 
+-    t = require_args;
++    require = ap_expr_str_exec(r, expr, &err);
++    if (err) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(02591)
++                      "authz_dbm authorize: require dbm-group: Can't "
++                      "evaluate require expression: %s", err);
++        return AUTHZ_DENIED;
++    }
++
++    t = require;
+     while ((w = ap_getword_white(r->pool, &t)) && w[0]) {
+         groups = orig_groups;
+         while (groups[0]) {
+@@ -262,10 +275,29 @@ static authz_status dbmfilegroup_check_authorization(request_rec *r,
+     return AUTHZ_DENIED;
+ }
+ 
++static const char *dbm_parse_config(cmd_parms *cmd, const char *require_line,
++                                     const void **parsed_require_line)
++{
++    const char *expr_err = NULL;
++    ap_expr_info_t *expr = apr_pcalloc(cmd->pool, sizeof(*expr));
++
++    expr = ap_expr_parse_cmd(cmd, require_line, AP_EXPR_FLAG_STRING_RESULT,
++            &expr_err, NULL);
++
++    if (expr_err)
++        return apr_pstrcat(cmd->temp_pool,
++                           "Cannot parse expression in require line: ",
++                           expr_err, NULL);
++
++    *parsed_require_line = expr;
++
++    return NULL;
++}
++
+ static const authz_provider authz_dbmgroup_provider =
+ {
+     &dbmgroup_check_authorization,
+-    NULL,
++    dbm_parse_config,
+ };
+ 
+ static const authz_provider authz_dbmfilegroup_provider =

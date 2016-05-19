@@ -1,0 +1,110 @@
+commit 78ca8786c37e7576beaa32bcbac52c4e2420d2c9
+Author: Christophe Jaillet <jailletc36@apache.org>
+Date:   Sat Jul 19 22:02:53 2014 +0000
+
+    Add missing APLOGNO.
+    Refactor to keep APLOGNO on the same line as ap_log_error, when applicable.
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1611978 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/docs/log-message-tags/next-number b/docs/log-message-tags/next-number
+index 06493b1..84e0d24 100644
+--- a/docs/log-message-tags/next-number
++++ b/docs/log-message-tags/next-number
+@@ -1 +1 @@
+-2653
++2660
+diff --git a/modules/aaa/mod_auth_basic.c b/modules/aaa/mod_auth_basic.c
+index 1a7d50b..325bfbe 100644
+--- a/modules/aaa/mod_auth_basic.c
++++ b/modules/aaa/mod_auth_basic.c
+@@ -315,8 +315,8 @@ static int authenticate_basic_user(request_rec *r)
+ 
+     /* We need an authentication realm. */
+     if (!ap_auth_name(r)) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR,
+-                      0, r, APLOGNO(01615) "need AuthName: %s", r->uri);
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01615)
++                      "need AuthName: %s", r->uri);
+         return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+diff --git a/modules/aaa/mod_auth_form.c b/modules/aaa/mod_auth_form.c
+index cfb4a7f..263c8e6 100644
+--- a/modules/aaa/mod_auth_form.c
++++ b/modules/aaa/mod_auth_form.c
+@@ -903,16 +903,16 @@ static int authenticate_form_authn(request_rec * r)
+      * never be secure. Abort the auth attempt in this case.
+      */
+     if (PROXYREQ_PROXY == r->proxyreq) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR,
+-                      0, r, APLOGNO(01809) "form auth cannot be used for proxy "
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01809)
++                      "form auth cannot be used for proxy "
+                       "requests due to XSS risk, access denied: %s", r->uri);
+         return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+     /* We need an authentication realm. */
+     if (!ap_auth_name(r)) {
+-        ap_log_rerror(APLOG_MARK, APLOG_ERR,
+-                      0, r, APLOGNO(01810) "need AuthName: %s", r->uri);
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01810)
++                      "need AuthName: %s", r->uri);
+         return HTTP_INTERNAL_SERVER_ERROR;
+     }
+ 
+diff --git a/modules/cache/cache_util.c b/modules/cache/cache_util.c
+index 3cff6f6..5b57003 100644
+--- a/modules/cache/cache_util.c
++++ b/modules/cache/cache_util.c
+@@ -461,7 +461,7 @@ int ap_cache_check_no_cache(cache_request_rec *cache, request_rec *r)
+             return 0;
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
++            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, APLOGNO(02657)
+                     "Incoming request is asking for an uncached version of "
+                     "%s, but we have been configured to ignore it and serve "
+                     "cached content anyway", r->unparsed_uri);
+@@ -501,7 +501,7 @@ int ap_cache_check_no_store(cache_request_rec *cache, request_rec *r)
+             return 0;
+         }
+         else {
+-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
++            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, APLOGNO(02658)
+                     "Incoming request is asking for a no-store version of "
+                     "%s, but we have been configured to ignore it and serve "
+                     "cached content anyway", r->unparsed_uri);
+diff --git a/modules/database/mod_dbd.c b/modules/database/mod_dbd.c
+index 5ff1ea2..7212665 100644
+--- a/modules/database/mod_dbd.c
++++ b/modules/database/mod_dbd.c
+@@ -327,7 +327,7 @@ DBD_DECLARE_NONSTD(void) ap_dbd_prepare(server_rec *s, const char *query,
+ 
+     if (apr_hash_get(svr->cfg->queries, label, APR_HASH_KEY_STRING)
+         && strcmp(query, "")) {
+-        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
++        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s, APLOGNO(02653)
+                      "conflicting SQL statements with label %s", label);
+     }
+ 
+@@ -799,7 +799,8 @@ DBD_DECLARE_NONSTD(ap_dbd_t*) ap_dbd_open(apr_pool_t *pool, server_rec *s)
+ 
+     /* If nothing is configured, we shouldn't be here */
+     if (cfg->name == no_dbdriver) {
+-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s, "not configured");
++        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s, APLOGNO(02654)
++                     "not configured");
+         return NULL;
+     }
+ 
+@@ -822,7 +823,7 @@ DBD_DECLARE_NONSTD(ap_dbd_t*) ap_dbd_open(apr_pool_t *pool, server_rec *s)
+ 
+     rv = apr_reslist_acquire(group->reslist, (void*) &rec);
+     if (rv != APR_SUCCESS) {
+-        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
++        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s, APLOGNO(02655)
+                      "Failed to acquire DBD connection from pool!");
+         return NULL;
+     }

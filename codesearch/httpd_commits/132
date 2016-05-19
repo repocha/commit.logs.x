@@ -1,0 +1,24 @@
+commit cc9a083e689c117434116b79bdd8d2a96e39fcb1
+Author: Jeff Trawick <trawick@apache.org>
+Date:   Sat May 16 13:21:23 2009 +0000
+
+    "fix" this warning by passing "%s" as the format string:
+    
+    mod_authz_core.c: In function ‘authz_core_check_section’:
+    mod_authz_core.c:579: warning: format not a string literal and no format arguments
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@775460 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index 23702bc..6dbea9c 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -572,6 +572,7 @@ static int authz_core_check_section(apr_pool_t *p, server_rec *s,
+ 
+     if (ret != OK) {
+         ap_log_error(APLOG_MARK, APLOG_ERR | APLOG_STARTUP, APR_SUCCESS, s,
++                     "%s",
+                      apr_pstrcat(p, (is_conf
+                                      ? "<Directory>, <Location>, or similar"
+                                      : format_authz_command(p, section)),

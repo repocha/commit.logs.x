@@ -1,0 +1,32 @@
+commit 03c6ae2002a16c4b4c65a02b064290f7cca440a1
+Author: Rainer Jung <rjung@apache.org>
+Date:   Tue Mar 31 19:07:11 2015 +0000
+
+    Add missing APLOGNOs by running
+    docs/log-message-tags/update-log-msg-tags.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1670431 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authn_core.c b/modules/aaa/mod_authn_core.c
+index 6df473e..0346602 100644
+--- a/modules/aaa/mod_authn_core.c
++++ b/modules/aaa/mod_authn_core.c
+@@ -343,7 +343,7 @@ static const char *authn_ap_auth_type(request_rec *r)
+         type = ap_expr_str_exec(r, conf->ap_auth_type, &err);
+         if (err) {
+             ap_log_rerror(
+-                    APLOG_MARK, APLOG_ERR, APR_SUCCESS, r, APLOGNO() "AuthType expression could not be evaluated: %s", err);
++                    APLOG_MARK, APLOG_ERR, APR_SUCCESS, r, APLOGNO(02834) "AuthType expression could not be evaluated: %s", err);
+             return NULL;
+         }
+ 
+@@ -365,7 +365,7 @@ static const char *authn_ap_auth_name(request_rec *r)
+         name = ap_expr_str_exec(r, conf->ap_auth_name, &err);
+         if (err) {
+             ap_log_rerror(
+-                    APLOG_MARK, APLOG_ERR, APR_SUCCESS, r, APLOGNO() "AuthName expression could not be evaluated: %s", err);
++                    APLOG_MARK, APLOG_ERR, APR_SUCCESS, r, APLOGNO(02835) "AuthName expression could not be evaluated: %s", err);
+             return NULL;
+         }
+ 

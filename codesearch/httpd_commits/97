@@ -1,0 +1,400 @@
+commit eca0e88909515f78c75376e9714b9dade734ebd8
+Author: Stefan Fritsch <sf@apache.org>
+Date:   Sat Feb 12 21:23:56 2011 +0000
+
+    Use ap_state_query() to fix many modules that were not correctly initializing
+    if they were not active during server startup but got enabled later during a
+    graceful restart (in which case they need to do all work during a single
+    config run).
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1070153 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 23a1547..2c9fb19 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,10 @@
+ 
+ Changes with Apache 2.3.11
+ 
++  *) modules: Fix many modules that were not correctly initializing if they
++     were not active during server startup but got enabled later during a
++     graceful restart. [Stefan Fritsch]
++
+   *) core: Create new ap_state_query function that allows modules to determine
+      if the current configuration run is the initial one at server startup,
+      and if the server is started for testing/config dumping only.
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index e88eba5..b137059 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -382,18 +382,12 @@ static int pre_init(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
+ static int initialize_module(apr_pool_t *p, apr_pool_t *plog,
+                              apr_pool_t *ptemp, server_rec *s)
+ {
+-    void *data;
+-    const char *userdata_key = "auth_digest_init";
+-
+     /* initialize_module() will be called twice, and if it's a DSO
+      * then all static data from the first call will be lost. Only
+      * set up our static data on the second call. */
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        apr_pool_userdata_set((const void *)1, userdata_key,
+-                               apr_pool_cleanup_null, s->process->pool);
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_PRE_CONFIG)
+         return OK;
+-    }
++
+     if (initialize_secret(s) != APR_SUCCESS) {
+         return !OK;
+     }
+diff --git a/modules/cluster/mod_heartmonitor.c b/modules/cluster/mod_heartmonitor.c
+index 07bada1..4c80e2d 100644
+--- a/modules/cluster/mod_heartmonitor.c
++++ b/modules/cluster/mod_heartmonitor.c
+@@ -665,8 +665,6 @@ static int hm_post_config(apr_pool_t *p, apr_pool_t *plog,
+                           apr_pool_t *ptemp, server_rec *s)
+ {
+     apr_status_t rv;
+-    const char *userdata_key = "mod_heartmonitor_init";
+-    void *data;
+     hm_ctx_t *ctx = ap_get_module_config(s->module_config,
+                                          &heartmonitor_module);
+     APR_OPTIONAL_FN_TYPE(ap_watchdog_get_instance) *hm_watchdog_get_instance;
+@@ -681,11 +679,8 @@ static int hm_post_config(apr_pool_t *p, apr_pool_t *plog,
+     }
+ 
+     /* Create the slotmem */
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        /* first call do nothing */
+-        apr_pool_userdata_set((const void *)1, userdata_key, apr_pool_cleanup_null, s->process->pool);
+-    } else {
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_CONFIG) {
++        /* this is the real thing */
+         if (maxworkers) {
+             storage = ap_lookup_provider(AP_SLOTMEM_PROVIDER_GROUP, "shared", "0");
+             if (!storage) {
+diff --git a/modules/core/mod_watchdog.c b/modules/core/mod_watchdog.c
+index 551d49a..7bc8a35 100644
+--- a/modules/core/mod_watchdog.c
++++ b/modules/core/mod_watchdog.c
+@@ -20,6 +20,7 @@
+ #include "mod_watchdog.h"
+ #include "ap_provider.h"
+ #include "ap_mpm.h"
++#include "http_core.h"
+ #include "util_mutex.h"
+ 
+ #define AP_WATCHODG_PGROUP    "watchdog"
+@@ -444,11 +445,12 @@ static int wd_post_config_hook(apr_pool_t *pconf, apr_pool_t *plog,
+         if (!(wd_server_conf = apr_pcalloc(pproc, sizeof(wd_server_conf_t))))
+             return APR_ENOMEM;
+         apr_pool_create(&wd_server_conf->pool, pproc);
+-        wd_server_conf->s = s;
+-        apr_pool_userdata_set(wd_server_conf, pk, apr_pool_cleanup_null, pproc);
++    }
++
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_PRE_CONFIG)
+         /* First time config phase -- skip. */
+         return OK;
+-    }
++
+ #if defined(WIN32)
+     {
+         const char *ppid = getenv("AP_PARENT_PID");
+diff --git a/modules/examples/mod_example_ipc.c b/modules/examples/mod_example_ipc.c
+index ef39cd7..483881b 100644
+--- a/modules/examples/mod_example_ipc.c
++++ b/modules/examples/mod_example_ipc.c
+@@ -50,6 +50,7 @@
+ 
+ #include "httpd.h"
+ #include "http_config.h"
++#include "http_core.h"
+ #include "http_log.h"
+ #include "http_protocol.h"
+ #include "util_mutex.h"
+@@ -117,35 +118,19 @@ static int exipc_pre_config(apr_pool_t *pconf, apr_pool_t *plog,
+ static int exipc_post_config(apr_pool_t *pconf, apr_pool_t *plog, 
+                              apr_pool_t *ptemp, server_rec *s)
+ {
+-    void *data; /* These two help ensure that we only init once. */
+-    const char *userdata_key;
+     apr_status_t rs;
+     exipc_data *base;
+     const char *tempdir; 
+ 
+ 
+     /* 
+-     * The following checks if this routine has been called before. 
+-     * This is necessary because the parent process gets initialized
+-     * a couple of times as the server starts up, and we don't want 
+-     * to create any more mutexes and shared memory segments than
+-     * we're actually going to use. 
+-     * 
+-     * The key needs to be unique for the entire web server, so put
+-     * the module name in it.
++     * Do nothing if we are not creating the final configuration.
++     * The parent process gets initialized a couple of times as the
++     * server starts up, and we don't want to create any more mutexes
++     * and shared memory segments than we're actually going to use. 
+      */ 
+-    userdata_key = "example_ipc_init_module";
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        /* 
+-         * If no data was found for our key, this must be the first
+-         * time the module is initialized. Put some data under that
+-         * key and return.
+-         */
+-        apr_pool_userdata_set((const void *) 1, userdata_key, 
+-                              apr_pool_cleanup_null, s->process->pool);
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_PRE_CONFIG)
+         return OK;
+-    } /* Kilroy was here */
+ 
+     /* 
+      * The shared memory allocation routines take a file name.
+diff --git a/modules/generators/mod_cgid.c b/modules/generators/mod_cgid.c
+index 8f84198..810a49b 100644
+--- a/modules/generators/mod_cgid.c
++++ b/modules/generators/mod_cgid.c
+@@ -891,7 +891,6 @@ static int cgid_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+                      server_rec *main_server)
+ {
+     apr_proc_t *procnew = NULL;
+-    int first_time = 0;
+     const char *userdata_key = "cgid_init";
+     module **m;
+     int ret = OK;
+@@ -902,7 +901,6 @@ static int cgid_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+ 
+     apr_pool_userdata_get(&data, userdata_key, main_server->process->pool);
+     if (!data) {
+-        first_time = 1;
+         procnew = apr_pcalloc(main_server->process->pool, sizeof(*procnew));
+         procnew->pid = -1;
+         procnew->err = procnew->in = procnew->out = NULL;
+@@ -913,7 +911,7 @@ static int cgid_init(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+         procnew = data;
+     }
+ 
+-    if (!first_time) {
++    if (ap_state_query(AP_SQ_MAIN_STATE) != AP_SQ_MS_CREATE_PRE_CONFIG) {
+         char *tmp_sockname;
+         total_modules = 0;
+         for (m = ap_preloaded_modules; *m != NULL; m++)
+diff --git a/modules/ldap/util_ldap.c b/modules/ldap/util_ldap.c
+index 6f485b5..9c15110 100644
+--- a/modules/ldap/util_ldap.c
++++ b/modules/ldap/util_ldap.c
+@@ -2703,18 +2703,13 @@ static int util_ldap_post_config(apr_pool_t *p, apr_pool_t *plog,
+                             ap_get_module_config(s->module_config,
+                                                  &ldap_module);
+ 
+-    void *data;
+-    const char *userdata_key = "util_ldap_init";
+     apr_ldap_err_t *result_err = NULL;
+     int rc;
+ 
+     /* util_ldap_post_config() will be called twice. Don't bother
+      * going through all of the initialization on the first call
+      * because it will just be thrown away.*/
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        apr_pool_userdata_set((const void *)1, userdata_key,
+-                               apr_pool_cleanup_null, s->process->pool);
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_PRE_CONFIG) {
+ 
+ #if APR_HAS_SHARED_MEMORY
+         /* If the cache file already exists then delete it.  Otherwise we are
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 73f0a88..55fc459 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -4309,16 +4309,6 @@ static int post_config(apr_pool_t *p,
+                        server_rec *s)
+ {
+     apr_status_t rv;
+-    void *data;
+-    int first_time = 0;
+-    const char *userdata_key = "rewrite_init_module";
+-
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        first_time = 1;
+-        apr_pool_userdata_set((const void *)1, userdata_key,
+-                              apr_pool_cleanup_null, s->process->pool);
+-    }
+ 
+     /* check if proxy module is available */
+     proxy_available = (ap_find_linked_module("mod_proxy.c") != NULL);
+@@ -4331,12 +4321,11 @@ static int post_config(apr_pool_t *p,
+     apr_pool_cleanup_register(p, (void *)s, rewritelock_remove,
+                               apr_pool_cleanup_null);
+ 
+-    /* step through the servers and
+-     * - open each rewriting logfile
+-     * - open the RewriteMap prg:xxx programs
++    /* if we are not doing the initial config, step through the servers and
++     * open the RewriteMap prg:xxx programs,
+      */
+-    for (; s; s = s->next) {
+-        if (!first_time) {
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_CONFIG) {
++        for (; s; s = s->next) {
+             if (run_rewritemap_programs(s, p) != APR_SUCCESS) {
+                 return HTTP_INTERNAL_SERVER_ERROR;
+             }
+diff --git a/modules/proxy/balancers/mod_lbmethod_heartbeat.c b/modules/proxy/balancers/mod_lbmethod_heartbeat.c
+index 63304e8..0987415 100644
+--- a/modules/proxy/balancers/mod_lbmethod_heartbeat.c
++++ b/modules/proxy/balancers/mod_lbmethod_heartbeat.c
+@@ -387,19 +387,15 @@ static const proxy_balancer_method heartbeat =
+ static int lb_hb_init(apr_pool_t *p, apr_pool_t *plog,
+                           apr_pool_t *ptemp, server_rec *s)
+ {
+-    const char *userdata_key = "mod_lbmethod_heartbeat_init";
+-    void *data;
+     apr_size_t size;
+     unsigned int num;
+     lb_hb_ctx_t *ctx = ap_get_module_config(s->module_config,
+                                             &lbmethod_heartbeat_module);
+     
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        /* first call do nothing */
+-        apr_pool_userdata_set((const void *)1, userdata_key, apr_pool_cleanup_null, s->process->pool);
++    /* do nothing on first call */
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_PRE_CONFIG)
+         return OK;
+-    }
++
+     storage = ap_lookup_provider(AP_SLOTMEM_PROVIDER_GROUP, "shared", "0");
+     if (!storage) {
+         ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 0, s, "ap_lookup_provider %s failed", AP_SLOTMEM_PROVIDER_GROUP);
+diff --git a/modules/proxy/mod_proxy_balancer.c b/modules/proxy/mod_proxy_balancer.c
+index 4b65c66..2d67ec2 100644
+--- a/modules/proxy/mod_proxy_balancer.c
++++ b/modules/proxy/mod_proxy_balancer.c
+@@ -690,21 +690,15 @@ static int balancer_post_config(apr_pool_t *pconf, apr_pool_t *plog,
+                          apr_pool_t *ptemp, server_rec *s)
+ {
+     apr_status_t rv;
+-    void *data;
+     void *sconf = s->module_config;
+     proxy_server_conf *conf = (proxy_server_conf *) ap_get_module_config(sconf, &proxy_module);
+-    const char *userdata_key = "mod_proxy_balancer_init";
+     ap_slotmem_instance_t *new = NULL;
+     apr_time_t tstamp;
+ 
+-    /* balancer_post_config() will be called twice during startup.  So, only
++    /* balancer_post_config() will be called twice during startup.  So, don't
+      * set up the static data the 1st time through. */
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        apr_pool_userdata_set((const void *)1, userdata_key,
+-                               apr_pool_cleanup_null, s->process->pool);
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_PRE_CONFIG)
+         return OK;
+-    }
+ 
+     /*
+      * Get slotmem setups
+diff --git a/modules/session/mod_session_crypto.c b/modules/session/mod_session_crypto.c
+index 5832d84..4583fbf 100644
+--- a/modules/session/mod_session_crypto.c
++++ b/modules/session/mod_session_crypto.c
+@@ -20,6 +20,7 @@
+ #include "apr_lib.h"
+ #include "apr_strings.h"
+ #include "http_log.h"
++#include "http_core.h"
+ 
+ #if APU_MAJOR_VERSION == 1 && APU_MINOR_VERSION < 4
+ 
+@@ -41,7 +42,6 @@
+ 
+ #define LOG_PREFIX "mod_session_crypto: "
+ #define DRIVER_KEY "session_crypto_driver"
+-#define INIT_KEY "session_crypto_init"
+ 
+ module AP_MODULE_DECLARE_DATA session_crypto_module;
+ 
+@@ -390,7 +390,6 @@ AP_DECLARE(int) ap_session_crypto_decode(request_rec * r, session_rec * z)
+ AP_DECLARE(int) ap_session_crypto_init(apr_pool_t *p, apr_pool_t *plog,
+         apr_pool_t *ptemp, server_rec *s)
+ {
+-    void *data;
+     const apr_crypto_driver_t *driver = NULL;
+ 
+     session_crypto_conf *conf = ap_get_module_config(s->module_config,
+@@ -399,12 +398,8 @@ AP_DECLARE(int) ap_session_crypto_init(apr_pool_t *p, apr_pool_t *plog,
+     /* session_crypto_init() will be called twice. Don't bother
+      * going through all of the initialization on the first call
+      * because it will just be thrown away.*/
+-    apr_pool_userdata_get(&data, INIT_KEY, s->process->pool);
+-    if (!data) {
+-        apr_pool_userdata_set((const void *)1, INIT_KEY,
+-                apr_pool_cleanup_null, s->process->pool);
++    if (ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_PRE_CONFIG)
+         return OK;
+-    }
+ 
+     if (conf->library) {
+ 
+diff --git a/modules/slotmem/mod_slotmem_shm.c b/modules/slotmem/mod_slotmem_shm.c
+index 23fdf82..c696a96 100644
+--- a/modules/slotmem/mod_slotmem_shm.c
++++ b/modules/slotmem/mod_slotmem_shm.c
+@@ -639,20 +639,7 @@ static void slotmem_shm_initialize_cleanup(apr_pool_t *p)
+ static int post_config(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
+                        server_rec *s)
+ {
+-    void *data;
+-    const char *userdata_key = "slotmem_shm_post_config";
+-
+     slotmem_shm_initialize_cleanup(p);
+-
+-    /* keep this around for possible future usage */
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        apr_pool_userdata_set((const void *)1, userdata_key,
+-                               apr_pool_cleanup_null, s->process->pool);
+-        /* Do Stuff */
+-        return OK;
+-    }
+-
+     return OK;
+ }
+ 
+diff --git a/modules/ssl/ssl_scache.c b/modules/ssl/ssl_scache.c
+index 104151e..d454c1f 100644
+--- a/modules/ssl/ssl_scache.c
++++ b/modules/ssl/ssl_scache.c
+@@ -41,8 +41,6 @@ void ssl_scache_init(server_rec *s, apr_pool_t *p)
+ {
+     SSLModConfigRec *mc = myModConfig(s);
+     apr_status_t rv;
+-    void *data;
+-    const char *userdata_key = "ssl_scache_init";
+     struct ap_socache_hints hints;
+     
+     /* The very first invocation of this function will be the
+@@ -50,12 +48,8 @@ void ssl_scache_init(server_rec *s, apr_pool_t *p)
+      * this first (and only the first) time through, since the pool
+      * will be immediately cleared anyway.  For every subsequent
+      * invocation, initialize the configured cache. */
+-    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+-    if (!data) {
+-        apr_pool_userdata_set((const void *)1, userdata_key,
+-                              apr_pool_cleanup_null, s->process->pool);
++    if (!ap_state_query(AP_SQ_MAIN_STATE) == AP_SQ_MS_CREATE_PRE_CONFIG)
+         return;
+-    }
+ 
+ #ifdef HAVE_OCSP_STAPLING
+     if (mc->stapling_cache) {

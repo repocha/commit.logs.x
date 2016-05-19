@@ -1,0 +1,1421 @@
+commit 246ba21fb31c7c139a862e0ba029cf2bec248af0
+Author: Yann Ylavic <ylavic@apache.org>
+Date:   Mon Nov 23 16:48:35 2015 +0000
+
+    More ap_casecmpstr[n]() usages.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1715880 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_basic.c b/modules/aaa/mod_auth_basic.c
+index 15d7bb9..9402463 100644
+--- a/modules/aaa/mod_auth_basic.c
++++ b/modules/aaa/mod_auth_basic.c
+@@ -238,7 +238,7 @@ static void note_basic_auth_failure(request_rec *r)
+ 
+ static int hook_note_basic_auth_failure(request_rec *r, const char *auth_type)
+ {
+-    if (strcasecmp(auth_type, "Basic"))
++    if (ap_casecmpstr(auth_type, "Basic"))
+         return DECLINED;
+ 
+     note_basic_auth_failure(r);
+@@ -262,7 +262,7 @@ static int get_basic_auth(request_rec *r, const char **user,
+         return HTTP_UNAUTHORIZED;
+     }
+ 
+-    if (strcasecmp(ap_getword(r->pool, &auth_line, ' '), "Basic")) {
++    if (ap_casecmpstr(ap_getword(r->pool, &auth_line, ' '), "Basic")) {
+         /* Client tried to authenticate using wrong auth scheme */
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01614)
+                       "client used wrong authentication scheme: %s", r->uri);
+@@ -305,7 +305,7 @@ static int authenticate_basic_user(request_rec *r)
+ 
+     /* Are we configured to be Basic auth? */
+     current_auth = ap_auth_type(r);
+-    if (!current_auth || strcasecmp(current_auth, "Basic")) {
++    if (!current_auth || ap_casecmpstr(current_auth, "Basic")) {
+         return DECLINED;
+     }
+ 
+@@ -324,7 +324,7 @@ static int authenticate_basic_user(request_rec *r)
+     }
+ 
+     if (conf->use_digest_algorithm
+-        && !strcasecmp(conf->use_digest_algorithm, "MD5")) {
++        && !ap_casecmpstr(conf->use_digest_algorithm, "MD5")) {
+         realm = ap_auth_name(r);
+         digest = ap_md5(r->pool,
+                         (unsigned char *)apr_pstrcat(r->pool, sent_user, ":",
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 7eb567b..a9b57a1 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -542,7 +542,7 @@ static const char *set_qop(cmd_parms *cmd, void *config, const char *op)
+     if (!strcasecmp(op, "auth-int")) {
+         return "AuthDigestQop auth-int is not implemented";
+     }
+-    else if (strcasecmp(op, "auth")) {
++    else if (ap_casecmpstr(op, "auth")) {
+         return apr_pstrcat(cmd->pool, "Unrecognized qop: ", op, NULL);
+     }
+ 
+@@ -594,7 +594,7 @@ static const char *set_algorithm(cmd_parms *cmd, void *config, const char *alg)
+         return "AuthDigestAlgorithm: ERROR: algorithm `MD5-sess' "
+                 "is not implemented";
+     }
+-    else if (strcasecmp(alg, "MD5")) {
++    else if (ap_casecmpstr(alg, "MD5")) {
+         return apr_pstrcat(cmd->pool, "Invalid algorithm in AuthDigestAlgorithm: ", alg, NULL);
+     }
+ 
+@@ -893,7 +893,7 @@ static int get_digest_rec(request_rec *r, digest_header_rec *resp)
+     }
+ 
+     resp->scheme = ap_getword_white(r->pool, &auth_line);
+-    if (strcasecmp(resp->scheme, "Digest")) {
++    if (ap_casecmpstr(resp->scheme, "Digest")) {
+         resp->auth_hdr_sts = NOT_DIGEST;
+         return !OK;
+     }
+@@ -957,25 +957,25 @@ static int get_digest_rec(request_rec *r, digest_header_rec *resp)
+             auth_line++;
+         }
+ 
+-        if (!strcasecmp(key, "username"))
++        if (!ap_casecmpstr(key, "username"))
+             resp->username = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "realm"))
++        else if (!ap_casecmpstr(key, "realm"))
+             resp->realm = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "nonce"))
++        else if (!ap_casecmpstr(key, "nonce"))
+             resp->nonce = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "uri"))
++        else if (!ap_casecmpstr(key, "uri"))
+             resp->uri = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "response"))
++        else if (!ap_casecmpstr(key, "response"))
+             resp->digest = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "algorithm"))
++        else if (!ap_casecmpstr(key, "algorithm"))
+             resp->algorithm = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "cnonce"))
++        else if (!ap_casecmpstr(key, "cnonce"))
+             resp->cnonce = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "opaque"))
++        else if (!ap_casecmpstr(key, "opaque"))
+             resp->opaque = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "qop"))
++        else if (!ap_casecmpstr(key, "qop"))
+             resp->message_qop = apr_pstrdup(r->pool, value);
+-        else if (!strcasecmp(key, "nc"))
++        else if (!ap_casecmpstr(key, "nc"))
+             resp->nonce_count = apr_pstrdup(r->pool, value);
+     }
+ 
+@@ -1148,7 +1148,7 @@ static void note_digest_auth_failure(request_rec *r,
+     if (apr_is_empty_array(conf->qop_list)) {
+         qop = ", qop=\"auth\"";
+     }
+-    else if (!strcasecmp(*(const char **)(conf->qop_list->elts), "none")) {
++    else if (!ap_casecmpstr(*(const char **)(conf->qop_list->elts), "none")) {
+         qop = "";
+     }
+     else {
+@@ -1237,7 +1237,7 @@ static int hook_note_digest_auth_failure(request_rec *r, const char *auth_type)
+     digest_header_rec *resp;
+     digest_config_rec *conf;
+ 
+-    if (strcasecmp(auth_type, "Digest"))
++    if (ap_casecmpstr(auth_type, "Digest"))
+         return DECLINED;
+ 
+     /* get the client response and mark */
+@@ -1347,7 +1347,7 @@ static int check_nc(const request_rec *r, const digest_header_rec *resp,
+     }
+ 
+     if (!apr_is_empty_array(conf->qop_list) &&
+-        !strcasecmp(*(const char **)(conf->qop_list->elts), "none")) {
++        !ap_casecmpstr(*(const char **)(conf->qop_list->elts), "none")) {
+         /* qop is none, client must not send a nonce count */
+         if (snc != NULL) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01772)
+@@ -1549,7 +1549,7 @@ static int authenticate_digest_user(request_rec *r)
+ 
+     /* do we require Digest auth for this URI? */
+ 
+-    if (!(t = ap_auth_type(r)) || strcasecmp(t, "Digest")) {
++    if (!(t = ap_auth_type(r)) || ap_casecmpstr(t, "Digest")) {
+         return DECLINED;
+     }
+ 
+@@ -1691,7 +1691,7 @@ static int authenticate_digest_user(request_rec *r)
+     }
+ 
+     if (resp->algorithm != NULL
+-        && strcasecmp(resp->algorithm, "MD5")) {
++        && ap_casecmpstr(resp->algorithm, "MD5")) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01789)
+                       "unknown algorithm `%s' received: %s",
+                       resp->algorithm, r->uri);
+@@ -1745,7 +1745,7 @@ static int authenticate_digest_user(request_rec *r)
+         int match = 0, idx;
+         const char **tmp = (const char **)(conf->qop_list->elts);
+         for (idx = 0; idx < conf->qop_list->nelts; idx++) {
+-            if (!strcasecmp(*tmp, resp->message_qop)) {
++            if (!ap_casecmpstr(*tmp, resp->message_qop)) {
+                 match = 1;
+                 break;
+             }
+@@ -1754,7 +1754,7 @@ static int authenticate_digest_user(request_rec *r)
+ 
+         if (!match
+             && !(apr_is_empty_array(conf->qop_list)
+-                 && !strcasecmp(resp->message_qop, "auth"))) {
++                 && !ap_casecmpstr(resp->message_qop, "auth"))) {
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01793)
+                           "invalid qop `%s' received: %s",
+                           resp->message_qop, r->uri);
+@@ -1836,7 +1836,7 @@ static int add_auth_info(request_rec *r)
+     /* do rfc-2069 digest
+      */
+     if (!apr_is_empty_array(conf->qop_list) &&
+-        !strcasecmp(*(const char **)(conf->qop_list->elts), "none")
++        !ap_casecmpstr(*(const char **)(conf->qop_list->elts), "none")
+         && resp->message_qop == NULL) {
+         /* use only RFC-2069 format */
+         ai = nextnonce;
+diff --git a/modules/aaa/mod_auth_form.c b/modules/aaa/mod_auth_form.c
+index 263c8e6..3a942d4 100644
+--- a/modules/aaa/mod_auth_form.c
++++ b/modules/aaa/mod_auth_form.c
+@@ -420,7 +420,7 @@ static void note_cookie_auth_failure(request_rec * r)
+ static int hook_note_cookie_auth_failure(request_rec * r,
+                                          const char *auth_type)
+ {
+-    if (strcasecmp(auth_type, "form"))
++    if (ap_casecmpstr(auth_type, "form"))
+         return DECLINED;
+ 
+     note_cookie_auth_failure(r);
+@@ -892,7 +892,7 @@ static int authenticate_form_authn(request_rec * r)
+ 
+     /* Are we configured to be Form auth? */
+     current_auth = ap_auth_type(r);
+-    if (!current_auth || strcasecmp(current_auth, "form")) {
++    if (!current_auth || ap_casecmpstr(current_auth, "form")) {
+         return DECLINED;
+     }
+ 
+diff --git a/modules/aaa/mod_authn_core.c b/modules/aaa/mod_authn_core.c
+index f3a494c..a2f8e1c 100644
+--- a/modules/aaa/mod_authn_core.c
++++ b/modules/aaa/mod_authn_core.c
+@@ -347,7 +347,7 @@ static const char *authn_ap_auth_type(request_rec *r)
+             return NULL;
+         }
+ 
+-        return strcasecmp(type, "None") ? type : NULL;
++        return ap_casecmpstr(type, "None") ? type : NULL;
+     }
+ 
+     return NULL;
+diff --git a/modules/aaa/mod_authnz_fcgi.c b/modules/aaa/mod_authnz_fcgi.c
+index 7c908f7..df59286 100644
+--- a/modules/aaa/mod_authnz_fcgi.c
++++ b/modules/aaa/mod_authnz_fcgi.c
+@@ -680,7 +680,7 @@ static int mod_fcgid_modify_auth_header(void *vars,
+     /* When the application gives a 200 response, the server ignores response
+        headers whose names aren't prefixed with Variable- prefix, and ignores
+        any response content */
+-    if (strncasecmp(key, "Variable-", 9) == 0)
++    if (ap_casecmpstrn(key, "Variable-", 9) == 0)
+         apr_table_setn(vars, key, val);
+     return 1;
+ }
+@@ -808,7 +808,7 @@ static int fcgi_check_authn(request_rec *r)
+ 
+     prov = dconf && dconf->name ? dconf->name : NULL;
+ 
+-    if (!prov || !strcasecmp(prov, "None")) {
++    if (!prov || !ap_casecmpstr(prov, "None")) {
+         return DECLINED;
+     }
+ 
+@@ -823,7 +823,7 @@ static int fcgi_check_authn(request_rec *r)
+                   dconf->user_expr ? "yes" : "no",
+                   auth_type);
+ 
+-    if (auth_type && !strcasecmp(auth_type, "Basic")) {
++    if (auth_type && !ap_casecmpstr(auth_type, "Basic")) {
+         if ((res = ap_get_basic_auth_pw(r, &password))) {
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                           APLOGNO(02517) "%s: couldn't retrieve basic auth "
+diff --git a/modules/aaa/mod_authz_core.c b/modules/aaa/mod_authz_core.c
+index b669c8c..1d614c7 100644
+--- a/modules/aaa/mod_authz_core.c
++++ b/modules/aaa/mod_authz_core.c
+@@ -1054,7 +1054,7 @@ struct require_expr_info {
+ static int expr_lookup_fn(ap_expr_lookup_parms *parms)
+ {
+     if (parms->type == AP_EXPR_FUNC_VAR
+-        && strcasecmp(parms->name, "REMOTE_USER") == 0) {
++        && ap_casecmpstr(parms->name, "REMOTE_USER") == 0) {
+         struct require_expr_info *info;
+         apr_pool_userdata_get((void**)&info, REQUIRE_EXPR_NOTE, parms->ptemp);
+         AP_DEBUG_ASSERT(info != NULL);
+diff --git a/modules/cache/cache_storage.c b/modules/cache/cache_storage.c
+index 59d12ac..6df17f2 100644
+--- a/modules/cache/cache_storage.c
++++ b/modules/cache/cache_storage.c
+@@ -115,7 +115,7 @@ int cache_create_entity(cache_request_rec *cache, request_rec *r,
+ 
+ static int filter_header_do(void *v, const char *key, const char *val)
+ {
+-    if ((*key == 'W' || *key == 'w') && !strcasecmp(key, "Warning")
++    if ((*key == 'W' || *key == 'w') && !ap_casecmpstr(key, "Warning")
+             && *val == '1') {
+         /* any stored Warning headers with warn-code 1xx (see section
+          * 14.46) MUST be deleted from the cache entry and the forwarded
+@@ -129,7 +129,7 @@ static int filter_header_do(void *v, const char *key, const char *val)
+ }
+ static int remove_header_do(void *v, const char *key, const char *val)
+ {
+-    if ((*key == 'W' || *key == 'w') && !strcasecmp(key, "Warning")) {
++    if ((*key == 'W' || *key == 'w') && !ap_casecmpstr(key, "Warning")) {
+         /* any stored Warning headers with warn-code 2xx MUST be retained
+          * in the cache entry and the forwarded response.
+          */
+diff --git a/modules/cache/cache_util.c b/modules/cache/cache_util.c
+index 6882f97..c648eb1 100644
+--- a/modules/cache/cache_util.c
++++ b/modules/cache/cache_util.c
+@@ -55,7 +55,7 @@ static int uri_meets_conditions(const apr_uri_t *filter, const int pathlen,
+     }
+     else {
+         /* The URI scheme must be present and identical except for case. */
+-        if (!url->scheme || strcasecmp(filter->scheme, url->scheme)) {
++        if (!url->scheme || ap_casecmpstr(filter->scheme, url->scheme)) {
+             return 0;
+         }
+ 
+diff --git a/modules/dav/main/mod_dav.c b/modules/dav/main/mod_dav.c
+index 7734bb8..5787355 100644
+--- a/modules/dav/main/mod_dav.c
++++ b/modules/dav/main/mod_dav.c
+@@ -651,7 +651,7 @@ DAV_DECLARE(int) dav_get_depth(request_rec *r, int def_depth)
+         return def_depth;
+     }
+ 
+-    if (strcasecmp(depth, "infinity") == 0) {
++    if (ap_casecmpstr(depth, "infinity") == 0) {
+         return DAV_INFINITY;
+     }
+     else if (strcmp(depth, "0") == 0) {
+@@ -781,7 +781,7 @@ static int dav_parse_range(request_rec *r,
+         return 0;
+ 
+     range = apr_pstrdup(r->pool, range_c);
+-    if (strncasecmp(range, "bytes ", 6) != 0
++    if (ap_casecmpstrn(range, "bytes ", 6) != 0
+         || (dash = ap_strchr(range, '-')) == NULL
+         || (slash = ap_strchr(range, '/')) == NULL) {
+         /* malformed header */
+@@ -2456,7 +2456,7 @@ static int process_mkcol_body(request_rec *r)
+     r->remaining = 0;
+ 
+     if (tenc) {
+-        if (strcasecmp(tenc, "chunked")) {
++        if (ap_casecmpstr(tenc, "chunked")) {
+             /* Use this instead of Apache's default error string */
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(00589)
+                           "Unknown Transfer-Encoding %s", tenc);
+diff --git a/modules/dav/main/std_liveprop.c b/modules/dav/main/std_liveprop.c
+index e760c65..1284ad8 100644
+--- a/modules/dav/main/std_liveprop.c
++++ b/modules/dav/main/std_liveprop.c
+@@ -88,7 +88,7 @@ static dav_prop_insert dav_core_insert_prop(const dav_resource *resource,
+                 if (!res_hooks->get_resource_type(resource, &name, &uri) &&
+                     name) {
+ 
+-                    if (!uri || !strcasecmp(uri, "DAV:"))
++                    if (!uri || !ap_casecmpstr(uri, "DAV:"))
+                         value = apr_pstrcat(p, value ? value : "",
+                                             "<D:", name, "/>", NULL);
+                     else
+diff --git a/modules/dav/main/util.c b/modules/dav/main/util.c
+index 8d4f64a..5deac14 100644
+--- a/modules/dav/main/util.c
++++ b/modules/dav/main/util.c
+@@ -240,7 +240,7 @@ DAV_DECLARE(dav_lookup_result) dav_lookup_uri(const char *uri,
+            request. the port must match our port.
+         */
+         port = r->connection->local_addr->port;
+-        if (strcasecmp(comp.scheme, scheme) != 0
++        if (ap_casecmpstr(comp.scheme, scheme) != 0
+ #ifdef APACHE_PORT_HANDLING_IS_BUSTED
+             || comp.port != port
+ #endif
+diff --git a/modules/filters/mod_charset_lite.c b/modules/filters/mod_charset_lite.c
+index aa46dc3..e10cb6c 100644
+--- a/modules/filters/mod_charset_lite.c
++++ b/modules/filters/mod_charset_lite.c
+@@ -790,7 +790,7 @@ static apr_status_t xlate_out_filter(ap_filter_t *f, apr_bucket_brigade *bb)
+     if (!ctx->noop && ctx->xlate == NULL) {
+         const char *mime_type = f->r->content_type;
+ 
+-        if (mime_type && (strncasecmp(mime_type, "text/", 5) == 0 ||
++        if (mime_type && (ap_casecmpstrn(mime_type, "text/", 5) == 0 ||
+ #if APR_CHARSET_EBCDIC
+         /* On an EBCDIC machine, be willing to translate mod_autoindex-
+          * generated output.  Otherwise, it doesn't look too cool.
+@@ -806,7 +806,7 @@ static apr_status_t xlate_out_filter(ap_filter_t *f, apr_bucket_brigade *bb)
+          */
+             strcmp(mime_type, DIR_MAGIC_TYPE) == 0 ||
+ #endif
+-            strncasecmp(mime_type, "message/", 8) == 0 ||
++            ap_casecmpstrn(mime_type, "message/", 8) == 0 ||
+             dc->force_xlate == FX_FORCE)) {
+ 
+             rv = apr_xlate_open(&ctx->xlate,
+diff --git a/modules/generators/mod_autoindex.c b/modules/generators/mod_autoindex.c
+index 67d7e5a..177bd51 100644
+--- a/modules/generators/mod_autoindex.c
++++ b/modules/generators/mod_autoindex.c
+@@ -348,64 +348,64 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+         else {
+             action = '\0';
+         }
+-        if (!strcasecmp(w, "FancyIndexing")) {
++        if (!ap_casecmpstr(w, "FancyIndexing")) {
+             option = FANCY_INDEXING;
+         }
+-        else if (!strcasecmp(w, "FoldersFirst")) {
++        else if (!ap_casecmpstr(w, "FoldersFirst")) {
+             option = FOLDERS_FIRST;
+         }
+-        else if (!strcasecmp(w, "HTMLTable")) {
++        else if (!ap_casecmpstr(w, "HTMLTable")) {
+             option = TABLE_INDEXING;
+         }
+-        else if (!strcasecmp(w, "IconsAreLinks")) {
++        else if (!ap_casecmpstr(w, "IconsAreLinks")) {
+             option = ICONS_ARE_LINKS;
+         }
+-        else if (!strcasecmp(w, "IgnoreCase")) {
++        else if (!ap_casecmpstr(w, "IgnoreCase")) {
+             option = IGNORE_CASE;
+         }
+-        else if (!strcasecmp(w, "IgnoreClient")) {
++        else if (!ap_casecmpstr(w, "IgnoreClient")) {
+             option = IGNORE_CLIENT;
+         }
+-        else if (!strcasecmp(w, "ScanHTMLTitles")) {
++        else if (!ap_casecmpstr(w, "ScanHTMLTitles")) {
+             option = SCAN_HTML_TITLES;
+         }
+-        else if (!strcasecmp(w, "SuppressColumnSorting")) {
++        else if (!ap_casecmpstr(w, "SuppressColumnSorting")) {
+             option = SUPPRESS_COLSORT;
+         }
+-        else if (!strcasecmp(w, "SuppressDescription")) {
++        else if (!ap_casecmpstr(w, "SuppressDescription")) {
+             option = SUPPRESS_DESC;
+         }
+-        else if (!strcasecmp(w, "SuppressHTMLPreamble")) {
++        else if (!ap_casecmpstr(w, "SuppressHTMLPreamble")) {
+             option = SUPPRESS_PREAMBLE;
+         }
+-        else if (!strcasecmp(w, "SuppressIcon")) {
++        else if (!ap_casecmpstr(w, "SuppressIcon")) {
+             option = SUPPRESS_ICON;
+         }
+-        else if (!strcasecmp(w, "SuppressLastModified")) {
++        else if (!ap_casecmpstr(w, "SuppressLastModified")) {
+             option = SUPPRESS_LAST_MOD;
+         }
+-        else if (!strcasecmp(w, "SuppressSize")) {
++        else if (!ap_casecmpstr(w, "SuppressSize")) {
+             option = SUPPRESS_SIZE;
+         }
+-        else if (!strcasecmp(w, "SuppressRules")) {
++        else if (!ap_casecmpstr(w, "SuppressRules")) {
+             option = SUPPRESS_RULES;
+         }
+-        else if (!strcasecmp(w, "TrackModified")) {
++        else if (!ap_casecmpstr(w, "TrackModified")) {
+             option = TRACK_MODIFIED;
+         }
+-        else if (!strcasecmp(w, "VersionSort")) {
++        else if (!ap_casecmpstr(w, "VersionSort")) {
+             option = VERSION_SORT;
+         }
+-        else if (!strcasecmp(w, "XHTML")) {
++        else if (!ap_casecmpstr(w, "XHTML")) {
+             option = EMIT_XHTML;
+         }
+-        else if (!strcasecmp(w, "ShowForbidden")) {
++        else if (!ap_casecmpstr(w, "ShowForbidden")) {
+             option = SHOW_FORBIDDEN;
+         }
+-        else if (!strcasecmp(w, "AddAltClass")) {
++        else if (!ap_casecmpstr(w, "AddAltClass")) {
+             option = ADDALTCLASS;
+         }
+-        else if (!strcasecmp(w, "None")) {
++        else if (!ap_casecmpstr(w, "None")) {
+             if (action != '\0') {
+                 return "Cannot combine '+' or '-' with 'None' keyword";
+             }
+@@ -413,7 +413,7 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+             opts_add = 0;
+             opts_remove = 0;
+         }
+-        else if (!strcasecmp(w, "IconWidth")) {
++        else if (!ap_casecmpstr(w, "IconWidth")) {
+             if (action != '-') {
+                 d_cfg->icon_width = DEFAULT_ICON_WIDTH;
+             }
+@@ -421,13 +421,13 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+                 d_cfg->icon_width = 0;
+             }
+         }
+-        else if (!strncasecmp(w, "IconWidth=", 10)) {
++        else if (!ap_casecmpstrn(w, "IconWidth=", 10)) {
+             if (action == '-') {
+                 return "Cannot combine '-' with IconWidth=n";
+             }
+             d_cfg->icon_width = atoi(&w[10]);
+         }
+-        else if (!strcasecmp(w, "IconHeight")) {
++        else if (!ap_casecmpstr(w, "IconHeight")) {
+             if (action != '-') {
+                 d_cfg->icon_height = DEFAULT_ICON_HEIGHT;
+             }
+@@ -435,13 +435,13 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+                 d_cfg->icon_height = 0;
+             }
+         }
+-        else if (!strncasecmp(w, "IconHeight=", 11)) {
++        else if (!ap_casecmpstrn(w, "IconHeight=", 11)) {
+             if (action == '-') {
+                 return "Cannot combine '-' with IconHeight=n";
+             }
+             d_cfg->icon_height = atoi(&w[11]);
+         }
+-        else if (!strcasecmp(w, "NameWidth")) {
++        else if (!ap_casecmpstr(w, "NameWidth")) {
+             if (action != '-') {
+                 return "NameWidth with no value may only appear as "
+                        "'-NameWidth'";
+@@ -449,7 +449,7 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+             d_cfg->name_width = DEFAULT_NAME_WIDTH;
+             d_cfg->name_adjust = K_NOADJUST;
+         }
+-        else if (!strncasecmp(w, "NameWidth=", 10)) {
++        else if (!ap_casecmpstrn(w, "NameWidth=", 10)) {
+             if (action == '-') {
+                 return "Cannot combine '-' with NameWidth=n";
+             }
+@@ -466,7 +466,7 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+                 d_cfg->name_adjust = K_NOADJUST;
+             }
+         }
+-        else if (!strcasecmp(w, "DescriptionWidth")) {
++        else if (!ap_casecmpstr(w, "DescriptionWidth")) {
+             if (action != '-') {
+                 return "DescriptionWidth with no value may only appear as "
+                        "'-DescriptionWidth'";
+@@ -474,7 +474,7 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+             d_cfg->desc_width = DEFAULT_DESC_WIDTH;
+             d_cfg->desc_adjust = K_NOADJUST;
+         }
+-        else if (!strncasecmp(w, "DescriptionWidth=", 17)) {
++        else if (!ap_casecmpstrn(w, "DescriptionWidth=", 17)) {
+             if (action == '-') {
+                 return "Cannot combine '-' with DescriptionWidth=n";
+             }
+@@ -491,10 +491,10 @@ static const char *add_opts(cmd_parms *cmd, void *d, int argc, char *const argv[
+                 d_cfg->desc_adjust = K_NOADJUST;
+             }
+         }
+-        else if (!strncasecmp(w, "Type=", 5)) {
++        else if (!ap_casecmpstrn(w, "Type=", 5)) {
+             d_cfg->ctype = apr_pstrdup(cmd->pool, &w[5]);
+         }
+-        else if (!strncasecmp(w, "Charset=", 8)) {
++        else if (!ap_casecmpstrn(w, "Charset=", 8)) {
+             d_cfg->charset = apr_pstrdup(cmd->pool, &w[8]);
+         }
+         else {
+@@ -528,26 +528,26 @@ static const char *set_default_order(cmd_parms *cmd, void *m,
+ {
+     autoindex_config_rec *d_cfg = (autoindex_config_rec *) m;
+ 
+-    if (!strcasecmp(direction, "Ascending")) {
++    if (!ap_casecmpstr(direction, "Ascending")) {
+         d_cfg->default_direction = D_ASCENDING;
+     }
+-    else if (!strcasecmp(direction, "Descending")) {
++    else if (!ap_casecmpstr(direction, "Descending")) {
+         d_cfg->default_direction = D_DESCENDING;
+     }
+     else {
+         return "First keyword must be 'Ascending' or 'Descending'";
+     }
+ 
+-    if (!strcasecmp(key, "Name")) {
++    if (!ap_casecmpstr(key, "Name")) {
+         d_cfg->default_keyid = K_NAME;
+     }
+-    else if (!strcasecmp(key, "Date")) {
++    else if (!ap_casecmpstr(key, "Date")) {
+         d_cfg->default_keyid = K_LAST_MOD;
+     }
+-    else if (!strcasecmp(key, "Size")) {
++    else if (!ap_casecmpstr(key, "Size")) {
+         d_cfg->default_keyid = K_SIZE;
+     }
+-    else if (!strcasecmp(key, "Description")) {
++    else if (!ap_casecmpstr(key, "Description")) {
+         d_cfg->default_keyid = K_DESC;
+     }
+     else {
+diff --git a/modules/generators/mod_info.c b/modules/generators/mod_info.c
+index 481d88d..0e91ebf 100644
+--- a/modules/generators/mod_info.c
++++ b/modules/generators/mod_info.c
+@@ -791,7 +791,7 @@ static int display_info(request_rec * r)
+              "  <title>Server Information</title>\n" "</head>\n", r);
+     ap_rputs("<body><h1 style=\"text-align: center\">"
+              "Apache Server Information</h1>\n", r);
+-    if (!r->args || strcasecmp(r->args, "list")) {
++    if (!r->args || ap_casecmpstr(r->args, "list")) {
+         if (!r->args) {
+             ap_rputs("<dl><dt><tt>Subpages:<br />", r);
+             ap_rputs("<a href=\"?config\">Configuration Files</a>, "
+@@ -825,19 +825,19 @@ static int display_info(request_rec * r)
+             ap_rputs("</tt></dt></dl><hr />", r);
+         }
+ 
+-        if (!r->args || !strcasecmp(r->args, "server")) {
++        if (!r->args || !ap_casecmpstr(r->args, "server")) {
+             show_server_settings(r);
+         }
+ 
+-        if (!r->args || !strcasecmp(r->args, "hooks")) {
++        if (!r->args || !ap_casecmpstr(r->args, "hooks")) {
+             show_active_hooks(r);
+         }
+ 
+-        if (!r->args || !strcasecmp(r->args, "providers")) {
++        if (!r->args || !ap_casecmpstr(r->args, "providers")) {
+             show_providers(r);
+         }
+ 
+-        if (r->args && 0 == strcasecmp(r->args, "config")) {
++        if (r->args && 0 == ap_casecmpstr(r->args, "config")) {
+             ap_rputs("<dl><dt><strong>Configuration:</strong>\n", r);
+             mod_info_module_cmds(r, NULL, ap_conftree, 0, 0);
+             ap_rputs("</dl><hr />", r);
+@@ -848,7 +848,7 @@ static int display_info(request_rec * r)
+                  modules = get_sorted_modules(r->pool);
+             for (i = 0; i < modules->nelts; i++) {
+                 modp = APR_ARRAY_IDX(modules, i, module *);
+-                if (!r->args || !strcasecmp(modp->name, r->args)) {
++                if (!r->args || !ap_casecmpstr(modp->name, r->args)) {
+                     ap_rprintf(r,
+                                "<dl><dt><a name=\"%s\"><strong>Module Name:</strong></a> "
+                                "<font size=\"+1\"><tt><a href=\"?%s\">%s</a></tt></font></dt>\n",
+@@ -946,7 +946,7 @@ static int display_info(request_rec * r)
+                     }
+                 }
+             }
+-            if (!modp && r->args && strcasecmp(r->args, "server")) {
++            if (!modp && r->args && ap_casecmpstr(r->args, "server")) {
+                 ap_rputs("<p><b>No such module</b></p>\n", r);
+             }
+         }
+diff --git a/modules/http/http_filters.c b/modules/http/http_filters.c
+index c1f2a1b..254ade3 100644
+--- a/modules/http/http_filters.c
++++ b/modules/http/http_filters.c
+@@ -1306,7 +1306,7 @@ AP_CORE_DECLARE_NONSTD(apr_status_t) ap_http_header_filter(ap_filter_t *f,
+ 
+         while (field && (token = ap_get_list_item(r->pool, &field)) != NULL) {
+             for (i = 0; i < r->content_languages->nelts; ++i) {
+-                if (!strcasecmp(token, languages[i]))
++                if (!ap_casecmpstr(token, languages[i]))
+                     break;
+             }
+             if (i == r->content_languages->nelts) {
+diff --git a/modules/http2/h2_from_h1.c b/modules/http2/h2_from_h1.c
+index a02794f..aa900b9 100644
+--- a/modules/http2/h2_from_h1.c
++++ b/modules/http2/h2_from_h1.c
+@@ -411,7 +411,7 @@ static h2_response *create_response(h2_from_h1 *from_h1, request_rec *r)
+         
+         while (field && (token = ap_get_list_item(r->pool, &field)) != NULL) {
+             for (i = 0; i < r->content_languages->nelts; ++i) {
+-                if (!strcasecmp(token, languages[i]))
++                if (!ap_casecmpstr(token, languages[i]))
+                     break;
+             }
+             if (i == r->content_languages->nelts) {
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 2a83e66..f518a2b 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -600,7 +600,7 @@ static const char *log_cookie(request_rec *r, char *a)
+                     --last;
+                 }
+ 
+-                if (!strcasecmp(name, a)) {
++                if (!ap_casecmpstr(name, a)) {
+                     /* last1 points to the next char following the ';' delim,
+                        or the trailing NUL char of the string */
+                     last = last1 - (*last1 ? 2 : 1);
+diff --git a/modules/mappers/mod_negotiation.c b/modules/mappers/mod_negotiation.c
+index 7f45388..dc10961 100644
+--- a/modules/mappers/mod_negotiation.c
++++ b/modules/mappers/mod_negotiation.c
+@@ -111,20 +111,20 @@ static const char *set_force_priority(cmd_parms *cmd, void *n_, const char *w)
+ {
+     neg_dir_config *n = n_;
+ 
+-    if (!strcasecmp(w, "None")) {
++    if (!ap_casecmpstr(w, "None")) {
+         if (n->forcelangpriority & ~FLP_NONE) {
+             return "Cannot combine ForceLanguagePriority options with None";
+         }
+         n->forcelangpriority = FLP_NONE;
+     }
+-    else if (!strcasecmp(w, "Prefer")) {
++    else if (!ap_casecmpstr(w, "Prefer")) {
+         if (n->forcelangpriority & FLP_NONE) {
+             return "Cannot combine ForceLanguagePriority options None and "
+                    "Prefer";
+         }
+         n->forcelangpriority |= FLP_PREFER;
+     }
+-    else if (!strcasecmp(w, "Fallback")) {
++    else if (!ap_casecmpstr(w, "Fallback")) {
+         if (n->forcelangpriority & FLP_NONE) {
+             return "Cannot combine ForceLanguagePriority options None and "
+                    "Fallback";
+@@ -774,7 +774,7 @@ static enum header_state get_header_line(char *buffer, int len, apr_file_t *map)
+     /* We need to shortcut the rest of this block following the Body:
+      * tag - we will not look for continutation after this line.
+      */
+-    if (!strncasecmp(buffer, "Body:", 5))
++    if (!ap_casecmpstrn(buffer, "Body:", 5))
+         return header_seen;
+ 
+     while (apr_file_getc(&c, map) != APR_EOF) {
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 99d8f6b..4841ccc 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -811,7 +811,7 @@ static void reduce_uri(request_rec *r)
+     cp = (char *)ap_http_scheme(r);
+     l  = strlen(cp);
+     if (   strlen(r->filename) > l+3
+-        && strncasecmp(r->filename, cp, l) == 0
++        && ap_casecmpstrn(r->filename, cp, l) == 0
+         && r->filename[l]   == ':'
+         && r->filename[l+1] == '/'
+         && r->filename[l+2] == '/' ) {
+@@ -3477,13 +3477,13 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+     switch (*key++) {
+     case 'b':
+     case 'B':
+-        if (!*key || !strcasecmp(key, "ackrefescaping")) {
++        if (!*key || !ap_casecmpstr(key, "ackrefescaping")) {
+             cfg->flags |= RULEFLAG_ESCAPEBACKREF;
+             if (val && *val) { 
+                 cfg->escapes = val;
+             }
+         }
+-        else if (!strcasecmp(key, "NP") || !strcasecmp(key, "ackrefernoplus")) { 
++        else if (!ap_casecmpstr(key, "NP") || !ap_casecmpstr(key, "ackrefernoplus")) { 
+             cfg->flags |= RULEFLAG_ESCAPENOPLUS;
+         }
+         else {
+@@ -3492,11 +3492,11 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+         break;
+     case 'c':
+     case 'C':
+-        if (!*key || !strcasecmp(key, "hain")) {           /* chain */
++        if (!*key || !ap_casecmpstr(key, "hain")) {           /* chain */
+             cfg->flags |= RULEFLAG_CHAIN;
+         }
+         else if (((*key == 'O' || *key == 'o') && !key[1])
+-                 || !strcasecmp(key, "ookie")) {           /* cookie */
++                 || !ap_casecmpstr(key, "ookie")) {           /* cookie */
+             data_item *cp = cfg->cookie;
+ 
+             if (!cp) {
+@@ -3519,13 +3519,13 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+         break;
+     case 'd':
+     case 'D':
+-        if (!*key || !strcasecmp(key, "PI") || !strcasecmp(key,"iscardpath")) {
++        if (!*key || !ap_casecmpstr(key, "PI") || !ap_casecmpstr(key,"iscardpath")) {
+             cfg->flags |= (RULEFLAG_DISCARDPATHINFO);
+         }
+         break;
+     case 'e':
+     case 'E':
+-        if (!*key || !strcasecmp(key, "nv")) {             /* env */
++        if (!*key || !ap_casecmpstr(key, "nv")) {             /* env */
+             data_item *cp = cfg->env;
+ 
+             if (!cp) {
+@@ -3542,7 +3542,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+             cp->next = NULL;
+             cp->data = val;
+         }
+-        else if (!strcasecmp(key, "nd")) {                /* end */
++        else if (!ap_casecmpstr(key, "nd")) {                /* end */
+             cfg->flags |= RULEFLAG_END;
+         }
+         else {
+@@ -3552,7 +3552,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+     case 'f':
+     case 'F':
+-        if (!*key || !strcasecmp(key, "orbidden")) {       /* forbidden */
++        if (!*key || !ap_casecmpstr(key, "orbidden")) {       /* forbidden */
+             cfg->flags |= (RULEFLAG_STATUS | RULEFLAG_NOSUB);
+             cfg->forced_responsecode = HTTP_FORBIDDEN;
+         }
+@@ -3563,7 +3563,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+     case 'g':
+     case 'G':
+-        if (!*key || !strcasecmp(key, "one")) {            /* gone */
++        if (!*key || !ap_casecmpstr(key, "one")) {            /* gone */
+             cfg->flags |= (RULEFLAG_STATUS | RULEFLAG_NOSUB);
+             cfg->forced_responsecode = HTTP_GONE;
+         }
+@@ -3574,7 +3574,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+     case 'h':
+     case 'H':
+-        if (!*key || !strcasecmp(key, "andler")) {         /* handler */
++        if (!*key || !ap_casecmpstr(key, "andler")) {         /* handler */
+             cfg->forced_handler = val;
+         }
+         else {
+@@ -3583,7 +3583,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+         break;
+     case 'l':
+     case 'L':
+-        if (!*key || !strcasecmp(key, "ast")) {            /* last */
++        if (!*key || !ap_casecmpstr(key, "ast")) {            /* last */
+             cfg->flags |= RULEFLAG_LASTRULE;
+         }
+         else {
+@@ -3594,10 +3594,10 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+     case 'n':
+     case 'N':
+         if (((*key == 'E' || *key == 'e') && !key[1])
+-            || !strcasecmp(key, "oescape")) {              /* noescape */
++            || !ap_casecmpstr(key, "oescape")) {              /* noescape */
+             cfg->flags |= RULEFLAG_NOESCAPE;
+         }
+-        else if (!*key || !strcasecmp(key, "ext")) {       /* next */
++        else if (!*key || !ap_casecmpstr(key, "ext")) {       /* next */
+             cfg->flags |= RULEFLAG_NEWROUND;
+             if (val && *val) { 
+                 cfg->maxrounds = atoi(val);
+@@ -3605,11 +3605,11 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+         }
+         else if (((*key == 'S' || *key == 's') && !key[1])
+-            || !strcasecmp(key, "osubreq")) {              /* nosubreq */
++            || !ap_casecmpstr(key, "osubreq")) {              /* nosubreq */
+             cfg->flags |= RULEFLAG_IGNOREONSUBREQ;
+         }
+         else if (((*key == 'C' || *key == 'c') && !key[1])
+-            || !strcasecmp(key, "ocase")) {                /* nocase */
++            || !ap_casecmpstr(key, "ocase")) {                /* nocase */
+             cfg->flags |= RULEFLAG_NOCASE;
+         }
+         else {
+@@ -3619,11 +3619,11 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+     case 'p':
+     case 'P':
+-        if (!*key || !strcasecmp(key, "roxy")) {           /* proxy */
++        if (!*key || !ap_casecmpstr(key, "roxy")) {           /* proxy */
+             cfg->flags |= RULEFLAG_PROXY;
+         }
+         else if (((*key == 'T' || *key == 't') && !key[1])
+-            || !strcasecmp(key, "assthrough")) {           /* passthrough */
++            || !ap_casecmpstr(key, "assthrough")) {           /* passthrough */
+             cfg->flags |= RULEFLAG_PASSTHROUGH;
+         }
+         else {
+@@ -3633,11 +3633,11 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+     case 'q':
+     case 'Q':
+-        if (   !strcasecmp(key, "SA")
+-            || !strcasecmp(key, "sappend")) {              /* qsappend */
++        if (   !ap_casecmpstr(key, "SA")
++            || !ap_casecmpstr(key, "sappend")) {              /* qsappend */
+             cfg->flags |= RULEFLAG_QSAPPEND;
+-        } else if ( !strcasecmp(key, "SD")
+-                || !strcasecmp(key, "sdiscard") ) {       /* qsdiscard */
++        } else if ( !ap_casecmpstr(key, "SD")
++                || !ap_casecmpstr(key, "sdiscard") ) {       /* qsdiscard */
+             cfg->flags |= RULEFLAG_QSDISCARD;
+         }
+         else {
+@@ -3647,18 +3647,18 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+     case 'r':
+     case 'R':
+-        if (!*key || !strcasecmp(key, "edirect")) {        /* redirect */
++        if (!*key || !ap_casecmpstr(key, "edirect")) {        /* redirect */
+             int status = 0;
+ 
+             cfg->flags |= RULEFLAG_FORCEREDIRECT;
+             if (*val) {
+-                if (strcasecmp(val, "permanent") == 0) {
++                if (ap_casecmpstr(val, "permanent") == 0) {
+                     status = HTTP_MOVED_PERMANENTLY;
+                 }
+-                else if (strcasecmp(val, "temp") == 0) {
++                else if (ap_casecmpstr(val, "temp") == 0) {
+                     status = HTTP_MOVED_TEMPORARILY;
+                 }
+-                else if (strcasecmp(val, "seeother") == 0) {
++                else if (ap_casecmpstr(val, "seeother") == 0) {
+                     status = HTTP_SEE_OTHER;
+                 }
+                 else if (apr_isdigit(*val)) {
+@@ -3688,7 +3688,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+     case 's':
+     case 'S':
+-        if (!*key || !strcasecmp(key, "kip")) {            /* skip */
++        if (!*key || !ap_casecmpstr(key, "kip")) {            /* skip */
+             cfg->skip = atoi(val);
+         }
+         else {
+@@ -3698,7 +3698,7 @@ static const char *cmd_rewriterule_setflag(apr_pool_t *p, void *_cfg,
+ 
+     case 't':
+     case 'T':
+-        if (!*key || !strcasecmp(key, "ype")) {            /* type */
++        if (!*key || !ap_casecmpstr(key, "ype")) {            /* type */
+             cfg->forced_mimetype = val;
+         }
+         else {
+diff --git a/modules/mappers/mod_vhost_alias.c b/modules/mappers/mod_vhost_alias.c
+index 0b61694..b20d8f8 100644
+--- a/modules/mappers/mod_vhost_alias.c
++++ b/modules/mappers/mod_vhost_alias.c
+@@ -152,7 +152,7 @@ static const char *vhost_alias_set(cmd_parms *cmd, void *dummy, const char *map)
+     }
+ 
+     if (!ap_os_is_path_absolute(cmd->pool, map)) {
+-        if (strcasecmp(map, "none")) {
++        if (ap_casecmpstr(map, "none")) {
+             return "format string must be an absolute path, or 'none'";
+         }
+         *pmap = NULL;
+diff --git a/modules/proxy/mod_proxy.c b/modules/proxy/mod_proxy.c
+index a949afb..d9fa06c 100644
+--- a/modules/proxy/mod_proxy.c
++++ b/modules/proxy/mod_proxy.c
+@@ -64,7 +64,7 @@ static const char *set_worker_param(apr_pool_t *p,
+     int ival;
+     apr_interval_time_t timeout;
+ 
+-    if (!strcasecmp(key, "loadfactor")) {
++    if (!ap_casecmpstr(key, "loadfactor")) {
+         /* Normalized load factor. Used with BalancerMamber,
+          * it is a number between 1 and 100.
+          */
+@@ -72,7 +72,7 @@ static const char *set_worker_param(apr_pool_t *p,
+         if (worker->s->lbfactor < 1 || worker->s->lbfactor > 100)
+             return "LoadFactor must be a number between 1..100";
+     }
+-    else if (!strcasecmp(key, "retry")) {
++    else if (!ap_casecmpstr(key, "retry")) {
+         /* If set it will give the retry timeout for the worker
+          * The default value is 60 seconds, meaning that if
+          * in error state, it will be retried after that timeout.
+@@ -83,7 +83,7 @@ static const char *set_worker_param(apr_pool_t *p,
+         worker->s->retry = apr_time_from_sec(ival);
+         worker->s->retry_set = 1;
+     }
+-    else if (!strcasecmp(key, "ttl")) {
++    else if (!ap_casecmpstr(key, "ttl")) {
+         /* Time in seconds that will destroy all the connections
+          * that exceed the smax
+          */
+@@ -92,7 +92,7 @@ static const char *set_worker_param(apr_pool_t *p,
+             return "TTL must be at least one second";
+         worker->s->ttl = apr_time_from_sec(ival);
+     }
+-    else if (!strcasecmp(key, "min")) {
++    else if (!ap_casecmpstr(key, "min")) {
+         /* Initial number of connections to remote
+          */
+         ival = atoi(val);
+@@ -100,7 +100,7 @@ static const char *set_worker_param(apr_pool_t *p,
+             return "Min must be a positive number";
+         worker->s->min = ival;
+     }
+-    else if (!strcasecmp(key, "max")) {
++    else if (!ap_casecmpstr(key, "max")) {
+         /* Maximum number of connections to remote
+          */
+         ival = atoi(val);
+@@ -109,7 +109,7 @@ static const char *set_worker_param(apr_pool_t *p,
+         worker->s->hmax = ival;
+     }
+     /* XXX: More inteligent naming needed */
+-    else if (!strcasecmp(key, "smax")) {
++    else if (!ap_casecmpstr(key, "smax")) {
+         /* Maximum number of connections to remote that
+          * will not be destroyed
+          */
+@@ -118,7 +118,7 @@ static const char *set_worker_param(apr_pool_t *p,
+             return "Smax must be a positive number";
+         worker->s->smax = ival;
+     }
+-    else if (!strcasecmp(key, "acquire")) {
++    else if (!ap_casecmpstr(key, "acquire")) {
+         /* Acquire timeout in given unit (default is milliseconds).
+          * If set this will be the maximum time to
+          * wait for a free connection.
+@@ -130,7 +130,7 @@ static const char *set_worker_param(apr_pool_t *p,
+         worker->s->acquire = timeout;
+         worker->s->acquire_set = 1;
+     }
+-    else if (!strcasecmp(key, "timeout")) {
++    else if (!ap_casecmpstr(key, "timeout")) {
+         /* Connection timeout in seconds.
+          * Defaults to server timeout.
+          */
+@@ -140,7 +140,7 @@ static const char *set_worker_param(apr_pool_t *p,
+         worker->s->timeout = apr_time_from_sec(ival);
+         worker->s->timeout_set = 1;
+     }
+-    else if (!strcasecmp(key, "iobuffersize")) {
++    else if (!ap_casecmpstr(key, "iobuffersize")) {
+         long s = atol(val);
+         if (s < 512 && s) {
+             return "IOBufferSize must be >= 512 bytes, or 0 for system default.";
+@@ -148,7 +148,7 @@ static const char *set_worker_param(apr_pool_t *p,
+         worker->s->io_buffer_size = (s ? s : AP_IOBUFSIZE);
+         worker->s->io_buffer_size_set = 1;
+     }
+-    else if (!strcasecmp(key, "receivebuffersize")) {
++    else if (!ap_casecmpstr(key, "receivebuffersize")) {
+         ival = atoi(val);
+         if (ival < 512 && ival != 0) {
+             return "ReceiveBufferSize must be >= 512 bytes, or 0 for system default.";
+@@ -156,34 +156,34 @@ static const char *set_worker_param(apr_pool_t *p,
+         worker->s->recv_buffer_size = ival;
+         worker->s->recv_buffer_size_set = 1;
+     }
+-    else if (!strcasecmp(key, "keepalive")) {
+-        if (!strcasecmp(val, "on"))
++    else if (!ap_casecmpstr(key, "keepalive")) {
++        if (!ap_casecmpstr(val, "on"))
+             worker->s->keepalive = 1;
+-        else if (!strcasecmp(val, "off"))
++        else if (!ap_casecmpstr(val, "off"))
+             worker->s->keepalive = 0;
+         else
+             return "KeepAlive must be On|Off";
+         worker->s->keepalive_set = 1;
+     }
+-    else if (!strcasecmp(key, "disablereuse")) {
+-        if (!strcasecmp(val, "on"))
++    else if (!ap_casecmpstr(key, "disablereuse")) {
++        if (!ap_casecmpstr(val, "on"))
+             worker->s->disablereuse = 1;
+-        else if (!strcasecmp(val, "off"))
++        else if (!ap_casecmpstr(val, "off"))
+             worker->s->disablereuse = 0;
+         else
+             return "DisableReuse must be On|Off";
+         worker->s->disablereuse_set = 1;
+     }
+-    else if (!strcasecmp(key, "enablereuse")) {
+-        if (!strcasecmp(val, "on"))
++    else if (!ap_casecmpstr(key, "enablereuse")) {
++        if (!ap_casecmpstr(val, "on"))
+             worker->s->disablereuse = 0;
+-        else if (!strcasecmp(val, "off"))
++        else if (!ap_casecmpstr(val, "off"))
+             worker->s->disablereuse = 1;
+         else
+             return "EnableReuse must be On|Off";
+         worker->s->disablereuse_set = 1;
+     }
+-    else if (!strcasecmp(key, "route")) {
++    else if (!ap_casecmpstr(key, "route")) {
+         /* Worker route.
+          */
+         if (strlen(val) >= sizeof(worker->s->route))
+@@ -191,7 +191,7 @@ static const char *set_worker_param(apr_pool_t *p,
+                     (int)sizeof(worker->s->route));
+         PROXY_STRNCPY(worker->s->route, val);
+     }
+-    else if (!strcasecmp(key, "redirect")) {
++    else if (!ap_casecmpstr(key, "redirect")) {
+         /* Worker redirection route.
+          */
+         if (strlen(val) >= sizeof(worker->s->redirect))
+@@ -199,7 +199,7 @@ static const char *set_worker_param(apr_pool_t *p,
+                     (int)sizeof(worker->s->redirect));
+         PROXY_STRNCPY(worker->s->redirect, val);
+     }
+-    else if (!strcasecmp(key, "status")) {
++    else if (!ap_casecmpstr(key, "status")) {
+         const char *v;
+         int mode = 1;
+         apr_status_t rv;
+@@ -219,17 +219,17 @@ static const char *set_worker_param(apr_pool_t *p,
+                 return "Unknown status parameter option";
+         }
+     }
+-    else if (!strcasecmp(key, "flushpackets")) {
+-        if (!strcasecmp(val, "on"))
++    else if (!ap_casecmpstr(key, "flushpackets")) {
++        if (!ap_casecmpstr(val, "on"))
+             worker->s->flush_packets = flush_on;
+-        else if (!strcasecmp(val, "off"))
++        else if (!ap_casecmpstr(val, "off"))
+             worker->s->flush_packets = flush_off;
+-        else if (!strcasecmp(val, "auto"))
++        else if (!ap_casecmpstr(val, "auto"))
+             worker->s->flush_packets = flush_auto;
+         else
+             return "flushpackets must be on|off|auto";
+     }
+-    else if (!strcasecmp(key, "flushwait")) {
++    else if (!ap_casecmpstr(key, "flushwait")) {
+         ival = atoi(val);
+         if (ival > 1000 || ival < 0) {
+             return "flushwait must be <= 1000, or 0 for system default of 10 millseconds.";
+@@ -239,7 +239,7 @@ static const char *set_worker_param(apr_pool_t *p,
+         else
+             worker->s->flush_wait = ival * 1000;    /* change to microseconds */
+     }
+-    else if (!strcasecmp(key, "ping")) {
++    else if (!ap_casecmpstr(key, "ping")) {
+         /* Ping/Pong timeout in given unit (default is second).
+          */
+         if (ap_timeout_parameter_parse(val, &timeout, "s") != APR_SUCCESS)
+@@ -249,13 +249,13 @@ static const char *set_worker_param(apr_pool_t *p,
+         worker->s->ping_timeout = timeout;
+         worker->s->ping_timeout_set = 1;
+     }
+-    else if (!strcasecmp(key, "lbset")) {
++    else if (!ap_casecmpstr(key, "lbset")) {
+         ival = atoi(val);
+         if (ival < 0 || ival > 99)
+             return "lbset must be between 0 and 99";
+         worker->s->lbset = ival;
+     }
+-    else if (!strcasecmp(key, "connectiontimeout")) {
++    else if (!ap_casecmpstr(key, "connectiontimeout")) {
+         /* Request timeout in given unit (default is second).
+          * Defaults to connection timeout
+          */
+@@ -266,7 +266,7 @@ static const char *set_worker_param(apr_pool_t *p,
+         worker->s->conn_timeout = timeout;
+         worker->s->conn_timeout_set = 1;
+     }
+-    else if (!strcasecmp(key, "flusher")) {
++    else if (!ap_casecmpstr(key, "flusher")) {
+         if (strlen(val) >= sizeof(worker->s->flusher))
+             apr_psprintf(p, "flusher name length must be < %d characters",
+                     (int)sizeof(worker->s->flusher));
+@@ -286,7 +286,7 @@ static const char *set_balancer_param(proxy_server_conf *conf,
+ {
+ 
+     int ival;
+-    if (!strcasecmp(key, "stickysession")) {
++    if (!ap_casecmpstr(key, "stickysession")) {
+         char *path;
+         /* Balancer sticky session name.
+          * Set to something like JSESSIONID or
+@@ -303,12 +303,12 @@ static const char *set_balancer_param(proxy_server_conf *conf,
+             PROXY_STRNCPY(balancer->s->sticky_path, path);
+         }
+     }
+-    else if (!strcasecmp(key, "stickysessionsep")) {
++    else if (!ap_casecmpstr(key, "stickysessionsep")) {
+         /* separator/delimiter for sessionid and route,
+          * normally '.'
+          */
+         if (strlen(val) != 1) {
+-            if (!strcasecmp(val, "off"))
++            if (!ap_casecmpstr(val, "off"))
+                 balancer->s->sticky_separator = 0;
+             else      
+                 return "stickysessionsep must be a single character or Off";
+@@ -317,20 +317,20 @@ static const char *set_balancer_param(proxy_server_conf *conf,
+             balancer->s->sticky_separator = *val;
+         balancer->s->sticky_separator_set = 1;
+     }
+-    else if (!strcasecmp(key, "nofailover")) {
++    else if (!ap_casecmpstr(key, "nofailover")) {
+         /* If set to 'on' the session will break
+          * if the worker is in error state or
+          * disabled.
+          */
+-        if (!strcasecmp(val, "on"))
++        if (!ap_casecmpstr(val, "on"))
+             balancer->s->sticky_force = 1;
+-        else if (!strcasecmp(val, "off"))
++        else if (!ap_casecmpstr(val, "off"))
+             balancer->s->sticky_force = 0;
+         else
+             return "failover must be On|Off";
+         balancer->s->sticky_force_set = 1;
+     }
+-    else if (!strcasecmp(key, "timeout")) {
++    else if (!ap_casecmpstr(key, "timeout")) {
+         /* Balancer timeout in seconds.
+          * If set this will be the maximum time to
+          * wait for a free worker.
+@@ -341,7 +341,7 @@ static const char *set_balancer_param(proxy_server_conf *conf,
+             return "timeout must be at least one second";
+         balancer->s->timeout = apr_time_from_sec(ival);
+     }
+-    else if (!strcasecmp(key, "maxattempts")) {
++    else if (!ap_casecmpstr(key, "maxattempts")) {
+         /* Maximum number of failover attempts before
+          * giving up.
+          */
+@@ -351,7 +351,7 @@ static const char *set_balancer_param(proxy_server_conf *conf,
+         balancer->s->max_attempts = ival;
+         balancer->s->max_attempts_set = 1;
+     }
+-    else if (!strcasecmp(key, "lbmethod")) {
++    else if (!ap_casecmpstr(key, "lbmethod")) {
+         proxy_balancer_method *provider;
+         if (strlen(val) > (sizeof(balancer->s->lbpname)-1))
+             return "unknown lbmethod";
+@@ -368,20 +368,20 @@ static const char *set_balancer_param(proxy_server_conf *conf,
+         }
+         return "unknown lbmethod";
+     }
+-    else if (!strcasecmp(key, "scolonpathdelim")) {
++    else if (!ap_casecmpstr(key, "scolonpathdelim")) {
+         /* If set to 'on' then ';' will also be
+          * used as a session path separator/delim (ala
+          * mod_jk)
+          */
+-        if (!strcasecmp(val, "on"))
++        if (!ap_casecmpstr(val, "on"))
+             balancer->s->scolonsep = 1;
+-        else if (!strcasecmp(val, "off"))
++        else if (!ap_casecmpstr(val, "off"))
+             balancer->s->scolonsep = 0;
+         else
+             return "scolonpathdelim must be On|Off";
+         balancer->s->scolonsep_set = 1;
+     }
+-    else if (!strcasecmp(key, "failonstatus")) {
++    else if (!ap_casecmpstr(key, "failonstatus")) {
+         char *val_split;
+         char *status;
+         char *tok_state;
+@@ -403,17 +403,17 @@ static const char *set_balancer_param(proxy_server_conf *conf,
+         }
+ 
+     }
+-    else if (!strcasecmp(key, "failontimeout")) {
+-        if (!strcasecmp(val, "on"))
++    else if (!ap_casecmpstr(key, "failontimeout")) {
++        if (!ap_casecmpstr(val, "on"))
+             balancer->failontimeout = 1;
+-        else if (!strcasecmp(val, "off"))
++        else if (!ap_casecmpstr(val, "off"))
+             balancer->failontimeout = 0;
+         else
+             return "failontimeout must be On|Off";
+         balancer->failontimeout_set = 1;
+     }
+-    else if (!strcasecmp(key, "nonce")) {
+-        if (!strcasecmp(val, "None")) {
++    else if (!ap_casecmpstr(key, "nonce")) {
++        if (!ap_casecmpstr(val, "None")) {
+             *balancer->s->nonce = '\0';
+         }
+         else {
+@@ -423,17 +423,17 @@ static const char *set_balancer_param(proxy_server_conf *conf,
+         }
+         balancer->s->nonce_set = 1;
+     }
+-    else if (!strcasecmp(key, "growth")) {
++    else if (!ap_casecmpstr(key, "growth")) {
+         ival = atoi(val);
+         if (ival < 1 || ival > 100)   /* arbitrary limit here */
+             return "growth must be between 1 and 100";
+         balancer->growth = ival;
+         balancer->growth_set = 1;
+     }
+-    else if (!strcasecmp(key, "forcerecovery")) {
+-        if (!strcasecmp(val, "on"))
++    else if (!ap_casecmpstr(key, "forcerecovery")) {
++        if (!ap_casecmpstr(val, "on"))
+             balancer->s->forcerecovery = 1;
+-        else if (!strcasecmp(val, "off"))
++        else if (!ap_casecmpstr(val, "off"))
+             balancer->s->forcerecovery = 0;
+         else
+             return "forcerecovery must be On|Off";
+@@ -520,7 +520,7 @@ static int proxy_detect(request_rec *r)
+     if (conf->req && r->parsed_uri.scheme) {
+         /* but it might be something vhosted */
+         if (!(r->parsed_uri.hostname
+-              && !strcasecmp(r->parsed_uri.scheme, ap_http_scheme(r))
++              && !ap_casecmpstr(r->parsed_uri.scheme, ap_http_scheme(r))
+               && ap_matches_request_vhost(r, r->parsed_uri.hostname,
+                                           (apr_port_t)(r->parsed_uri.port_str ? r->parsed_uri.port
+                                                        : ap_default_port(r))))) {
+@@ -899,7 +899,7 @@ static int proxy_needsdomain(request_rec *r, const char *url, const char *domain
+     /* If host does contain a dot already, or it is "localhost", decline */
+     if (strchr(r->parsed_uri.hostname, '.') != NULL /* has domain, or IPv4 literal */
+      || strchr(r->parsed_uri.hostname, ':') != NULL /* IPv6 literal */
+-     || strcasecmp(r->parsed_uri.hostname, "localhost") == 0)
++     || ap_casecmpstr(r->parsed_uri.hostname, "localhost") == 0)
+         return DECLINED;    /* host name has a dot already */
+ 
+     ref = apr_table_get(r->headers_in, "Referer");
+diff --git a/modules/proxy/mod_proxy_fcgi.c b/modules/proxy/mod_proxy_fcgi.c
+index 48dc81f..2cd32fd 100644
+--- a/modules/proxy/mod_proxy_fcgi.c
++++ b/modules/proxy/mod_proxy_fcgi.c
+@@ -91,11 +91,11 @@ static int proxy_fcgi_canon(request_rec *r, char *url)
+ 
+     if (NULL != (pathinfo_type = apr_table_get(r->subprocess_env, "proxy-fcgi-pathinfo"))) {
+         /* It has to be on disk for this to work */
+-        if (!strcasecmp(pathinfo_type, "full")) { 
++        if (!ap_casecmpstr(pathinfo_type, "full")) { 
+             rconf->need_dirwalk = 1;
+             ap_unescape_url_keep2f(path, 0);
+         }
+-        else if (!strcasecmp(pathinfo_type, "first-dot")) { 
++        else if (!ap_casecmpstr(pathinfo_type, "first-dot")) { 
+             char *split = ap_strchr(path, '.');
+             if (split) { 
+                 char *slash = ap_strchr(split, '/');
+@@ -106,7 +106,7 @@ static int proxy_fcgi_canon(request_rec *r, char *url)
+                 }
+             }
+         }
+-        else if (!strcasecmp(pathinfo_type, "last-dot")) { 
++        else if (!ap_casecmpstr(pathinfo_type, "last-dot")) { 
+             char *split = ap_strrchr(path, '.');
+             if (split) { 
+                 char *slash = ap_strchr(split, '/');
+@@ -122,7 +122,7 @@ static int proxy_fcgi_canon(request_rec *r, char *url)
+              * the FCGI server to fixup PATH_INFO because it's the entire path
+              */
+             r->path_info = apr_pstrcat(r->pool, "/", path, NULL);
+-            if (!strcasecmp(pathinfo_type, "unescape")) { 
++            if (!ap_casecmpstr(pathinfo_type, "unescape")) { 
+                 ap_unescape_url_keep2f(r->path_info, 0);
+             }
+             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01061)
+diff --git a/modules/proxy/mod_proxy_http.c b/modules/proxy/mod_proxy_http.c
+index c367604..b1d6aef 100644
+--- a/modules/proxy/mod_proxy_http.c
++++ b/modules/proxy/mod_proxy_http.c
+@@ -1641,13 +1641,14 @@ int ap_proxy_http_process_response(apr_pool_t * p, request_rec *r,
+             ap_log_rerror(APLOG_MARK, APLOG_TRACE2, 0, r,
+                           "HTTP: received interim %d response", r->status);
+             if (!policy
+-                    || (!strcasecmp(policy, "RFC") && ((r->expecting_100 = 1)))) {
++                    || (!ap_casecmpstr(policy, "RFC")
++                        && ((r->expecting_100 = 1)))) {
+                 ap_send_interim_response(r, 1);
+             }
+             /* FIXME: refine this to be able to specify per-response-status
+              * policies and maybe also add option to bail out with 502
+              */
+-            else if (strcasecmp(policy, "Suppress")) {
++            else if (ap_casecmpstr(policy, "Suppress")) {
+                 ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, APLOGNO(01108)
+                               "undefined proxy interim response policy");
+             }
+diff --git a/modules/ssl/ssl_ct_log_config.c b/modules/ssl/ssl_ct_log_config.c
+index f08e08f..27b4d45 100644
+--- a/modules/ssl/ssl_ct_log_config.c
++++ b/modules/ssl/ssl_ct_log_config.c
+@@ -201,10 +201,10 @@ apr_status_t save_log_config_entry(apr_array_header_t *log_config,
+     if (!distrusted_str) {
+         distrusted = DISTRUSTED_UNSET;
+     }
+-    else if (!strcasecmp(distrusted_str, "1")) {
++    else if (!strcmp(distrusted_str, "1")) {
+         distrusted = DISTRUSTED;
+     }
+-    else if (!strcasecmp(distrusted_str, "0")) {
++    else if (!strcmp(distrusted_str, "0")) {
+         distrusted = TRUSTED;
+     }
+     else {
+diff --git a/modules/ssl/ssl_engine_ocsp.c b/modules/ssl/ssl_engine_ocsp.c
+index 27061f6..eaa1828 100644
+--- a/modules/ssl/ssl_engine_ocsp.c
++++ b/modules/ssl/ssl_engine_ocsp.c
+@@ -86,7 +86,7 @@ static apr_uri_t *determine_responder_uri(SSLSrvConfigRec *sc, X509 *cert,
+         return NULL;
+     }
+ 
+-    if (strcasecmp(u->scheme, "http") != 0) {
++    if (ap_casecmpstr(u->scheme, "http") != 0) {
+         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, rv, c, APLOGNO(01920)
+                       "cannot handle OCSP responder URI '%s'", s);
+         return NULL;
+diff --git a/server/log.c b/server/log.c
+index 0508d2f..c545bfc 100644
+--- a/server/log.c
++++ b/server/log.c
+@@ -596,7 +596,7 @@ static int log_log_id(const ap_errorlog_info *info, const char *arg,
+      * c: log conn log id if available and not a once-per-request log line
+      * else: log request log id if available
+      */
+-    if (arg && !strcasecmp(arg, "c")) {
++    if (arg && !ap_casecmpstr(arg, "c")) {
+         if (info->c && (*arg != 'C' || !info->r)) {
+             return cpystrn(buf, info->c->log_id, buflen);
+         }
+@@ -1864,7 +1864,7 @@ AP_DECLARE(const char *) ap_parse_log_level(const char *str, int *val)
+         return err;
+ 
+     while (priorities[i].t_name != NULL) {
+-        if (!strcasecmp(str, priorities[i].t_name)) {
++        if (!ap_casecmpstr(str, priorities[i].t_name)) {
+             *val = priorities[i].t_val;
+             return NULL;
+         }
+diff --git a/server/util.c b/server/util.c
+index 76b7e2c..b69df08 100644
+--- a/server/util.c
++++ b/server/util.c
+@@ -881,7 +881,7 @@ AP_DECLARE(apr_status_t) ap_pcfg_openfile(ap_configfile_t **ret_cfg,
+ 
+     if (finfo.filetype != APR_REG &&
+ #if defined(WIN32) || defined(OS2) || defined(NETWARE)
+-        strcasecmp(apr_filepath_name_get(name), "nul") != 0) {
++        ap_casecmpstr(apr_filepath_name_get(name), "nul") != 0) {
+ #else
+         strcmp(name, "/dev/null") != 0) {
+ #endif /* WIN32 || OS2 */

@@ -1,0 +1,686 @@
+commit 71936dd31e1146fd550f32d30db02defbdb60b9c
+Author: Doug MacEachern <dougm@apache.org>
+Date:   Mon Jan 8 23:55:12 2001 +0000
+
+    adjust remaining modules to use the new handler hook method (Alan Edwards)
+    
+    bring back the old handler prototype by reusing r->handler (dougm)
+    PR:
+    Obtained from:
+    Submitted by:
+    Reviewed by:
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@87617 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/http_config.h b/include/http_config.h
+index a515df3..f691b3d 100644
+--- a/include/http_config.h
++++ b/include/http_config.h
+@@ -993,12 +993,11 @@ AP_DECLARE_HOOK(void,child_init,(apr_pool_t *pchild, server_rec *s))
+ 
+ /**
+  * Run the handler functions for each module
+- * @param handler The handler string (a MIME type or a handler)
+  * @param r The request_rec
+- * @deffunc void ap_run_handler(const char *handler,request_rec *r)
++ * @deffunc void ap_run_handler(request_rec *r)
+  * @tip non-wildcard handlers should HOOK_MIDDLE, wildcard HOOK_LAST
+  */
+-AP_DECLARE_HOOK(int,handler,(const char *handler,request_rec *r))
++AP_DECLARE_HOOK(int,handler,(request_rec *))
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/libhttpd.def b/libhttpd.def
+index 0f0f9c9..b8e66fd 100644
+--- a/libhttpd.def
++++ b/libhttpd.def
+@@ -376,6 +376,7 @@ EXPORTS
+         ap_hook_post_config
+         ap_hook_open_logs
+         ap_hook_child_init
++        ap_hook_handler
+ 
+         ap_get_status_table
+         ap_run_default_port
+diff --git a/modules/aaa/mod_auth_anon.c b/modules/aaa/mod_auth_anon.c
+index 9a90f65..703aa00 100644
+--- a/modules/aaa/mod_auth_anon.c
++++ b/modules/aaa/mod_auth_anon.c
+@@ -308,6 +308,5 @@ module AP_MODULE_DECLARE_DATA anon_auth_module =
+     NULL,			/* server config */
+     NULL,			/* merge server config */
+     anon_auth_cmds,		/* command apr_table_t */
+-    NULL,			/* handlers */
+     register_hooks		/* register hooks */
+ };
+diff --git a/modules/aaa/mod_auth_db.c b/modules/aaa/mod_auth_db.c
+index 193332f..552e2b7 100644
+--- a/modules/aaa/mod_auth_db.c
++++ b/modules/aaa/mod_auth_db.c
+@@ -409,7 +409,6 @@ module db_auth_module =
+     NULL,			/* server config */
+     NULL,			/* merge server config */
+     db_auth_cmds,		/* command apr_table_t */
+-    NULL,			/* handlers */
+     register_hooks		/* register hooks */
+ };
+ 
+diff --git a/modules/aaa/mod_auth_dbm.c b/modules/aaa/mod_auth_dbm.c
+index f2d5107..7399aa0 100644
+--- a/modules/aaa/mod_auth_dbm.c
++++ b/modules/aaa/mod_auth_dbm.c
+@@ -349,6 +349,5 @@ module AP_MODULE_DECLARE_DATA dbm_auth_module =
+     NULL,			/* server config */
+     NULL,			/* merge server config */
+     dbm_auth_cmds,		/* command apr_table_t */
+-    NULL,			/* handlers */
+     register_hooks              /* register hooks */
+ };
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 76501b8..d230c4a 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -2070,7 +2070,6 @@ module AP_MODULE_DECLARE_DATA digest_auth_module =
+     NULL,			/* server config */
+     NULL,			/* merge server config */
+     digest_cmds,		/* command table */
+-    NULL,			/* handlers */
+     register_hooks		/* register hooks */
+ };
+ 
+diff --git a/modules/arch/win32/mod_isapi.c b/modules/arch/win32/mod_isapi.c
+index 64a93ba..f7dfe6d 100644
+--- a/modules/arch/win32/mod_isapi.c
++++ b/modules/arch/win32/mod_isapi.c
+@@ -347,15 +347,20 @@ static int isapi_unload(isapi_loaded* isa, int force)
+ 
+ apr_status_t isapi_handler (request_rec *r)
+ {
+-    isapi_server_conf *sconf = ap_get_module_config(r->server->module_config, 
+-                                                    &isapi_module);
+-    apr_table_t *e = r->subprocess_env;
++    isapi_server_conf * sconf;
++    apr_table_t *e;
+     apr_status_t rv;
+     isapi_loaded *isa;
+     isapi_cid *cid;
+     DWORD read;
+     int res;
+     
++    if(strcmp(r->handler, "isapi-isa"))
++        return DECLINED;    
++
++    sconf = ap_get_module_config(r->server->module_config, &isapi_module);
++    e = r->subprocess_env;
++
+     /* Use similar restrictions as CGIs
+      *
+      * If this fails, it's pointless to load the isapi dll.
+@@ -1262,6 +1267,7 @@ static const char *isapi_cmd_cachefile(cmd_parms *cmd, void *dummy,
+ static void isapi_hooks(void)
+ {
+     ap_hook_post_config(isapi_post_config, NULL, NULL, AP_HOOK_MIDDLE);
++    ap_hook_handler(isapi_handler, NULL, NULL, AP_HOOK_MIDDLE);
+ }
+ 
+ static const command_rec isapi_cmds[] = {
+@@ -1278,11 +1284,6 @@ AP_INIT_ITERATE("ISAPICacheFile", isapi_cmd_cachefile, NULL, RSRC_CONF,
+ { NULL }
+ };
+ 
+-handler_rec isapi_handlers[] = {
+-    { "isapi-isa", isapi_handler },
+-    { NULL}
+-};
+-
+ module isapi_module = {
+    STANDARD20_MODULE_STUFF,
+    NULL,                        /* create per-dir config */
+@@ -1290,6 +1291,5 @@ module isapi_module = {
+    create_isapi_server_config,  /* server config */
+    NULL,                        /* merge server config */
+    isapi_cmds,                  /* command apr_table_t */
+-   isapi_handlers,              /* handlers */
+    isapi_hooks                  /* register hooks */
+ };
+diff --git a/modules/cache/mod_file_cache.c b/modules/cache/mod_file_cache.c
+index e256055..2271287 100644
+--- a/modules/cache/mod_file_cache.c
++++ b/modules/cache/mod_file_cache.c
+@@ -422,6 +422,10 @@ static int file_cache_handler(request_rec *r)
+     int errstatus;
+     int rc = OK;
+ 
++    if (strcmp(r->handler, "*.*")) {
++        return DECLINED;
++    }
++
+     /* we don't handle anything but GET */
+     if (r->method_number != M_GET) return DECLINED;
+ 
+@@ -473,6 +477,7 @@ AP_INIT_ITERATE("mmapfile", mmapfile, NULL, RSRC_CONF,
+ 
+ static void register_hooks(void)
+ {
++    ap_hook_handler(file_cache_handler, NULL, NULL, AP_HOOK_MIDDLE);
+     ap_hook_post_config(file_cache_post_config, NULL, NULL, AP_HOOK_MIDDLE);
+     ap_hook_translate_name(file_cache_xlat, NULL, NULL, AP_HOOK_MIDDLE);
+     /* This trick doesn't work apparently because the translate hooks
+@@ -483,12 +488,6 @@ static void register_hooks(void)
+ 
+ }
+ 
+-static const handler_rec file_cache_handlers[] =
+-{
+-    { "*/*", file_cache_handler },
+-    { NULL }
+-};
+-
+ module AP_MODULE_DECLARE_DATA file_cache_module =
+ {
+     STANDARD20_MODULE_STUFF,
+@@ -497,6 +496,5 @@ module AP_MODULE_DECLARE_DATA file_cache_module =
+     create_server_config,     /* create per-server config structure */
+     NULL,                     /* merge per-server config structures */
+     file_cache_cmds,          /* command handlers */
+-    file_cache_handlers,      /* handlers */
+     register_hooks            /* register hooks */
+ };
+diff --git a/modules/dav/fs/mod_dav_fs.c b/modules/dav/fs/mod_dav_fs.c
+index 9d32c08..20d2c32 100644
+--- a/modules/dav/fs/mod_dav_fs.c
++++ b/modules/dav/fs/mod_dav_fs.c
+@@ -138,6 +138,5 @@ module AP_MODULE_DECLARE_DATA dav_fs_module =
+     dav_fs_create_server_config,	/* server config */
+     dav_fs_merge_server_config,	/* merge server config */
+     dav_fs_cmds,		/* command table */
+-    NULL,                       /* handlers */
+     register_hooks,             /* register hooks */
+ };
+diff --git a/modules/dav/main/mod_dav.c b/modules/dav/main/mod_dav.c
+index 360b66f..d925d58 100644
+--- a/modules/dav/main/mod_dav.c
++++ b/modules/dav/main/mod_dav.c
+@@ -3788,6 +3788,10 @@ static int dav_handler(request_rec *r)
+ {
+     dav_dir_conf *conf;
+ 
++    if (strcmp(r->handler, "dav-handler")) {
++	return DECLINED;
++    }
++
+     /* quickly ignore any HTTP/0.9 requests */
+     if (r->assbackwards) {
+ 	return DECLINED;
+@@ -4004,6 +4008,7 @@ static int dav_type_checker(request_rec *r)
+ 
+ static void register_hooks(void)
+ {
++    ap_hook_handler(dav_handler, NULL, NULL, AP_HOOK_MIDDLE);
+     ap_hook_post_config(dav_init_handler, NULL, NULL, AP_HOOK_MIDDLE);
+     ap_hook_type_checker(dav_type_checker, NULL, NULL, AP_HOOK_FIRST);
+ 
+@@ -4044,12 +4049,6 @@ static const command_rec dav_cmds[] =
+     { NULL }
+ };
+ 
+-static const handler_rec dav_handlers[] =
+-{
+-    {"dav-handler", dav_handler},
+-    { NULL }
+-};
+-
+ module DAV_DECLARE_DATA dav_module =
+ {
+     STANDARD20_MODULE_STUFF,
+@@ -4058,7 +4057,6 @@ module DAV_DECLARE_DATA dav_module =
+     dav_create_server_config,	/* server config */
+     dav_merge_server_config,	/* merge server config */
+     dav_cmds,			/* command table */
+-    dav_handlers,		/* handlers */
+     register_hooks,             /* register hooks */
+ };
+ 
+diff --git a/modules/generators/mod_asis.c b/modules/generators/mod_asis.c
+index 5702a90..6b7de1d 100644
+--- a/modules/generators/mod_asis.c
++++ b/modules/generators/mod_asis.c
+@@ -68,14 +68,14 @@
+ 
+ #define ASIS_MAGIC_TYPE "httpd/send-as-is"
+ 
+-static int asis_handler(const char *handler,request_rec *r)
++static int asis_handler(request_rec *r)
+ {
+     apr_file_t *f = NULL;
+     apr_status_t status;
+     const char *location;
+     apr_size_t nbytes;
+ 
+-    if(strcmp(handler,ASIS_MAGIC_TYPE) && strcmp(handler,"send-as-is"))
++    if(strcmp(r->handler,ASIS_MAGIC_TYPE) && strcmp(r->handler,"send-as-is"))
+ 	return DECLINED;
+ 
+     r->allowed |= (1 << M_GET);
+diff --git a/modules/generators/mod_autoindex.c b/modules/generators/mod_autoindex.c
+index 79891d3..d4734ff 100644
+--- a/modules/generators/mod_autoindex.c
++++ b/modules/generators/mod_autoindex.c
+@@ -1660,12 +1660,12 @@ static int index_directory(request_rec *r,
+ 
+ /* The formal handler... */
+ 
+-static int handle_autoindex(const char *handler,request_rec *r)
++static int handle_autoindex(request_rec *r)
+ {
+     autoindex_config_rec *d;
+     int allow_opts;
+ 
+-    if(strcmp(handler,DIR_MAGIC_TYPE))
++    if(strcmp(r->handler,DIR_MAGIC_TYPE))
+ 	return DECLINED;
+ 
+     allow_opts = ap_allow_options(r);
+diff --git a/modules/generators/mod_cgi.c b/modules/generators/mod_cgi.c
+index b1193d6..8ccc223 100644
+--- a/modules/generators/mod_cgi.c
++++ b/modules/generators/mod_cgi.c
+@@ -498,7 +498,7 @@ static apr_status_t build_command_line(const char **cmd, request_rec *r,
+     return APR_SUCCESS;
+ }
+ 
+-static int cgi_handler(const char *handler, request_rec *r)
++static int cgi_handler(request_rec *r)
+ {
+     int retval, nph, dbpos = 0;
+     const char *argv0;
+@@ -514,7 +514,7 @@ static int cgi_handler(const char *handler, request_rec *r)
+     cgi_server_conf *conf;
+     apr_status_t rv;
+ 
+-    if(strcmp(handler,CGI_MAGIC_TYPE) && strcmp(handler,"cgi-script"))
++    if(strcmp(r->handler,CGI_MAGIC_TYPE) && strcmp(r->handler,"cgi-script"))
+ 	return DECLINED;
+ 
+     p = r->main ? r->main->pool : r->pool;
+diff --git a/modules/generators/mod_cgid.c b/modules/generators/mod_cgid.c
+index 24fcee7..2155a83 100644
+--- a/modules/generators/mod_cgid.c
++++ b/modules/generators/mod_cgid.c
+@@ -730,7 +730,7 @@ static int log_script(request_rec *r, cgid_server_conf * conf, int ret,
+  * 
+  * Actual cgid handling... 
+  */ 
+-static int cgid_handler(const char *handler, request_rec *r) 
++static int cgid_handler(request_rec *r) 
+ { 
+     int retval, nph, dbpos = 0; 
+     char *argv0, *dbuf = NULL; 
+@@ -746,7 +746,7 @@ static int cgid_handler(const char *handler, request_rec *r)
+     apr_file_t *tempsock = NULL;
+     apr_size_t nbytes;
+ 
+-    if(strcmp(handler,CGI_MAGIC_TYPE) && strcmp(handler,"cgi-script"))
++    if(strcmp(r->handler,CGI_MAGIC_TYPE) && strcmp(r->handler,"cgi-script"))
+ 	return DECLINED;
+ 
+     if (r->method_number == M_OPTIONS) { 
+diff --git a/modules/generators/mod_status.c b/modules/generators/mod_status.c
+index fff13b2..4e204b6 100644
+--- a/modules/generators/mod_status.c
++++ b/modules/generators/mod_status.c
+@@ -84,6 +84,10 @@ static int status_handler(request_rec *r)
+     apr_array_header_t *server_status;
+     ap_status_table_row_t *status_rows;
+ 
++    if (strcmp(r->handler, STATUS_MAGIC_TYPE) && strcmp(r->handler, "server-status")) {
++        return DECLINED;
++    }
++
+     r->allowed = (1 << M_GET);
+     if (r->method_number != M_GET)
+ 	return DECLINED;
+@@ -120,12 +124,10 @@ static int status_handler(request_rec *r)
+     return 0;
+ }
+ 
+-static const handler_rec status_handlers[] =
++static void register_hooks(void)
+ {
+-    {STATUS_MAGIC_TYPE, status_handler},
+-    {"server-status", status_handler},
+-    {NULL}
+-};
++    ap_hook_handler(status_handler, NULL, NULL, AP_HOOK_MIDDLE);
++}
+ 
+ module AP_MODULE_DECLARE_DATA status_module =
+ {
+@@ -135,6 +137,5 @@ module AP_MODULE_DECLARE_DATA status_module =
+     NULL,			/* server config */
+     NULL,			/* merge server config */
+     NULL,			/* command table */
+-    status_handlers,		/* handlers */
+-    NULL                        /* register hooks */
++    register_hooks	/* register hooks */
+ };
+diff --git a/modules/http/http_core.c b/modules/http/http_core.c
+index cca74c6..312bca7 100644
+--- a/modules/http/http_core.c
++++ b/modules/http/http_core.c
+@@ -2971,7 +2971,7 @@ AP_DECLARE_NONSTD(int) ap_core_translate(request_rec *r)
+ 
+ static int do_nothing(request_rec *r) { return OK; }
+ 
+-static int default_handler(const char *handler, request_rec *r)
++static int default_handler(request_rec *r)
+ {
+     ap_bucket_brigade *bb;
+     ap_bucket *e;
+@@ -2994,8 +2994,8 @@ static int default_handler(const char *handler, request_rec *r)
+      * have a / in the middle, which probably captures the original
+      * intent, but may cause problems at first - Ben 7th Jan 01
+      */
+-    if(strcmp(handler,"request-handler")
+-       && ap_strcmp_match(handler,"*/*"))
++    if(strcmp(r->handler,"default-handler")
++       && ap_strcmp_match(r->handler,"*/*"))
+ 	return DECLINED;
+ 
+     d = (core_dir_config *)ap_get_module_config(r->per_dir_config,
+diff --git a/modules/mappers/mod_actions.c b/modules/mappers/mod_actions.c
+index 31639a2..5c400bc 100644
+--- a/modules/mappers/mod_actions.c
++++ b/modules/mappers/mod_actions.c
+@@ -158,7 +158,7 @@ static const command_rec action_cmds[] =
+     {NULL}
+ };
+ 
+-static int action_handler(const char *handler,request_rec *r)
++static int action_handler(request_rec *r)
+ {
+     action_dir_config *conf = (action_dir_config *)
+         ap_get_module_config(r->per_dir_config, &action_module);
+diff --git a/modules/mappers/mod_dir.c b/modules/mappers/mod_dir.c
+index 9391a91..9d305da 100644
+--- a/modules/mappers/mod_dir.c
++++ b/modules/mappers/mod_dir.c
+@@ -116,7 +116,7 @@ static void *merge_dir_configs(apr_pool_t *p, void *basev, void *addv)
+     return new;
+ }
+ 
+-static int handle_dir(const char *handler,request_rec *r)
++static int handle_dir(request_rec *r)
+ {
+     dir_config_rec *d;
+     char *dummy_ptr[1];
+@@ -124,7 +124,7 @@ static int handle_dir(const char *handler,request_rec *r)
+     int num_names;
+     int error_notfound = 0;
+ 
+-    if(strcmp(handler,DIR_MAGIC_TYPE))
++    if(strcmp(r->handler,DIR_MAGIC_TYPE))
+ 	return DECLINED;
+ 
+     d = (dir_config_rec *) ap_get_module_config(r->per_dir_config,
+diff --git a/modules/mappers/mod_imap.c b/modules/mappers/mod_imap.c
+index 61544f8..f3781dd 100644
+--- a/modules/mappers/mod_imap.c
++++ b/modules/mappers/mod_imap.c
+@@ -612,7 +612,7 @@ static void menu_footer(request_rec *r)
+     ap_rputs("\n\n</body>\n</html>\n", r);         /* finish the menu */
+ }
+ 
+-static int imap_handler(const char *handler,request_rec *r)
++static int imap_handler(request_rec *r)
+ {
+     char input[MAX_STRING_LEN];
+     char *directive;
+@@ -640,8 +640,8 @@ static int imap_handler(const char *handler,request_rec *r)
+ 
+     configfile_t *imap; 
+ 
+-    if (r->method_number != M_GET || (strcmp(handler,IMAP_MAGIC_TYPE)
+-				      && strcmp(handler, "imap-file")))
++    if (r->method_number != M_GET || (strcmp(r->handler,IMAP_MAGIC_TYPE)
++				      && strcmp(r->handler, "imap-file")))
+ 	return DECLINED;
+ 
+     icr = ap_get_module_config(r->per_dir_config, &imap_module);
+diff --git a/modules/mappers/mod_negotiation.c b/modules/mappers/mod_negotiation.c
+index 2120d8d..a7add86 100644
+--- a/modules/mappers/mod_negotiation.c
++++ b/modules/mappers/mod_negotiation.c
+@@ -2566,14 +2566,14 @@ static int do_negotiation(request_rec *r, negotiation_state *neg,
+     return OK;
+ }
+ 
+-static int handle_map_file(const char *handler,request_rec *r)
++static int handle_map_file(request_rec *r)
+ {
+     negotiation_state *neg;
+     var_rec *best;
+     int res;
+     char *udir;
+ 
+-    if(strcmp(handler,MAP_FILE_MAGIC_TYPE) && strcmp(handler,"type-map"))
++    if(strcmp(r->handler,MAP_FILE_MAGIC_TYPE) && strcmp(r->handler,"type-map"))
+ 	return DECLINED;
+ 
+     neg = parse_accept_headers(r);
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index f25bcfd..d170cbe 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -210,14 +210,9 @@ static const command_rec command_table[] = {
+     { NULL }
+ };
+ 
+-    /* the apr_table_t of content handlers we provide */
+-static const handler_rec handler_table[] = {
+-    { "redirect-handler", handler_redirect },
+-    { NULL }
+-};
+-
+ static void register_hooks(void)
+ {
++    ap_hook_handler(handler_redirect, NULL, NULL, AP_HOOK_MIDDLE);
+     ap_hook_post_config(init_module,NULL,NULL,AP_HOOK_MIDDLE);
+     ap_hook_child_init(init_child,NULL,NULL,AP_HOOK_MIDDLE);
+ 
+@@ -234,7 +229,6 @@ module AP_MODULE_DECLARE_DATA rewrite_module = {
+    config_server_create,        /* create per-server config structures */
+    config_server_merge,         /* merge  per-server config structures */
+    command_table,               /* apr_table_t of config file commands  */
+-   handler_table,               /* [#8] MIME-typed-dispatched handlers */
+    register_hooks               /* register hooks                      */
+ };
+ 
+@@ -1628,6 +1622,10 @@ static int hook_fixup(request_rec *r)
+ 
+ static int handler_redirect(request_rec *r)
+ {
++    if (strcmp(r->handler, "redirect-handler")) {
++        return DECLINED;
++    }
++
+     /* just make sure that we are really meant! */
+     if (strncmp(r->filename, "redirect:", 9) != 0) {
+         return DECLINED;
+diff --git a/modules/mappers/mod_so.c b/modules/mappers/mod_so.c
+index 2029582..ea012f9 100644
+--- a/modules/mappers/mod_so.c
++++ b/modules/mappers/mod_so.c
+@@ -379,6 +379,5 @@ module AP_MODULE_DECLARE_DATA so_module = {
+    so_sconf_create,		/* server config */
+    NULL,			    /* merge server config */
+    so_cmds,			    /* command apr_table_t */
+-   NULL,			    /* handlers */
+    NULL				    /* register hooks */
+ };
+diff --git a/modules/mappers/mod_speling.c b/modules/mappers/mod_speling.c
+index 82e9066..ef4e80b 100644
+--- a/modules/mappers/mod_speling.c
++++ b/modules/mappers/mod_speling.c
+@@ -564,6 +564,5 @@ module AP_MODULE_DECLARE_DATA speling_module =
+     create_mconfig_for_server,  /* server config */
+     NULL,                       /* merge server config */
+     speling_cmds,               /* command apr_table_t */
+-    NULL,                       /* handlers */
+     register_hooks		/* register hooks */
+ };
+diff --git a/modules/metadata/mod_cern_meta.c b/modules/metadata/mod_cern_meta.c
+index 3a4d4e1..0c2d3db 100644
+--- a/modules/metadata/mod_cern_meta.c
++++ b/modules/metadata/mod_cern_meta.c
+@@ -397,6 +397,5 @@ module AP_MODULE_DECLARE_DATA cern_meta_module =
+     NULL,			/* server config */
+     NULL,			/* merge server configs */
+     cern_meta_cmds,		/* command apr_table_t */
+-    NULL,			/* handlers */
+     register_hooks		/* register hooks */
+ };
+diff --git a/modules/metadata/mod_expires.c b/modules/metadata/mod_expires.c
+index 9f853e1..d062689 100644
+--- a/modules/metadata/mod_expires.c
++++ b/modules/metadata/mod_expires.c
+@@ -516,6 +516,5 @@ module AP_MODULE_DECLARE_DATA expires_module =
+     NULL,                       /* server config */
+     NULL,                       /* merge server configs */
+     expires_cmds,               /* command apr_table_t */
+-    NULL,                       /* handlers */
+     register_hooks		/* register hooks */
+ };
+diff --git a/modules/metadata/mod_headers.c b/modules/metadata/mod_headers.c
+index 2c7896c..4bf81a4 100644
+--- a/modules/metadata/mod_headers.c
++++ b/modules/metadata/mod_headers.c
+@@ -262,6 +262,5 @@ module AP_MODULE_DECLARE_DATA headers_module =
+     create_headers_config,      /* server config */
+     merge_headers_config,       /* merge server configs */
+     headers_cmds,               /* command apr_table_t */
+-    NULL,                       /* handlers */
+     register_hooks		/* register hooks */
+ };
+diff --git a/modules/metadata/mod_usertrack.c b/modules/metadata/mod_usertrack.c
+index 811426b..80dd3c1 100644
+--- a/modules/metadata/mod_usertrack.c
++++ b/modules/metadata/mod_usertrack.c
+@@ -319,6 +319,5 @@ module AP_MODULE_DECLARE_DATA usertrack_module = {
+     make_cookie_log_state,      /* server config */
+     NULL,                       /* merge server configs */
+     cookie_log_cmds,            /* command apr_table_t */
+-    NULL,                       /* handlers */
+     register_hooks		/* register hooks */
+ };
+diff --git a/os/win32/mod_isapi.c b/os/win32/mod_isapi.c
+index 64a93ba..f7dfe6d 100644
+--- a/os/win32/mod_isapi.c
++++ b/os/win32/mod_isapi.c
+@@ -347,15 +347,20 @@ static int isapi_unload(isapi_loaded* isa, int force)
+ 
+ apr_status_t isapi_handler (request_rec *r)
+ {
+-    isapi_server_conf *sconf = ap_get_module_config(r->server->module_config, 
+-                                                    &isapi_module);
+-    apr_table_t *e = r->subprocess_env;
++    isapi_server_conf * sconf;
++    apr_table_t *e;
+     apr_status_t rv;
+     isapi_loaded *isa;
+     isapi_cid *cid;
+     DWORD read;
+     int res;
+     
++    if(strcmp(r->handler, "isapi-isa"))
++        return DECLINED;    
++
++    sconf = ap_get_module_config(r->server->module_config, &isapi_module);
++    e = r->subprocess_env;
++
+     /* Use similar restrictions as CGIs
+      *
+      * If this fails, it's pointless to load the isapi dll.
+@@ -1262,6 +1267,7 @@ static const char *isapi_cmd_cachefile(cmd_parms *cmd, void *dummy,
+ static void isapi_hooks(void)
+ {
+     ap_hook_post_config(isapi_post_config, NULL, NULL, AP_HOOK_MIDDLE);
++    ap_hook_handler(isapi_handler, NULL, NULL, AP_HOOK_MIDDLE);
+ }
+ 
+ static const command_rec isapi_cmds[] = {
+@@ -1278,11 +1284,6 @@ AP_INIT_ITERATE("ISAPICacheFile", isapi_cmd_cachefile, NULL, RSRC_CONF,
+ { NULL }
+ };
+ 
+-handler_rec isapi_handlers[] = {
+-    { "isapi-isa", isapi_handler },
+-    { NULL}
+-};
+-
+ module isapi_module = {
+    STANDARD20_MODULE_STUFF,
+    NULL,                        /* create per-dir config */
+@@ -1290,6 +1291,5 @@ module isapi_module = {
+    create_isapi_server_config,  /* server config */
+    NULL,                        /* merge server config */
+    isapi_cmds,                  /* command apr_table_t */
+-   isapi_handlers,              /* handlers */
+    isapi_hooks                  /* register hooks */
+ };
+diff --git a/server/config.c b/server/config.c
+index 573591c..ea0f432 100644
+--- a/server/config.c
++++ b/server/config.c
+@@ -132,8 +132,8 @@ AP_IMPLEMENT_HOOK_VOID(open_logs,
+ AP_IMPLEMENT_HOOK_VOID(child_init,
+                        (apr_pool_t *pchild, server_rec *s),(pchild,s))
+ 
+-AP_IMPLEMENT_HOOK_RUN_FIRST(int,handler,(const char *handler,request_rec *r),
+-			    (handler,r),DECLINED)
++AP_IMPLEMENT_HOOK_RUN_FIRST(int,handler,(request_rec *r),
++			    (r),DECLINED)
+ 
+ /****************************************************************
+  *
+@@ -283,11 +283,9 @@ int ap_invoke_handler(request_rec *r)
+     char *p2;
+     int result;
+     char hbuf[MAX_STRING_LEN];
++    const char *old_handler = r->handler;
+ 
+-    if (r->handler) {
+-        handler = r->handler;
+-    }
+-    else {
++    if (!r->handler) {
+         handler = r->content_type ? r->content_type : ap_default_type(r);
+         if ((p=ap_strchr_c(handler, ';')) != NULL) {
+ 	    apr_cpystrn(hbuf, handler, sizeof hbuf);
+@@ -298,9 +296,12 @@ int ap_invoke_handler(request_rec *r)
+ 	        --p2;		/* strip trailing spaces */
+ 	    *p2='\0';
+ 	}
++        r->handler = handler;
+     }
+ 
+-    result = ap_run_handler(handler ,r);
++    result = ap_run_handler(r);
++
++    r->handler = old_handler;
+ 
+     if (result == DECLINED && r->handler && r->filename) {
+         ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r,
+diff --git a/server/mpm/winnt/mpm_winnt.c b/server/mpm/winnt/mpm_winnt.c
+index 6ad24f3..2a2303c 100644
+--- a/server/mpm/winnt/mpm_winnt.c
++++ b/server/mpm/winnt/mpm_winnt.c
+@@ -2348,6 +2348,5 @@ AP_MODULE_DECLARE_DATA module mpm_winnt_module = {
+     NULL,			/* create per-server config structure */
+     NULL,			/* merge per-server config structures */
+     winnt_cmds,		        /* command apr_table_t */
+-    NULL,			/* handlers */
+     winnt_hooks 		/* register_hooks */
+ };

@@ -1,0 +1,39 @@
+commit e513f6263300954af67a89447086816ad467d410
+Author: Eric Covener <covener@apache.org>
+Date:   Sun Jan 24 20:54:05 2010 +0000
+
+    Change LDAP authentication failures (user->DN or password check) to log
+    level INFO from log level WARNING.  This is still liberal for authn
+    providers.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@902641 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 0126552..e078220 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,10 @@
+ 
+ Changes with Apache 2.3.6
+ 
++  *) mod_authnz_ldap: Failures to map a username to a DN, or to check a user
++     password now result in an informational level log entry instead of 
++     warning level.  [Eric Covener]
++
+ Changes with Apache 2.3.5
+ 
+   *) Ensure each subrequest has a shallow copy of headers_in so that the
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 15aec4d..28e0bb5 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -417,7 +417,7 @@ start_over:
+            return AUTH_USER_NOT_FOUND;
+         }
+ 
+-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
++        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                       "[%" APR_PID_T_FMT "] auth_ldap authenticate: "
+                       "user %s authentication failed; URI %s [%s][%s]",
+                       getpid(), user, r->uri, ldc->reason, ldap_err2string(result));

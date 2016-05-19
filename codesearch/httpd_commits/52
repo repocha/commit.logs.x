@@ -1,0 +1,23 @@
+commit 1803f8dd6d8cfe5e97d2350afd6d0e5c40925882
+Author: Eric Covener <covener@apache.org>
+Date:   Mon Jun 24 20:32:31 2013 +0000
+
+    revert r1496183, leave at DEBUG. This not a subgroup message.
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1496202 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 8747010..d46eeb4 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -891,7 +891,7 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+             return AUTHZ_GRANTED;
+         }
+         else { 
+-                ap_log_rerror(APLOG_MARK, APLOG_TRACE4, 0, r, APLOGNO(01719)
++                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01719)
+                               "auth_ldap authorize: require group \"%s\": "
+                               "didn't match with attr %s [%s][%d - %s]",
+                               t, ent[i].name, ldc->reason, result, 

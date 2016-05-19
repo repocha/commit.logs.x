@@ -1,0 +1,235 @@
+commit 88213b20bf3e4e5803ae930dcd99802bd78f3abe
+Author: Jeff Trawick <trawick@apache.org>
+Date:   Sat Mar 12 00:35:39 2011 +0000
+
+    fix some grammar mistakes, mostly in comments
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1080821 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/http_config.h b/include/http_config.h
+index 6c09410..f7896bc 100644
+--- a/include/http_config.h
++++ b/include/http_config.h
+@@ -102,9 +102,9 @@ typedef union {
+ 
+ /** This configuration directive does not take any arguments */
+ # define AP_NO_ARGS	func.no_args
+-/** This configuration directive will handle it's own parsing of arguments*/
++/** This configuration directive will handle its own parsing of arguments*/
+ # define AP_RAW_ARGS	func.raw_args
+-/** This configuration directive will handle it's own parsing of arguments*/
++/** This configuration directive will handle its own parsing of arguments*/
+ # define AP_TAKE_ARGV	func.take_argv
+ /** This configuration directive takes 1 argument*/
+ # define AP_TAKE1	func.take1
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index b137059..81b884f 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -1340,7 +1340,7 @@ static void note_digest_auth_failure(request_rec *r,
+ 
+     /* don't send domain
+      * - for proxy requests
+-     * - if it's no specified
++     * - if it's not specified
+      */
+     if (r->proxyreq || !conf->uri_list) {
+         domain = NULL;
+diff --git a/modules/arch/win32/mod_isapi.h b/modules/arch/win32/mod_isapi.h
+index 44c845b..dcef4fc 100644
+--- a/modules/arch/win32/mod_isapi.h
++++ b/modules/arch/win32/mod_isapi.h
+@@ -257,7 +257,7 @@ typedef int (APR_THREAD_FUNC *PFN_TERMINATEEXTENSION)(apr_uint32_t flags);
+ 
+ /* Module may return 0 if passed HSE_TERM_ADVISORY_UNLOAD, and the module
+  * will remain loaded, or 1 if it consents to being unloaded. If the module
+- * is passed HSE_TERM_MUST_UNLOAD, it's return value is ignored.
++ * is passed HSE_TERM_MUST_UNLOAD, its return value is ignored.
+  */
+ #define HSE_TERM_MUST_UNLOAD      1
+ #define HSE_TERM_ADVISORY_UNLOAD  2
+diff --git a/modules/cache/cache_pqueue.h b/modules/cache/cache_pqueue.h
+index 4696486..b658bb7 100644
+--- a/modules/cache/cache_pqueue.h
++++ b/modules/cache/cache_pqueue.h
+@@ -141,7 +141,7 @@ void cache_pq_print(cache_pqueue_t *q,
+                     cache_pqueue_print_entry print);
+ 
+ /**
+- * dump the queue and it's internal structure
++ * dump the queue and its internal structure
+  * @internal
+  * debug function only
+  * @param q the queue
+diff --git a/modules/filters/mod_sed.c b/modules/filters/mod_sed.c
+index 5252f3e..8c67706 100644
+--- a/modules/filters/mod_sed.c
++++ b/modules/filters/mod_sed.c
+@@ -306,7 +306,7 @@ static apr_status_t sed_response_filter(ap_filter_t *f,
+      * sed_write_output which will add the output to ctx->bb. At the end of
+      * the loop, ctx->bb is passed to the next filter in chain. At the end of
+      * the data, if new line is not found then sed_eval_buffer will store the
+-     * data in it's own buffer.
++     * data in its own buffer.
+      *
+      * Once eos bucket is found then sed_finalize_eval will flush the rest of
+      * the data. If there is no new line in last line of data, new line is
+@@ -424,7 +424,7 @@ static apr_status_t sed_request_filter(ap_filter_t *f,
+     /* Here is the logic :
+      * Read the readbytes data from next level fiter into bbinp. Loop through
+      * the buckets in bbinp and read the data from buckets and invoke
+-     * sed_eval_buffer on the data. libsed will generate it's output using
++     * sed_eval_buffer on the data. libsed will generate its output using
+      * sed_write_output which will add data in ctx->bb. Do it until it have
+      * atleast one bucket bucket in ctx->bb. At the end of data eos bucket
+      * should be there.
+diff --git a/modules/http/http_request.c b/modules/http/http_request.c
+index 852b3e1..ed16708 100644
+--- a/modules/http/http_request.c
++++ b/modules/http/http_request.c
+@@ -371,7 +371,7 @@ void ap_process_request(request_rec *r)
+              * valuable for detecting clients with broken network
+              * connections or possible DoS attacks.
+              *
+-             * It is still save to use r / r->pool here as the eor bucket
++             * It is still safe to use r / r->pool here as the eor bucket
+              * could not have been destroyed in the event of a timeout.
+              */
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, rv, r,
+diff --git a/modules/ldap/util_ldap.c b/modules/ldap/util_ldap.c
+index 9c15110..e714938 100644
+--- a/modules/ldap/util_ldap.c
++++ b/modules/ldap/util_ldap.c
+@@ -192,7 +192,7 @@ static apr_status_t uldap_connection_unbind(void *param)
+  * Clean up an LDAP connection by unbinding and unlocking the connection.
+  * This cleanup does not remove the util_ldap_connection_t from the 
+  * per-virtualhost list of connections, does not remove the storage
+- * for the util_ldap_connection_t or it's data, and is NOT run automatically.
++ * for the util_ldap_connection_t or its data, and is NOT run automatically.
+  */
+ static apr_status_t uldap_connection_cleanup(void *param)
+ {
+diff --git a/modules/proxy/mod_proxy.c b/modules/proxy/mod_proxy.c
+index 1a5ad17..ce5a83a 100644
+--- a/modules/proxy/mod_proxy.c
++++ b/modules/proxy/mod_proxy.c
+@@ -67,7 +67,7 @@ static const char *set_worker_param(apr_pool_t *p,
+          */
+         worker->s->lbfactor = atoi(val);
+         if (worker->s->lbfactor < 1 || worker->s->lbfactor > 100)
+-            return "LoadFactor must be number between 1..100";
++            return "LoadFactor must be a number between 1..100";
+     }
+     else if (!strcasecmp(key, "retry")) {
+         /* If set it will give the retry timeout for the worker
+diff --git a/modules/proxy/mod_proxy_balancer.c b/modules/proxy/mod_proxy_balancer.c
+index cf4c739..24febdd 100644
+--- a/modules/proxy/mod_proxy_balancer.c
++++ b/modules/proxy/mod_proxy_balancer.c
+@@ -149,7 +149,7 @@ static char *get_path_param(apr_pool_t *pool, char *url,
+         path += strlen(name);
+         if (*path == '=') {
+             /*
+-             * Session path was found, get it's value
++             * Session path was found, get its value
+              */
+             ++path;
+             if (*path) {
+@@ -180,7 +180,7 @@ static char *get_cookie_param(request_rec *r, const char *name)
+                     ++start_cookie;
+                 if (*start_cookie++ == '=' && *start_cookie) {
+                     /*
+-                     * Session cookie was found, get it's value
++                     * Session cookie was found, get its value
+                      */
+                     char *end_cookie, *cookie;
+                     cookie = apr_pstrdup(r->pool, start_cookie);
+@@ -654,7 +654,7 @@ static void recalc_factors(proxy_balancer *balancer)
+ 
+     /* Recalculate lbfactors */
+     workers = (proxy_worker **)balancer->workers->elts;
+-    /* Special case if there is only one worker it's
++    /* Special case if there is only one worker its
+      * load factor will always be 1
+      */
+     if (balancer->workers->nelts == 1) {
+diff --git a/modules/ssl/ssl_engine_kernel.c b/modules/ssl/ssl_engine_kernel.c
+index 60b2b71..e8df047 100644
+--- a/modules/ssl/ssl_engine_kernel.c
++++ b/modules/ssl/ssl_engine_kernel.c
+@@ -1610,7 +1610,7 @@ int ssl_callback_SSLVerify_CRL(int ok, X509_STORE_CTX *ctx, conn_rec *c)
+      * We come through this procedure for each certificate in the certificate
+      * chain, starting with the root-CA's certificate. At each step we've to
+      * both verify the signature on the CRL (to make sure it's a valid CRL)
+-     * and it's revocation list (to make sure the current certificate isn't
++     * and its revocation list (to make sure the current certificate isn't
+      * revoked).  But because to check the signature on the CRL we need the
+      * public key of the issuing CA certificate (which was already processed
+      * one round before), we've a little problem. But we can both solve it and
+@@ -1634,7 +1634,7 @@ int ssl_callback_SSLVerify_CRL(int ok, X509_STORE_CTX *ctx, conn_rec *c)
+ 
+     /*
+      * Try to retrieve a CRL corresponding to the _subject_ of
+-     * the current certificate in order to verify it's integrity.
++     * the current certificate in order to verify its integrity.
+      */
+     memset((char *)&obj, 0, sizeof(obj));
+     rc = SSL_X509_STORE_lookup(mctx->crl,
+diff --git a/modules/ssl/ssl_engine_pphrase.c b/modules/ssl/ssl_engine_pphrase.c
+index 3cea72d..61ab0a6 100644
+--- a/modules/ssl/ssl_engine_pphrase.c
++++ b/modules/ssl/ssl_engine_pphrase.c
+@@ -813,7 +813,7 @@ int ssl_pphrase_Handle_CB(char *buf, int bufsize, int verify, void *srv)
+     *cppPassPhraseCur = apr_pstrdup(p, buf);
+ 
+     /*
+-     * And return it's length to OpenSSL...
++     * And return its length to OpenSSL...
+      */
+     return (len);
+ }
+diff --git a/server/core.c b/server/core.c
+index caa02e6..f764df6 100644
+--- a/server/core.c
++++ b/server/core.c
+@@ -231,7 +231,7 @@ static void *merge_core_dir_configs(apr_pool_t *a, void *basev, void *newv)
+         conf->response_code_strings = new->response_code_strings;
+     }
+     else if (new->response_code_strings != NULL) {
+-        /* If we merge, the merge-result must have it's own array
++        /* If we merge, the merge-result must have its own array
+          */
+         conf->response_code_strings = apr_pmemdup(a,
+             base->response_code_strings,
+@@ -297,7 +297,7 @@ static void *merge_core_dir_configs(apr_pool_t *a, void *basev, void *newv)
+         conf->sec_file = new->sec_file;
+     }
+     else if (new->sec_file) {
+-        /* If we merge, the merge-result must have it's own array
++        /* If we merge, the merge-result must have its own array
+          */
+         conf->sec_file = apr_array_append(a, base->sec_file, new->sec_file);
+     }
+@@ -308,7 +308,7 @@ static void *merge_core_dir_configs(apr_pool_t *a, void *basev, void *newv)
+         conf->sec_if = new->sec_if;
+     }
+     else if (new->sec_if) {
+-        /* If we merge, the merge-result must have it's own array
++        /* If we merge, the merge-result must have its own array
+          */
+         conf->sec_if = apr_array_append(a, base->sec_if, new->sec_if);
+     }
+diff --git a/server/mpm/winnt/service.c b/server/mpm/winnt/service.c
+index adfea4a..ffe736d 100644
+--- a/server/mpm/winnt/service.c
++++ b/server/mpm/winnt/service.c
+@@ -291,7 +291,7 @@ static int ReportStatusToSCMgr(int currentState, int waitHint,
+ }
+ 
+ /* Note this works on Win2000 and later due to ChangeServiceConfig2
+- * Continue to test it's existence, but at least drop the feature
++ * Continue to test its existence, but at least drop the feature
+  * of revising service description tags prior to Win2000.
+  */
+ 

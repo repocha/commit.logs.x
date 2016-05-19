@@ -1,0 +1,26 @@
+commit 8382cc70eafe8df06b431e3e2a9c87bbb0878bc0
+Author: Eric Covener <covener@apache.org>
+Date:   Fri Jan 23 12:21:34 2015 +0000
+
+    as in r1517366, drop the severity in authz_groupfile when a require
+    didn't match but no real error was encountered.
+    
+    This individual 'require group' may not really dictate who gets in. PR55523
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1654184 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authz_groupfile.c b/modules/aaa/mod_authz_groupfile.c
+index 261f2fb..e1df129 100644
+--- a/modules/aaa/mod_authz_groupfile.c
++++ b/modules/aaa/mod_authz_groupfile.c
+@@ -194,7 +194,7 @@ static authz_status group_check_authorization(request_rec *r,
+         }
+     }
+ 
+-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(01667)
++    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(01667)
+                     "Authorization of user %s to access %s failed, reason: "
+                     "user is not part of the 'require'ed group(s).",
+                     r->user, r->uri);

@@ -1,0 +1,102 @@
+commit 7b3ea72e1859dcf8168a459b3efd67499c739b6f
+Author: Eric Covener <covener@apache.org>
+Date:   Sun May 8 18:36:17 2011 +0000
+
+    PR51163: Resolve crashes when LDAP is used for authorization-only
+    
+    Submitted By: Scott Hill <shill genscape.com>
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1100786 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 354d4cd..ea7b651 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,9 @@
+ 
+ Changes with Apache 2.3.12
+ 
++  *) mod_authnz_ldap: Resolve crash when LDAP is used for authorization only
++     [Scott Hill <shill genscape.com>]
++
+   *) support: Make sure check_forensic works with mod_unique_id loaded
+      [Joe Schaefer]
+ 
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index eb77dad..8c1e6c5 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -827,6 +827,8 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+             "ldap authorize: Creating LDAP req structure");
+ 
++        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
++            sizeof(authn_ldap_request_t));
+         /* Build the username filter */
+         authn_ldap_build_filter(filtbuf, r, r->user, NULL, sec);
+ 
+@@ -841,8 +843,6 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+             return AUTHZ_DENIED;
+         }
+ 
+-        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
+-            sizeof(authn_ldap_request_t));
+         ap_set_module_config(r->request_config, &authnz_ldap_module, req);
+         req->dn = apr_pstrdup(r->pool, dn);
+         req->user = r->user;
+@@ -1005,6 +1005,8 @@ static authz_status ldapdn_check_authorization(request_rec *r,
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+             "ldap authorize: Creating LDAP req structure");
+ 
++        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
++            sizeof(authn_ldap_request_t));
+         /* Build the username filter */
+         authn_ldap_build_filter(filtbuf, r, r->user, NULL, sec);
+ 
+@@ -1019,8 +1021,6 @@ static authz_status ldapdn_check_authorization(request_rec *r,
+             return AUTHZ_DENIED;
+         }
+ 
+-        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
+-            sizeof(authn_ldap_request_t));
+         ap_set_module_config(r->request_config, &authnz_ldap_module, req);
+         req->dn = apr_pstrdup(r->pool, dn);
+         req->user = r->user;
+@@ -1115,6 +1115,8 @@ static authz_status ldapattribute_check_authorization(request_rec *r,
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+             "ldap authorize: Creating LDAP req structure");
+ 
++        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
++            sizeof(authn_ldap_request_t));
+         /* Build the username filter */
+         authn_ldap_build_filter(filtbuf, r, r->user, NULL, sec);
+ 
+@@ -1129,8 +1131,6 @@ static authz_status ldapattribute_check_authorization(request_rec *r,
+             return AUTHZ_DENIED;
+         }
+ 
+-        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
+-            sizeof(authn_ldap_request_t));
+         ap_set_module_config(r->request_config, &authnz_ldap_module, req);
+         req->dn = apr_pstrdup(r->pool, dn);
+         req->user = r->user;
+@@ -1229,6 +1229,8 @@ static authz_status ldapfilter_check_authorization(request_rec *r,
+         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+             "ldap authorize: Creating LDAP req structure");
+ 
++        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
++            sizeof(authn_ldap_request_t));
+         /* Build the username filter */
+         authn_ldap_build_filter(filtbuf, r, r->user, NULL, sec);
+ 
+@@ -1243,8 +1245,6 @@ static authz_status ldapfilter_check_authorization(request_rec *r,
+             return AUTHZ_DENIED;
+         }
+ 
+-        req = (authn_ldap_request_t *)apr_pcalloc(r->pool,
+-            sizeof(authn_ldap_request_t));
+         ap_set_module_config(r->request_config, &authnz_ldap_module, req);
+         req->dn = apr_pstrdup(r->pool, dn);
+         req->user = r->user;

@@ -1,0 +1,4215 @@
+commit ac1a23820fd92ffa3b2994f4dea07878a0003d5b
+Author: William A. Rowe Jr <wrowe@apache.org>
+Date:   Thu Dec 21 01:04:49 2000 +0000
+
+      The Win32 overhaul, in summary;
+        Modules are named mod_foo.so
+        Dynamic Libraries are named libfoo.dll, and are stored in bin/
+        The former ApacheCoreDll is now libhttpd.dll
+        Apache.exe moves to bin/
+        The make install now copies include, lib, and libexec
+        All build options are normalized, filenames adjusted appropriately
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@87471 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/Apache.dsp b/Apache.dsp
+index 7128df1..42affc7 100644
+--- a/Apache.dsp
++++ b/Apache.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="Apache" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=Apache - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -32,42 +31,41 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\ApacheLa"
+-# PROP BASE Intermediate_Dir ".\ApacheLa"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\ApacheR"
+-# PROP Intermediate_Dir ".\ApacheR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I "./include" /I "./os/win32" /I "./srclib/apr/include" /I "./srclib/apr-util/include" /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "SHARED_MODULE" /YX /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "./include" /I "./os/win32" /I "./srclib/apr/include" /I "./srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_CONSOLE" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /I "./include" /I "./os/win32" /I "./srclib/apr/include" /I "./srclib/apr-util/include" /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "SHARED_MODULE" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "./include" /I "./os/win32" /I "./srclib/apr/include" /I "./srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_CONSOLE" /Fd"Release\Apache" /FD /c
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+ # ADD RSC /l 0x809 /d "NDEBUG"
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:console /map /machine:I386
+-# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:console /map /machine:I386
++# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:console /incremental:no /map /machine:I386
++# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:console /incremental:no /map /machine:I386
+ 
+ !ELSEIF  "$(CFG)" == "Apache - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\ApacheL0"
+-# PROP BASE Intermediate_Dir ".\ApacheL0"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\ApacheD"
+-# PROP Intermediate_Dir ".\ApacheD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /ZI /Od /I "./include" /I "./os/win32" /I "./srclib/apr/include" /I "./srclib/apr-util/include" /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /YX /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "./include" /I "./os/win32" /I "./srclib/apr/include" /I "./srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /FD /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /I "./include" /I "./os/win32" /I "./srclib/apr/include" /I "./srclib/apr-util/include" /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "./include" /I "./os/win32" /I "./srclib/apr/include" /I "./srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /Fd"Debug\Apache" /FD /c
+ # SUBTRACT CPP /YX
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+ # ADD RSC /l 0x809 /d "_DEBUG"
+@@ -75,9 +73,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:console /map /debug /machine:I386
+-# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:console /debug /machine:I386
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:console /incremental:no /map /debug /machine:I386
++# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:console /incremental:no /map /debug /machine:I386
+ 
+ !ENDIF 
+ 
+diff --git a/Apache.dsw b/Apache.dsw
+index 833a89b..85b47cd 100644
+--- a/Apache.dsw
++++ b/Apache.dsw
+@@ -12,19 +12,19 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+ ###############################################################################
+ 
+-Project: "ApacheCore"=".\ApacheCore.dsp" - Package Owner=<4>
++Project: "httpd"=".\httpd.dsp" - Package Owner=<4>
+ 
+ Package=<5>
+ {{{
+@@ -42,16 +42,16 @@ Package=<4>
+     Project_Dep_Name sdbmlib
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+ ###############################################################################
+ 
+-Project: "ApacheCoreDll"=".\ApacheCoreDll.dsp" - Package Owner=<4>
++Project: "libhttpd"=".\libhttpd.dsp" - Package Owner=<4>
+ 
+ Package=<5>
+ {{{
+@@ -60,7 +60,7 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name pcre
+@@ -69,13 +69,13 @@ Package=<4>
+     Project_Dep_Name pcreposix
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCore
++    Project_Dep_Name httpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name expatlib
++    Project_Dep_Name libexpat
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -90,10 +90,10 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCore
++    Project_Dep_Name httpd
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name Apache
+@@ -147,16 +147,16 @@ Package=<4>
+     Project_Dep_Name ab
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name pcreposix
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name expatlib
++    Project_Dep_Name libexpat
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name mod_dav
+@@ -180,7 +180,7 @@ Package=<4>
+     Project_Dep_Name aprlib
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCore
++    Project_Dep_Name httpd
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name aprutil
+@@ -201,7 +201,7 @@ Package=<4>
+ 
+ ###############################################################################
+ 
+-Project: "aprlibdll"=".\srclib\apr\aprlibdll.dsp" - Package Owner=<4>
++Project: "libapr"=".\srclib\apr\libapr.dsp" - Package Owner=<4>
+ 
+ Package=<5>
+ {{{
+@@ -225,13 +225,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+ }}}
+ 
+ ###############################################################################
+ 
+-Project: "aprutildll"=".\srclib\apr-util\aprutildll.dsp" - Package Owner=<4>
++Project: "libaprutil"=".\srclib\apr-util\libaprutil.dsp" - Package Owner=<4>
+ 
+ Package=<5>
+ {{{
+@@ -240,7 +240,7 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name aprutil
+@@ -261,7 +261,7 @@ Package=<4>
+ 
+ ###############################################################################
+ 
+-Project: "expatlib"=".\srclib\expat-lite\expatlib.dsp" - Package Owner=<4>
++Project: "libexpat"=".\srclib\expat-lite\libexpat.dsp" - Package Owner=<4>
+ 
+ Package=<5>
+ {{{
+@@ -339,7 +339,7 @@ Package=<4>
+     Project_Dep_Name aprlib
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCore
++    Project_Dep_Name httpd
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name aprutil
+@@ -375,13 +375,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -396,16 +396,16 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name sdbmlib
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -420,13 +420,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -441,13 +441,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -462,13 +462,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -483,10 +483,10 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+     Project_Dep_Name sdbmlib
+@@ -495,10 +495,10 @@ Package=<4>
+     Project_Dep_Name mod_dav
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name expatlib
++    Project_Dep_Name libexpat
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -513,13 +513,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -534,13 +534,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -555,13 +555,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -576,13 +576,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -597,13 +597,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -618,13 +618,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -639,13 +639,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -660,13 +660,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+@@ -681,13 +681,13 @@ Package=<5>
+ Package=<4>
+ {{{
+     Begin Project Dependency
+-    Project_Dep_Name aprlibdll
++    Project_Dep_Name libapr
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name ApacheCoreDll
++    Project_Dep_Name libhttpd
+     End Project Dependency
+     Begin Project Dependency
+-    Project_Dep_Name aprutildll
++    Project_Dep_Name libaprutil
+     End Project Dependency
+ }}}
+ 
+diff --git a/ApacheCore.def b/ApacheCore.def
+deleted file mode 100644
+index 1e1dd31..0000000
+--- a/ApacheCore.def
++++ /dev/null
+@@ -1,420 +0,0 @@
+-; apachecore.def : 
+-
+-LIBRARY ApacheCore
+-DESCRIPTION ''
+-
+-EXPORTS
+-	; Add new API calls to the end of this list.
+-
+-
+-
+-
+-	ap_add_cgi_vars
+-	ap_add_common_vars
+-	ap_add_loaded_module
+-	ap_add_module
+-	ap_add_named_module
+-	ap_add_per_dir_conf
+-	ap_add_per_url_conf
+-        ap_add_version_component
+-	ap_allow_options
+-	ap_allow_overrides
+-
+-
+-	ap_auth_name
+-	ap_auth_type
+-	ap_basic_http_header
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-	ap_cfg_closefile
+-	ap_cfg_getc
+-	ap_cfg_getline
+-	ap_chdir_file
+-
+-	ap_check_cmd_context
+-	ap_checkmask
+-
+-	ap_clear_module_list
+-
+-
+-	ap_close_piped_log
+-	ap_construct_server
+-	ap_construct_url
+-	ap_content_type_tolower
+-
+-
+-	ap_core_translate
+-	ap_count_dirs
+-
+-	ap_create_environment
+-
+-	ap_create_per_dir_config
+-	ap_custom_response
+-	ap_default_port_for_request
+-	ap_default_port_for_scheme
+-	ap_default_type
+-
+-
+-	ap_destroy_sub_req
+-	ap_die
+-	ap_discard_request_body
+-	ap_document_root
+-	
+-	ap_error_log2stderr
+-	ap_escape_html
+-	ap_escape_path_segment
+-	ap_escape_quotes
+-	ap_escape_shell_cmd
+-
+-	ap_finalize_request_protocol
+-	ap_find_command
+-	ap_find_command_in_modules
+-	ap_find_last_token
+-	ap_find_linked_module
+-	ap_find_module_name
+-	ap_find_path_info
+-	ap_find_token
+-	ap_get_basic_auth_pw
+-	ap_get_client_block
+-
+-	ap_get_limit_req_body
+-	ap_get_remote_host
+-	ap_get_remote_logname
+-	ap_get_server_built
+-	ap_get_server_name
+-	ap_get_server_port
+-	ap_get_server_version
+-
+-	ap_get_token
+-	ap_getparents
+-	ap_getword
+-	ap_getword_conf
+-	ap_getword_conf_nc
+-	ap_getword_nc
+-	ap_getword_nulls
+-	ap_getword_nulls_nc
+-	ap_getword_white
+-	ap_getword_white_nc
+-
+-	ap_gname2id
+-
+-
+-	ap_ht_time
+-	ap_ind
+-	ap_index_of_response
+-	ap_init_virtual_host
+-	ap_internal_redirect
+-	ap_internal_redirect_handler
+-	ap_is_directory
+-
+-	ap_is_initial_req
+-	ap_is_matchexp
+-	ap_is_url
+-
+-
+-
+-
+-	ap_log_assert
+-
+-
+-
+-
+-
+-	ap_make_dirstr_parent
+-	ap_make_dirstr_prefix
+-	ap_make_full_path
+-
+-
+-	ap_matches_request_vhost
+-	ap_md5
+-	ap_md5_binary
+-	ap_md5contextTo64
+-	ap_md5digest
+-	ap_meets_conditions
+-	ap_no2slash
+-	ap_note_auth_failure
+-	ap_note_basic_auth_failure
+-
+-
+-
+-
+-	ap_note_digest_auth_failure
+-
+-
+-	ap_open_piped_log
+-	ap_os_canonical_filename
+-	ap_os_case_canonical_filename
+-	ap_os_escape_path
+-
+-
+-	ap_parseHTTPdate
+-	ap_parse_hostinfo_components
+-	ap_parse_uri
+-	ap_parse_uri_components
+-
+-	ap_pcfg_open_custom
+-	ap_pcfg_openfile
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-	ap_pregcomp
+-	ap_pregfree
+-	ap_pregsub
+-	ap_psignature
+-
+-
+-
+-
+-
+-	ap_rationalize_mtime
+-
+-
+-	ap_remove_loaded_module
+-	ap_remove_module
+-	ap_requires
+-
+-	ap_rflush
+-	ap_rind
+-	ap_rputc
+-	ap_rputs
+-
+-	ap_run_sub_req
+-	ap_rwrite
+-	ap_satisfies
+-	ap_scan_script_header_err
+-
+-	ap_scan_script_header_err_core
+-	ap_scan_script_header_err_strs
+-
+-	ap_send_fd
+-
+-	ap_send_http_header
+-	ap_send_http_trace
+-        ap_send_mmap
+-	ap_send_size
+-	ap_server_root_relative
+-	
+-	ap_set_content_length
+-	ap_set_etag
+-	ap_set_keepalive
+-	ap_set_last_modified
+-	ap_setup_client_block
+-	ap_should_client_block
+-
+-	ap_some_auth_required
+-
+-
+-	ap_str_tolower
+-	ap_strcasecmp_match
+-	ap_strcmp_match
+-	ap_sub_req_lookup_file
+-	ap_sub_req_lookup_uri
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-	ap_uname2id
+-
+-	ap_unescape_url
+-	ap_unparse_uri_components
+-	ap_update_mtime
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-	regcomp
+-	regexec
+-	regfree
+-	access_module
+-	alias_module
+-
+-
+-
+-
+-	ap_limit_section
+-	ap_loaded_modules
+-	ap_log_error
+-
+-	ap_log_rerror
+-
+-
+-
+-
+-
+-	ap_rprintf
+-	ap_rvputs
+-
+-
+-	ap_server_argv0
+-	ap_server_root
+-	ap_set_file_slot
+-	ap_set_flag_slot
+-	ap_set_string_slot
+-	ap_set_string_slot_lower
+-
+-
+-
+-
+-	asis_module
+-	auth_module
+-	autoindex_module
+-
+-	config_log_module
+-	core_module
+-	dir_module
+-	env_module
+-	imap_module
+-
+-	mime_module
+-	negotiation_module
+-
+-	setenvif_module
+-
+-	top_module
+-
+-	ap_method_number_of
+-	ap_exists_config_define
+-	ap_single_module_configure
+-	ap_make_etag
+-
+-
+-	ap_find_list_item
+-
+-
+-	ap_size_list_item
+-	ap_get_list_item
+-
+-        ap_get_status_line
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-	ap_sub_req_method_uri
+-	ap_regerror
+-	ap_regexec
+-	ap_field_noparam
+-	ap_show_hook
+-	ap_hook_sort_register
+-	ap_hook_process_connection
+-	ap_process_http_connection
+-	ap_hook_check_user_id
+-	ap_hook_auth_checker
+-	ap_hook_fixups
+-        regerror
+-        ap_send_error_response
+-	ap_start_shutdown
+-
+-        ap_read_config
+-	ap_server_pre_read_config
+-	ap_server_post_read_config
+-	ap_setup_prelinked_modules
+-
+-
+-
+-
+-        ap_debug_module_hooks
+-        ap_debug_module_name
+-        ap_global_hook_pool
+-        ap_hook_pre_connection
+-        ap_hook_post_read_request
+-        ap_hook_log_transaction
+-        ap_hook_http_method
+-        ap_hook_default_port
+-        ap_hook_translate_name
+-        ap_hook_type_checker
+-        ap_hook_access_checker
+-        ap_hook_header_parser
+-        ap_hook_post_config
+-        ap_hook_open_logs
+-        ap_hook_child_init
+-
+-        ap_get_status_table
+-        ap_run_default_port
+-        ap_run_http_method
+-
+-
+-
+-
+-;       Exclusively provided for http_main.c
+-        ap_register_hooks
+-        ap_prelinked_modules
+-        ap_preloaded_modules
+-        ap_post_config_hook
+-        ap_run_pre_config
+-        ap_run_rewrite_args
+-        ap_show_directives
+-        ap_show_modules
+-        ap_util_uri_init
+-        ap_mpm_run
+-        ap_hook_deregister_all
+-        ap_run_open_logs
+-        ap_process_config_tree
+-        ap_server_config_defines
+-        ap_sort_hooks
+-	ap_fini_vhost_config
+-	ap_fixup_virtual_hosts
+-        ap_conftree
+-        
+-; 
+-; util_xml.h
+-       ap_text_append
+-       ap_xml_parse_input
+-       ap_xml_to_text
+-       ap_xml_empty_elem
+-       ap_xml_quote_string
+-       ap_xml_quote_elem
+-       ap_xml_insert_uri
+-
+-       ap_os_create_privileged_process
+diff --git a/ApacheCore.dsp b/ApacheCore.dsp
+deleted file mode 100644
+index 417addf..0000000
+--- a/ApacheCore.dsp
++++ /dev/null
+@@ -1,464 +0,0 @@
+-# Microsoft Developer Studio Project File - Name="ApacheCore" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
+-# ** DO NOT EDIT **
+-
+-# TARGTYPE "Win32 (x86) Static Library" 0x0104
+-
+-CFG=ApacheCore - Win32 Debug
+-!MESSAGE This is not a valid makefile. To build this project using NMAKE,
+-!MESSAGE use the Export Makefile command and run
+-!MESSAGE 
+-!MESSAGE NMAKE /f "ApacheCore.mak".
+-!MESSAGE 
+-!MESSAGE You can specify a configuration when running NMAKE
+-!MESSAGE by defining the macro CFG on the command line. For example:
+-!MESSAGE 
+-!MESSAGE NMAKE /f "ApacheCore.mak" CFG="ApacheCore - Win32 Debug"
+-!MESSAGE 
+-!MESSAGE Possible choices for configuration are:
+-!MESSAGE 
+-!MESSAGE "ApacheCore - Win32 Release" (based on "Win32 (x86) Static Library")
+-!MESSAGE "ApacheCore - Win32 Debug" (based on "Win32 (x86) Static Library")
+-!MESSAGE 
+-
+-# Begin Project
+-# PROP AllowPerConfigDependencies 0
+-# PROP Scc_ProjName ""
+-# PROP Scc_LocalPath ""
+-CPP=cl.exe
+-RSC=rc.exe
+-
+-!IF  "$(CFG)" == "ApacheCore - Win32 Release"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "LibR"
+-# PROP BASE Intermediate_Dir "LibR"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 0
+-# PROP Output_Dir "LibR"
+-# PROP Intermediate_Dir "LibR"
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\srclib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\srclib\apr\include" /I ".\srclib\apr-util\include" /I ".\srclib\sdbm" /I ".\os\win32" /I ".\server\mpm\winnt" /I ".\srclib\expat-lite" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD BASE RSC /l 0x409
+-# ADD RSC /l 0x409
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LIB32=link.exe -lib
+-# ADD BASE LIB32 /nologo
+-# ADD LIB32 /nologo
+-
+-!ELSEIF  "$(CFG)" == "ApacheCore - Win32 Debug"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "LibD"
+-# PROP BASE Intermediate_Dir "LibD"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 1
+-# PROP Output_Dir "LibD"
+-# PROP Intermediate_Dir "LibD"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\srclib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\srclib\apr\include" /I ".\srclib\apr-util\include" /I ".\srclib\sdbm" /I ".\os\win32" /I ".\server\mpm\winnt" /I ".\srclib\expat-lite" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD BASE RSC /l 0x409
+-# ADD RSC /l 0x409
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LIB32=link.exe -lib
+-# ADD BASE LIB32 /nologo
+-# ADD LIB32 /nologo
+-
+-!ENDIF 
+-
+-# Begin Target
+-
+-# Name "ApacheCore - Win32 Release"
+-# Name "ApacheCore - Win32 Debug"
+-# Begin Group "Configuration"
+-
+-# PROP Default_Filter "cpp;c;cxx;rc;def;r;odl;hpj;bat;for;f90"
+-# Begin Source File
+-
+-SOURCE=.\include\ap_config.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\ap_mmn.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\ApacheCore.def
+-# PROP Exclude_From_Build 1
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\buildmark.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_conf_globals.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\os\win32\modules.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\os\win32\os.h
+-# End Source File
+-# End Group
+-# Begin Group "Generated Files"
+-
+-# PROP Default_Filter ""
+-# Begin Source File
+-
+-SOURCE=.\server\gen_test_char.exe
+-
+-!IF  "$(CFG)" == "ApacheCore - Win32 Release"
+-
+-# Begin Custom Build - Generating test_char.h
+-InputPath=.\server\gen_test_char.exe
+-
+-".\server\test_char.h" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	.\server\gen_test_char.exe >.\server\test_char.h 
+-	echo Generated test_char.h from gen_test_char.exe 
+-	
+-# End Custom Build
+-
+-!ELSEIF  "$(CFG)" == "ApacheCore - Win32 Debug"
+-
+-# Begin Custom Build - Generating test_char.h
+-InputPath=.\server\gen_test_char.exe
+-
+-".\server\test_char.h" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	.\server\gen_test_char.exe >.\server\test_char.h 
+-	echo Generated test_char.h from gen_test_char.exe 
+-	
+-# End Custom Build
+-
+-!ENDIF 
+-
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\gen_uri_delims.exe
+-
+-!IF  "$(CFG)" == "ApacheCore - Win32 Release"
+-
+-# Begin Custom Build - Generating uri_delims.h
+-InputPath=.\server\gen_uri_delims.exe
+-
+-".\server\uri_delims.h" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	.\server\gen_uri_delims.exe >.\server\uri_delims.h 
+-	echo Generated uri_delims.h from gen_uri_delims.exe 
+-	
+-# End Custom Build
+-
+-!ELSEIF  "$(CFG)" == "ApacheCore - Win32 Debug"
+-
+-# Begin Custom Build - Generating uri_delims.h
+-InputPath=.\server\gen_uri_delims.exe
+-
+-".\server\uri_delims.h" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+-	.\server\gen_uri_delims.exe >.\server\uri_delims.h 
+-	echo Generated uri_delims.h from gen_uri_delims.exe 
+-	
+-# End Custom Build
+-
+-!ENDIF 
+-
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\test_char.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\uri_delims.h
+-# End Source File
+-# End Group
+-# Begin Group "httpd"
+-
+-# PROP Default_Filter ""
+-# Begin Source File
+-
+-SOURCE=.\server\config.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\connection.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_config.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_connection.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_log.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_main.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_vhost.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\httpd.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\log.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\vhost.c
+-# End Source File
+-# End Group
+-# Begin Group "modules"
+-
+-# PROP Default_Filter ""
+-# Begin Source File
+-
+-SOURCE=.\modules\http\http_core.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_core.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\http\http_protocol.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_protocol.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\http\http_request.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\http_request.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\aaa\mod_access.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\mappers\mod_actions.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\mappers\mod_alias.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\generators\mod_asis.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\aaa\mod_auth.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\generators\mod_autoindex.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\generators\mod_cgi.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\mappers\mod_dir.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\metadata\mod_env.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\mappers\mod_imap.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\filters\mod_include.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\os\win32\mod_isapi.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\loggers\mod_log_config.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\http\mod_mime.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\mappers\mod_negotiation.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\metadata\mod_setenvif.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\mappers\mod_so.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\modules\mappers\mod_userdir.c
+-# End Source File
+-# End Group
+-# Begin Group "util"
+-
+-# PROP Default_Filter ""
+-# Begin Source File
+-
+-SOURCE=.\server\rfc1413.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\rfc1413.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\util.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\util_cfgtree.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_cfgtree.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_charset.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\util_date.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_date.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_ebcdic.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\util_filter.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_filter.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\util_md5.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_md5.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\util_script.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_script.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\util_uri.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_uri.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\os\win32\util_win32.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\util_xml.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\util_xml.h
+-# End Source File
+-# End Group
+-# Begin Group "mpm_winnt"
+-
+-# PROP Default_Filter ""
+-# Begin Source File
+-
+-SOURCE=.\include\ap_listen.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\ap_mpm.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\listen.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\mpm\winnt\mpm.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\mpm_common.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\mpm\winnt\mpm_default.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\include\mpm_status.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\mpm\winnt\mpm_winnt.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\mpm\winnt\mpm_winnt.h
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\mpm\winnt\registry.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\server\mpm\winnt\service.c
+-# End Source File
+-# End Group
+-# End Target
+-# End Project
+diff --git a/ApacheCoreDll.dsp b/ApacheCoreDll.dsp
+deleted file mode 100644
+index 78c3870..0000000
+--- a/ApacheCoreDll.dsp
++++ /dev/null
+@@ -1,100 +0,0 @@
+-# Microsoft Developer Studio Project File - Name="ApacheCoreDll" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
+-# ** DO NOT EDIT **
+-
+-# TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+-
+-CFG=ApacheCoreDll - Win32 Release
+-!MESSAGE This is not a valid makefile. To build this project using NMAKE,
+-!MESSAGE use the Export Makefile command and run
+-!MESSAGE 
+-!MESSAGE NMAKE /f "ApacheCoreDll.mak".
+-!MESSAGE 
+-!MESSAGE You can specify a configuration when running NMAKE
+-!MESSAGE by defining the macro CFG on the command line. For example:
+-!MESSAGE 
+-!MESSAGE NMAKE /f "ApacheCoreDll.mak" CFG="ApacheCoreDll - Win32 Release"
+-!MESSAGE 
+-!MESSAGE Possible choices for configuration are:
+-!MESSAGE 
+-!MESSAGE "ApacheCoreDll - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE "ApacheCoreDll - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE 
+-
+-# Begin Project
+-# PROP AllowPerConfigDependencies 0
+-# PROP Scc_ProjName ""
+-# PROP Scc_LocalPath ""
+-CPP=cl.exe
+-MTL=midl.exe
+-RSC=rc.exe
+-
+-!IF  "$(CFG)" == "ApacheCoreDll - Win32 Release"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\CoreR"
+-# PROP BASE Intermediate_Dir ".\CoreR"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\CoreR"
+-# PROP Intermediate_Dir ".\CoreR"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD BASE MTL /nologo /D "NDEBUG" /win32
+-# ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x809 /d "NDEBUG"
+-# ADD RSC /l 0x809 /d "NDEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /base:@"os\win32\BaseAddr.ref",ApacheCore
+-# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:".\CoreR/ApacheCore.dll" /base:@"os\win32\BaseAddr.ref",ApacheCore
+-
+-!ELSEIF  "$(CFG)" == "ApacheCoreDll - Win32 Debug"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\CoreD"
+-# PROP BASE Intermediate_Dir ".\CoreD"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\CoreD"
+-# PROP Intermediate_Dir ".\CoreD"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /ZI /c
+-# ADD CPP /nologo /MDd /W3 /GX /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /ZI /c
+-# SUBTRACT CPP /YX
+-# ADD BASE MTL /nologo /D "_DEBUG" /win32
+-# ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x809 /d "_DEBUG"
+-# ADD RSC /l 0x809 /d "_DEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /base:@"os\win32\BaseAddr.ref",ApacheCore
+-# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /out:".\CoreD/ApacheCore.dll" /base:@"os\win32\BaseAddr.ref",ApacheCore
+-
+-!ENDIF 
+-
+-# Begin Target
+-
+-# Name "ApacheCoreDll - Win32 Release"
+-# Name "ApacheCoreDll - Win32 Debug"
+-# Begin Source File
+-
+-SOURCE=.\os\win32\ApacheCore.c
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=.\ApacheCore.def
+-# End Source File
+-# End Target
+-# End Project
+diff --git a/CHANGES b/CHANGES
+index adf463f..79e864f 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,5 +1,13 @@
+ Changes with Apache 2.0b1
+ 
++  *) The Apache/Win32 Apache.exe and dll's now live in bin.  The 
++     current directory logic now backs up over bin/ to determine the
++     server root from the Apache.exe path.
++
++  *) Apache/Win32 now follows the standard conventions of mod_foo.so
++     loadable modules, dynamic libs are all named libfoo.dll, and the
++     makefile.win populates the include, lib and libexec directories.
++
+   *) Apache is now IPv6-capable.  On systems where APR supports IPv6,
+      Apache gets IPv6 listening sockets by default.  Additionally, the
+      Listen, NameVirtualHost, and <VirtualHost> directives support IPv6
+diff --git a/InstallBin.dsp b/InstallBin.dsp
+index 4d7e9ee..9a03dd8 100644
+--- a/InstallBin.dsp
++++ b/InstallBin.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="InstallBin" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) External Target" 0x0106
+@@ -22,7 +22,6 @@ CFG=InstallBin - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ 
+@@ -39,9 +38,9 @@ CFG=InstallBin - Win32 Debug
+ # PROP Use_Debug_Libraries 0
+ # PROP Output_Dir "Release"
+ # PROP Intermediate_Dir "Release"
+-# PROP Cmd_Line "NMAKE /f makefile.win INSTDIR=\Apache SHORT=R LONG=Release _install"
++# PROP Cmd_Line "NMAKE /f makefile.win INSTDIR="\Apache2.0" SHORT=R LONG=Release _install"
+ # PROP Rebuild_Opt ""
+-# PROP Target_File "\Apache.exe"
++# PROP Target_File "\Apache2.0\Apache.exe"
+ # PROP Bsc_Name ""
+ # PROP Target_Dir ""
+ 
+@@ -58,9 +57,9 @@ CFG=InstallBin - Win32 Debug
+ # PROP Use_Debug_Libraries 1
+ # PROP Output_Dir "Debug"
+ # PROP Intermediate_Dir "Debug"
+-# PROP Cmd_Line "NMAKE /f makefile.win INSTDIR=\Apache SHORT=D LONG=Debug _install"
++# PROP Cmd_Line "NMAKE /f makefile.win INSTDIR="\Apache2.0" SHORT=D LONG=Debug _install"
+ # PROP Rebuild_Opt ""
+-# PROP Target_File "\Apache.exe"
++# PROP Target_File "\Apache2.0\Apache.exe"
+ # PROP Bsc_Name ""
+ # PROP Target_Dir ""
+ 
+diff --git a/Makefile.win b/Makefile.win
+index c30c30c..1990bb9 100644
+--- a/Makefile.win
++++ b/Makefile.win
+@@ -133,31 +133,33 @@ _install:
+ 	-mkdir "$(INSTDIR)\htdocs\manual"
+ 	-mkdir "$(INSTDIR)\icons"
+ 	-mkdir "$(INSTDIR)\include"
++	-mkdir "$(INSTDIR)\include\xml"
++	-mkdir "$(INSTDIR)\include\pcre"
+ 	-mkdir "$(INSTDIR)\lib"
+ 	-mkdir "$(INSTDIR)\libexec"
+ 	-mkdir "$(INSTDIR)\logs"
+ 	-mkdir "$(INSTDIR)\modules"
+ #	-mkdir "$(INSTDIR)\proxy"
+-	copy Apache$(SHORT)\Apache.exe "$(INSTDIR)"
+-	copy Core$(SHORT)\ApacheCore.dll "$(INSTDIR)"
+-	copy srclib\apr\$(LONG)\aprlib.dll "$(INSTDIR)"
+-        copy srclib\apr-util\$(LONG)\apr-util.dll "$(INSTDIR)"
+-        copy srclib\expat-lite\$(LONG)\expatlib.dll "$(INSTDIR)"
+-        copy modules\aaa\mod_auth_anon$(SHORT)\mod_auth_anon.dll "$(INSTDIR)\modules"
+-	copy modules\aaa\mod_auth_dbm$(SHORT)\mod_auth_dbm.dll "$(INSTDIR)\modules"
+-	copy modules\aaa\mod_auth_digest$(SHORT)\mod_auth_digest.dll "$(INSTDIR)\modules"
+-	copy modules\cache\mod_file_cache$(SHORT)\mod_file_cache.dll "$(INSTDIR)\modules"
+-        copy modules\dav\fs\mod_dav_fs$(SHORT)\mod_dav_fs.dll "$(INSTDIR)\modules"
+-        copy modules\dav\main\mod_dav$(SHORT)\mod_dav.dll "$(INSTDIR)\modules"
+-#       copy modules\generators\mod_info$(SHORT)\mod_info.dll "$(INSTDIR)\modules"
+-        copy modules\generators\mod_status$(SHORT)\mod_status.dll "$(INSTDIR)\modules"
+-        copy modules\mappers\mod_rewrite$(SHORT)\mod_rewrite.dll "$(INSTDIR)\modules"
+-	copy modules\mappers\mod_speling$(SHORT)\mod_speling.dll "$(INSTDIR)\modules"
+-	copy modules\metadata\mod_cern_meta$(SHORT)\mod_cern_meta.dll "$(INSTDIR)\modules"
+-	copy modules\metadata\mod_expires$(SHORT)\mod_expires.dll "$(INSTDIR)\modules"
+-	copy modules\metadata\mod_headers$(SHORT)\mod_headers.dll "$(INSTDIR)\modules"
+-	copy modules\metadata\mod_usertrack$(SHORT)\mod_usertrack.dll "$(INSTDIR)\modules"
+-#       copy modules\proxy\mod_proxy$(SHORT)\mod_proxy.dll "$(INSTDIR)\modules"
++	copy $(LONG)\Apache.exe "$(INSTDIR)\bin"
++	copy $(LONG)\libhttpd.dll "$(INSTDIR)\bin"
++	copy srclib\apr\$(LONG)\libapr.dll "$(INSTDIR)\bin"
++        copy srclib\apr-util\$(LONG)\libaprutil.dll "$(INSTDIR)\bin"
++        copy srclib\expat-lite\$(LONG)\libexpat.dll "$(INSTDIR)\bin"
++        copy modules\aaa\$(LONG)\mod_auth_anon.so "$(INSTDIR)\modules"
++	copy modules\aaa\$(LONG)\mod_auth_dbm.so "$(INSTDIR)\modules"
++	copy modules\aaa\$(LONG)\mod_auth_digest.so "$(INSTDIR)\modules"
++	copy modules\cache\$(LONG)\mod_file_cache.so "$(INSTDIR)\modules"
++        copy modules\dav\fs\$(LONG)\mod_dav_fs.so "$(INSTDIR)\modules"
++        copy modules\dav\main\$(LONG)\mod_dav.so "$(INSTDIR)\modules"
++#       copy modules\generators\$(LONG)\mod_info.so "$(INSTDIR)\modules"
++        copy modules\generators\$(LONG)\mod_status.so "$(INSTDIR)\modules"
++        copy modules\mappers\$(LONG)\mod_rewrite.so "$(INSTDIR)\modules"
++	copy modules\mappers\$(LONG)\mod_speling.so "$(INSTDIR)\modules"
++	copy modules\metadata\$(LONG)\mod_cern_meta.so "$(INSTDIR)\modules"
++	copy modules\metadata\$(LONG)\mod_expires.so "$(INSTDIR)\modules"
++	copy modules\metadata\$(LONG)\mod_headers.so "$(INSTDIR)\modules"
++	copy modules\metadata\$(LONG)\mod_usertrack.so "$(INSTDIR)\modules"
++#       copy modules\proxy\$(LONG)\mod_proxy.so "$(INSTDIR)\modules"
+         copy support\$(LONG)\ab.exe "$(INSTDIR)\bin"
+         copy support\$(LONG)\htpasswd.exe "$(INSTDIR)\bin"
+ 	copy support\$(LONG)\htdigest.exe "$(INSTDIR)\bin"
+@@ -170,10 +172,39 @@ A
+         xcopy docs\manual "$(INSTDIR)\htdocs\manual" /s /d < <<
+ A
+ <<
++	xcopy include\*.h "$(INSTDIR)\include" /d < <<
++A
++<<
++	xcopy srclib\apr\include\*.h "$(INSTDIR)\include" /d < <<
++A
++<<
++	xcopy srclib\apr-util\include\*.h "$(INSTDIR)\include" /d < <<
++A
++<<
++	xcopy srclib\expat-lite\*.h "$(INSTDIR)\include\xml" /d < <<
++A
++<<
++	xcopy srclib\pcre\*.h "$(INSTDIR)\include\pcre" /d < <<
++A
++<<
+         xcopy docs\icons "$(INSTDIR)\icons" /s /d < <<
+ A
+ <<
+-        copy docs\conf\magic "$(INSTDIR)\conf\magic.default"
++	copy srclib\apr\Lib$(SHORT)\apr.lib "$(INSTDIR)\lib"
++	copy srclib\apr-util\Lib$(SHORT)\aprutil.lib "$(INSTDIR)\lib"
++	copy srclib\pcre\Lib$(SHORT)\pcre.lib "$(INSTDIR)\lib"
++	copy srclib\pcre\Lib$(SHORT)\pcreposix.lib "$(INSTDIR)\lib"
++	copy srclib\apr\$(LONG)\libapr.lib "$(INSTDIR)\libexec"
++	copy srclib\apr\$(LONG)\libapr.exp "$(INSTDIR)\libexec"
++	copy srclib\apr-util\$(LONG)\libaprutil.lib "$(INSTDIR)\libexec"
++	copy srclib\apr-util\$(LONG)\libaprutil.exp "$(INSTDIR)\libexec"
++	copy srclib\expat-lite\$(LONG)\libexpat.lib "$(INSTDIR)\libexec"
++	copy srclib\expat-lite\$(LONG)\libexpat.exp "$(INSTDIR)\libexec"
++	copy $(LONG)\libhttpd.exp "$(INSTDIR)\libexec"
++	copy $(LONG)\libhttpd.lib "$(INSTDIR)\libexec"
++	copy modules\dav\main\$(LONG)\mod_dav.exp "$(INSTDIR)\libexec"
++	copy modules\dav\main\$(LONG)\mod_dav.lib "$(INSTDIR)\libexec"
++	copy docs\conf\magic "$(INSTDIR)\conf\magic.default"
+         if not exist "$(INSTDIR)\conf\magic" \
+             copy "$(INSTDIR)\conf\magic.default" "$(INSTDIR)\conf\magic"
+         copy docs\conf\mime.types "$(INSTDIR)\conf\mime.types.default"
+diff --git a/docs/conf/httpd-win.conf b/docs/conf/httpd-win.conf
+index 6f77e95..d9e6998 100644
+--- a/docs/conf/httpd-win.conf
++++ b/docs/conf/httpd-win.conf
+@@ -145,18 +145,18 @@ ThreadsPerChild 250
+ # Note: The order in which modules are loaded is important.  Don't change
+ # the order below without expert advice.
+ #
+-#LoadModule anon_auth_module modules/mod_auth_anon.dll
+-#LoadModule auth_dbm_module modules/mod_auth_dbm.dll
+-#LoadModule auth_digest_module modules/mod_auth_digest.dll
+-#LoadModule cern_meta_module modules/mod_cern_meta.dll
+-#LoadModule expires_module modules/mod_expires.dll
+-#LoadModule file_cache_module modules/mod_file_cache.dll
+-#LoadModule headers_module modules/mod_headers.dll
+-#LoadModule proxy_module modules/mod_proxy.dll
+-#LoadModule rewrite_module modules/mod_rewrite.dll
+-#LoadModule speling_module modules/mod_speling.dll
+-#LoadModule status_module modules/mod_status.dll
+-#LoadModule usertrack_module modules/mod_usertrack.dll
++#LoadModule anon_auth_module modules/mod_auth_anon.so
++#LoadModule auth_dbm_module modules/mod_auth_dbm.so
++#LoadModule auth_digest_module modules/mod_auth_digest.so
++#LoadModule cern_meta_module modules/mod_cern_meta.so
++#LoadModule expires_module modules/mod_expires.so
++#LoadModule file_cache_module modules/mod_file_cache.so
++#LoadModule headers_module modules/mod_headers.so
++#LoadModule proxy_module modules/mod_proxy.so
++#LoadModule rewrite_module modules/mod_rewrite.so
++#LoadModule speling_module modules/mod_speling.so
++#LoadModule status_module modules/mod_status.so
++#LoadModule usertrack_module modules/mod_usertrack.so
+ 
+ ### Section 2: 'Main' server configuration
+ #
+diff --git a/httpd.dsp b/httpd.dsp
+index 417addf..9d7bed1 100644
+--- a/httpd.dsp
++++ b/httpd.dsp
+@@ -1,34 +1,33 @@
+-# Microsoft Developer Studio Project File - Name="ApacheCore" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Project File - Name="httpd" - Package Owner=<4>
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Static Library" 0x0104
+ 
+-CFG=ApacheCore - Win32 Debug
++CFG=httpd - Win32 Debug
+ !MESSAGE This is not a valid makefile. To build this project using NMAKE,
+ !MESSAGE use the Export Makefile command and run
+ !MESSAGE 
+-!MESSAGE NMAKE /f "ApacheCore.mak".
++!MESSAGE NMAKE /f "httpd.mak".
+ !MESSAGE 
+ !MESSAGE You can specify a configuration when running NMAKE
+ !MESSAGE by defining the macro CFG on the command line. For example:
+ !MESSAGE 
+-!MESSAGE NMAKE /f "ApacheCore.mak" CFG="ApacheCore - Win32 Debug"
++!MESSAGE NMAKE /f "httpd.mak" CFG="httpd - Win32 Debug"
+ !MESSAGE 
+ !MESSAGE Possible choices for configuration are:
+ !MESSAGE 
+-!MESSAGE "ApacheCore - Win32 Release" (based on "Win32 (x86) Static Library")
+-!MESSAGE "ApacheCore - Win32 Debug" (based on "Win32 (x86) Static Library")
++!MESSAGE "httpd - Win32 Release" (based on "Win32 (x86) Static Library")
++!MESSAGE "httpd - Win32 Debug" (based on "Win32 (x86) Static Library")
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+ RSC=rc.exe
+ 
+-!IF  "$(CFG)" == "ApacheCore - Win32 Release"
++!IF  "$(CFG)" == "httpd - Win32 Release"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+@@ -40,8 +39,8 @@ RSC=rc.exe
+ # PROP Output_Dir "LibR"
+ # PROP Intermediate_Dir "LibR"
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\srclib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\srclib\apr\include" /I ".\srclib\apr-util\include" /I ".\srclib\sdbm" /I ".\os\win32" /I ".\server\mpm\winnt" /I ".\srclib\expat-lite" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /I ".\include" /I ".\srclib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I ".\include" /I ".\srclib\apr\include" /I ".\srclib\apr-util\include" /I ".\srclib\sdbm" /I ".\os\win32" /I ".\server\mpm\winnt" /I ".\srclib\expat-lite" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /Fd"LibR\httpd" /FD /c
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
+ BSC32=bscmake.exe
+@@ -51,7 +50,7 @@ LIB32=link.exe -lib
+ # ADD BASE LIB32 /nologo
+ # ADD LIB32 /nologo
+ 
+-!ELSEIF  "$(CFG)" == "ApacheCore - Win32 Debug"
++!ELSEIF  "$(CFG)" == "httpd - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+@@ -64,8 +63,8 @@ LIB32=link.exe -lib
+ # PROP Intermediate_Dir "LibD"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\srclib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I ".\include" /I ".\srclib\apr\include" /I ".\srclib\apr-util\include" /I ".\srclib\sdbm" /I ".\os\win32" /I ".\server\mpm\winnt" /I ".\srclib\expat-lite" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /I ".\include" /I ".\srclib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I ".\include" /I ".\srclib\apr\include" /I ".\srclib\apr-util\include" /I ".\srclib\sdbm" /I ".\os\win32" /I ".\server\mpm\winnt" /I ".\srclib\expat-lite" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /Fd"LibD\httpd" /FD /c
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
+ BSC32=bscmake.exe
+@@ -79,8 +78,8 @@ LIB32=link.exe -lib
+ 
+ # Begin Target
+ 
+-# Name "ApacheCore - Win32 Release"
+-# Name "ApacheCore - Win32 Debug"
++# Name "httpd - Win32 Release"
++# Name "httpd - Win32 Debug"
+ # Begin Group "Configuration"
+ 
+ # PROP Default_Filter "cpp;c;cxx;rc;def;r;odl;hpj;bat;for;f90"
+@@ -94,7 +93,7 @@ SOURCE=.\include\ap_mmn.h
+ # End Source File
+ # Begin Source File
+ 
+-SOURCE=.\ApacheCore.def
++SOURCE=.\httpd.def
+ # PROP Exclude_From_Build 1
+ # End Source File
+ # Begin Source File
+@@ -121,7 +120,7 @@ SOURCE=.\os\win32\os.h
+ 
+ SOURCE=.\server\gen_test_char.exe
+ 
+-!IF  "$(CFG)" == "ApacheCore - Win32 Release"
++!IF  "$(CFG)" == "httpd - Win32 Release"
+ 
+ # Begin Custom Build - Generating test_char.h
+ InputPath=.\server\gen_test_char.exe
+@@ -132,7 +131,7 @@ InputPath=.\server\gen_test_char.exe
+ 	
+ # End Custom Build
+ 
+-!ELSEIF  "$(CFG)" == "ApacheCore - Win32 Debug"
++!ELSEIF  "$(CFG)" == "httpd - Win32 Debug"
+ 
+ # Begin Custom Build - Generating test_char.h
+ InputPath=.\server\gen_test_char.exe
+@@ -150,7 +149,7 @@ InputPath=.\server\gen_test_char.exe
+ 
+ SOURCE=.\server\gen_uri_delims.exe
+ 
+-!IF  "$(CFG)" == "ApacheCore - Win32 Release"
++!IF  "$(CFG)" == "httpd - Win32 Release"
+ 
+ # Begin Custom Build - Generating uri_delims.h
+ InputPath=.\server\gen_uri_delims.exe
+@@ -161,7 +160,7 @@ InputPath=.\server\gen_uri_delims.exe
+ 	
+ # End Custom Build
+ 
+-!ELSEIF  "$(CFG)" == "ApacheCore - Win32 Debug"
++!ELSEIF  "$(CFG)" == "httpd - Win32 Debug"
+ 
+ # Begin Custom Build - Generating uri_delims.h
+ InputPath=.\server\gen_uri_delims.exe
+diff --git a/libhttpd.def b/libhttpd.def
+index 1e1dd31..41ad77f 100644
+--- a/libhttpd.def
++++ b/libhttpd.def
+@@ -1,7 +1,7 @@
+-; apachecore.def : 
++; libhttpd.def : 
+ 
+-LIBRARY ApacheCore
+-DESCRIPTION ''
++LIBRARY libhttpd
++DESCRIPTION 'Apache httpd Server Dynamic Library'
+ 
+ EXPORTS
+ 	; Add new API calls to the end of this list.
+diff --git a/libhttpd.dsp b/libhttpd.dsp
+index 78c3870..0476433 100644
+--- a/libhttpd.dsp
++++ b/libhttpd.dsp
+@@ -1,49 +1,48 @@
+-# Microsoft Developer Studio Project File - Name="ApacheCoreDll" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Project File - Name="libhttpd" - Package Owner=<4>
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+ 
+-CFG=ApacheCoreDll - Win32 Release
++CFG=libhttpd - Win32 Release
+ !MESSAGE This is not a valid makefile. To build this project using NMAKE,
+ !MESSAGE use the Export Makefile command and run
+ !MESSAGE 
+-!MESSAGE NMAKE /f "ApacheCoreDll.mak".
++!MESSAGE NMAKE /f "libhttpd.mak".
+ !MESSAGE 
+ !MESSAGE You can specify a configuration when running NMAKE
+ !MESSAGE by defining the macro CFG on the command line. For example:
+ !MESSAGE 
+-!MESSAGE NMAKE /f "ApacheCoreDll.mak" CFG="ApacheCoreDll - Win32 Release"
++!MESSAGE NMAKE /f "libhttpd.mak" CFG="libhttpd - Win32 Release"
+ !MESSAGE 
+ !MESSAGE Possible choices for configuration are:
+ !MESSAGE 
+-!MESSAGE "ApacheCoreDll - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE "ApacheCoreDll - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
++!MESSAGE "libhttpd - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
++!MESSAGE "libhttpd - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+ MTL=midl.exe
+ RSC=rc.exe
+ 
+-!IF  "$(CFG)" == "ApacheCoreDll - Win32 Release"
++!IF  "$(CFG)" == "libhttpd - Win32 Release"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\CoreR"
+-# PROP BASE Intermediate_Dir ".\CoreR"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\CoreR"
+-# PROP Intermediate_Dir ".\CoreR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /Fd"Debug\libhttpd" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -52,24 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /base:@"os\win32\BaseAddr.ref",ApacheCore
+-# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /out:".\CoreR/ApacheCore.dll" /base:@"os\win32\BaseAddr.ref",ApacheCore
++# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /machine:I386 /base:@"os\win32\BaseAddr.ref",libhttpd
++# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /machine:I386 /base:@"os\win32\BaseAddr.ref",libhttpd
+ 
+-!ELSEIF  "$(CFG)" == "ApacheCoreDll - Win32 Debug"
++!ELSEIF  "$(CFG)" == "libhttpd - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\CoreD"
+-# PROP BASE Intermediate_Dir ".\CoreD"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\CoreD"
+-# PROP Intermediate_Dir ".\CoreD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /GX /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /ZI /c
+-# ADD CPP /nologo /MDd /W3 /GX /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /ZI /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I ".\include" /I ".\lib\apr\include" /I ".\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_DECLARE_EXPORT" /Fd"Debug\libhttpd" /FD /c
+ # SUBTRACT CPP /YX
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+@@ -79,22 +78,22 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /base:@"os\win32\BaseAddr.ref",ApacheCore
+-# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /out:".\CoreD/ApacheCore.dll" /base:@"os\win32\BaseAddr.ref",ApacheCore
++# ADD BASE LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /base:@"os\win32\BaseAddr.ref",libhttpd
++# ADD LINK32 kernel32.lib user32.lib advapi32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /machine:I386 /base:@"os\win32\BaseAddr.ref",libhttpd
+ 
+ !ENDIF 
+ 
+ # Begin Target
+ 
+-# Name "ApacheCoreDll - Win32 Release"
+-# Name "ApacheCoreDll - Win32 Debug"
++# Name "libhttpd - Win32 Release"
++# Name "libhttpd - Win32 Debug"
+ # Begin Source File
+ 
+-SOURCE=.\os\win32\ApacheCore.c
++SOURCE=.\os\win32\libhttpd.c
+ # End Source File
+ # Begin Source File
+ 
+-SOURCE=.\ApacheCore.def
++SOURCE=.\libhttpd.def
+ # End Source File
+ # End Target
+ # End Project
+diff --git a/modules/aaa/mod_auth_anon.dsp b/modules/aaa/mod_auth_anon.dsp
+index bd880a7..bab18ae 100644
+--- a/modules/aaa/mod_auth_anon.dsp
++++ b/modules/aaa/mod_auth_anon.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_auth_anon" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_auth_anon - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_auth_anonR"
+-# PROP Intermediate_Dir ".\mod_auth_anonR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_auth_anon" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_auth_anon.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_auth_anon.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+ 
+ !ELSEIF  "$(CFG)" == "mod_auth_anon - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_auth_anonD"
+-# PROP Intermediate_Dir ".\mod_auth_anonD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "..\..\srclib\apr-util\include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "..\..\srclib\apr-util\include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_auth_anon" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_auth_anon.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_auth_anon.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_anon
+ 
+ !ENDIF 
+ 
+diff --git a/modules/aaa/mod_auth_dbm.dsp b/modules/aaa/mod_auth_dbm.dsp
+index 498115e..d5f3f97 100644
+--- a/modules/aaa/mod_auth_dbm.dsp
++++ b/modules/aaa/mod_auth_dbm.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_auth_dbm" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_auth_dbm - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,17 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_auth_dbmR"
+-# PROP Intermediate_Dir ".\mod_auth_dbmR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /I "..\..\srclib\sdbm" /I "..\..\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_AUTH_DBM_USE_APR" /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /I "..\..\srclib\sdbm" /I "..\..\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_AUTH_DBM_USE_APR" /Fd"Release\mod_auth_dbm" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -52,24 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_auth_dbm.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_auth_dbm.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+ 
+ !ELSEIF  "$(CFG)" == "mod_auth_dbm - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_auth_dbmD"
+-# PROP Intermediate_Dir ".\mod_auth_dbmD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /I "..\..\srclib\sdbm" /I "..\..\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_AUTH_DBM_USE_APR" /FD /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /I "..\..\srclib\sdbm" /I "..\..\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "AP_AUTH_DBM_USE_APR" /Fd"Debug\mod_auth_dbm" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -78,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_auth_dbm.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_auth_dbm.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_dbm
+ 
+ !ENDIF 
+ 
+diff --git a/modules/aaa/mod_auth_digest.dsp b/modules/aaa/mod_auth_digest.dsp
+index 7bd2299..c471820 100644
+--- a/modules/aaa/mod_auth_digest.dsp
++++ b/modules/aaa/mod_auth_digest.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_auth_digest" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_auth_digest - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,17 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\mod_auth_digestR"
+-# PROP BASE Intermediate_Dir ".\mod_auth_digestR"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_auth_digestR"
+-# PROP Intermediate_Dir ".\mod_auth_digestR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MD /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_auth_digest" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /o /win32 "NUL"
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /o /win32 "NUL"
+ # ADD BASE RSC /l 0x409 /d "NDEBUG"
+@@ -52,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /machine:I386
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_digest
+-# SUBTRACT LINK32 /pdb:none
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_auth_digest.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_digest
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_auth_digest.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_digest
+ 
+ !ELSEIF  "$(CFG)" == "mod_auth_digest - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\mod_auth_digestD"
+-# PROP BASE Intermediate_Dir ".\mod_auth_digestD"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_auth_digestD"
+-# PROP Intermediate_Dir ".\mod_auth_digestD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_auth_digest" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /o /win32 "NUL"
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /o /win32 "NUL"
+ # ADD BASE RSC /l 0x409 /d "_DEBUG"
+@@ -79,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /pdbtype:sept
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /pdbtype:sept /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_auth_digest
+-# SUBTRACT LINK32 /pdb:none /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_auth_digest.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_digest
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_auth_digest.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_auth_digest
+ 
+ !ENDIF 
+ 
+diff --git a/modules/cache/mod_file_cache.dsp b/modules/cache/mod_file_cache.dsp
+index 20d7a41..c13f848f 100644
+--- a/modules/cache/mod_file_cache.dsp
++++ b/modules/cache/mod_file_cache.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_file_cache" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_file_cache - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -38,13 +37,12 @@ RSC=rc.exe
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_file_cacheR"
+-# PROP Intermediate_Dir ".\mod_file_cacheR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /FD /c
+-# ADD CPP /nologo /MT /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_file_cache" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /o /win32 "NUL"
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /o /win32 "NUL"
+ # ADD BASE RSC /l 0x409 /d "NDEBUG"
+@@ -53,8 +51,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386
+-# ADD LINK32 user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release"
++# ADD BASE LINK32 /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_file_cache.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_file_cache
++# ADD LINK32 /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_file_cache.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_file_cache
+ 
+ !ELSEIF  "$(CFG)" == "mod_file_cache - Win32 Debug"
+ 
+@@ -65,13 +63,12 @@ LINK32=link.exe
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_file_cacheD"
+-# PROP Intermediate_Dir ".\mod_file_cacheD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /FD /c
+-# ADD CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_file_cache" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /o /win32 "NUL"
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /o /win32 "NUL"
+ # ADD BASE RSC /l 0x409 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /pdbtype:sept
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /pdbtype:sept /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug"
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_file_cache.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_file_cache
++# ADD LINK32 /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_file_cache.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_file_cache
+ 
+ !ENDIF 
+ 
+diff --git a/modules/dav/fs/mod_dav_fs.dsp b/modules/dav/fs/mod_dav_fs.dsp
+index d839093..f45a497 100644
+--- a/modules/dav/fs/mod_dav_fs.dsp
++++ b/modules/dav/fs/mod_dav_fs.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_dav_fs" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_dav_fs - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,17 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\ApacheMo"
+-# PROP BASE Intermediate_Dir ".\ApacheMo"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_dav_fsR"
+-# PROP Intermediate_Dir ".\mod_dav_fsR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\main" /I "..\..\..\srclib\aputil" /I "..\..\..\srclib\sdbm" /I "..\..\..\srclib\expat-lite" /I "..\..\..\srclib\apr\include" /I "../../../srclib/apr-util/include" /I "..\..\..\include" /I "..\..\..\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /YX /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\main" /I "..\..\..\srclib\aputil" /I "..\..\..\srclib\sdbm" /I "..\..\..\srclib\expat-lite" /I "..\..\..\srclib\apr\include" /I "../../../srclib/apr-util/include" /I "..\..\..\include" /I "..\..\..\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_dav_fs" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -52,24 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\..\CoreR" /libpath:"..\..\..\srclib\apr\Release" /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav_fs
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\..\CoreR" /libpath:"..\..\..\srclib\apr\Release" /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav_fs
++# ADD BASE LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_dav_fs.so" /machine:I386 /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav_fs
++# ADD LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_dav_fs.so" /machine:I386 /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav_fs
+ 
+ !ELSEIF  "$(CFG)" == "mod_dav_fs - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\ApacheM0"
+-# PROP BASE Intermediate_Dir ".\ApacheM0"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_dav_fsD"
+-# PROP Intermediate_Dir ".\mod_dav_fsD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /GX /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /ZI /c
+-# ADD CPP /nologo /MDd /W3 /GX /Od /I "..\main" /I "..\..\..\srclib\aputil" /I "..\..\..\srclib\sdbm" /I "..\..\..\srclib\expat-lite" /I "..\..\..\srclib\apr\include" /I "../../../srclib/apr-util/include" /I "..\..\..\include" /I "..\..\..\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /YX /FD /ZI /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\main" /I "..\..\..\srclib\aputil" /I "..\..\..\srclib\sdbm" /I "..\..\..\srclib\expat-lite" /I "..\..\..\srclib\apr\include" /I "../../../srclib/apr-util/include" /I "..\..\..\include" /I "..\..\..\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_dav_fs" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -78,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\..\CoreD" /libpath:"..\..\..\srclib\apr\Debug" /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav_fs
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\..\CoreD" /libpath:"..\..\..\srclib\apr\Debug" /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav_fs
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_dav_fs.so" /machine:I386 /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav_fs
++# ADD LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_dav_fs.so" /machine:I386 /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav_fs
+ 
+ !ENDIF 
+ 
+diff --git a/modules/dav/main/mod_dav.dsp b/modules/dav/main/mod_dav.dsp
+index b062697..e819473 100644
+--- a/modules/dav/main/mod_dav.dsp
++++ b/modules/dav/main/mod_dav.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_dav" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_dav - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,17 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\ApacheMo"
+-# PROP BASE Intermediate_Dir ".\ApacheMo"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_davR"
+-# PROP Intermediate_Dir ".\mod_davR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\..\srclib\aputil" /I "..\..\..\srclib\sdbm" /I "..\..\..\srclib\expat-lite" /I "..\..\..\srclib\apr\include" /I "../../../srclib/apr-util/include" /I "..\..\..\include" /I "..\..\..\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "DAV_DECLARE_EXPORT" /YX /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\..\srclib\aputil" /I "..\..\..\srclib\sdbm" /I "..\..\..\srclib\expat-lite" /I "..\..\..\srclib\apr\include" /I "../../../srclib/apr-util/include" /I "..\..\..\include" /I "..\..\..\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "DAV_DECLARE_EXPORT" /Fd"Release\mod_dav" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -52,24 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\..\CoreR" /libpath:"..\..\..\srclib\apr\Release" /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\..\CoreR" /libpath:"..\..\..\srclib\apr\Release" /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav
++# ADD BASE LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_dav.so" /machine:I386 /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav
++# ADD LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_dav.so" /machine:I386 /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav
+ 
+ !ELSEIF  "$(CFG)" == "mod_dav - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\ApacheM0"
+-# PROP BASE Intermediate_Dir ".\ApacheM0"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_davD"
+-# PROP Intermediate_Dir ".\mod_davD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "..\..\..\srclib\aputil" /I "..\..\..\srclib\sdbm" /I "..\..\..\srclib\expat-lite" /I "..\..\..\srclib\apr\include" /I "../../../srclib/apr-util/include" /I "..\..\..\include" /I "..\..\..\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "DAV_DECLARE_EXPORT" /YX /FD /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\..\srclib\aputil" /I "..\..\..\srclib\sdbm" /I "..\..\..\srclib\expat-lite" /I "..\..\..\srclib\apr\include" /I "../../../srclib/apr-util/include" /I "..\..\..\include" /I "..\..\..\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "DAV_DECLARE_EXPORT" /Fd"Debug\mod_dav" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -78,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\..\CoreD" /libpath:"..\..\..\srclib\apr\Debug" /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\..\CoreD" /libpath:"..\..\..\srclib\apr\Debug" /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no  /map /debug /out:"Debug/mod_dav.so" /machine:I386 /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav
++# ADD LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /debug /out:"Debug/mod_dav.so" /machine:I386 /base:@..\..\..\os\win32\BaseAddr.ref,mod_dav
+ 
+ !ENDIF 
+ 
+diff --git a/modules/generators/mod_info.dsp b/modules/generators/mod_info.dsp
+index 8d938fb..44573fd 100644
+--- a/modules/generators/mod_info.dsp
++++ b/modules/generators/mod_info.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_info" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_info - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_infoR"
+-# PROP Intermediate_Dir ".\mod_infoR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_info" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_info
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_info
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_info.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_info
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_info.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_info
+ 
+ !ELSEIF  "$(CFG)" == "mod_info - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_infoD"
+-# PROP Intermediate_Dir ".\mod_infoD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_info" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_info
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_info
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_info.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_info
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map/debug /out:"Debug/mod_info.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_info
+ 
+ !ENDIF 
+ 
+diff --git a/modules/generators/mod_status.dsp b/modules/generators/mod_status.dsp
+index 0a7cec2..97688a9 100644
+--- a/modules/generators/mod_status.dsp
++++ b/modules/generators/mod_status.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_status" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_status - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_statusR"
+-# PROP Intermediate_Dir ".\mod_statusR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_status" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_status
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_status
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_status.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_status
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_status.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_status
+ 
+ !ELSEIF  "$(CFG)" == "mod_status - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_statusD"
+-# PROP Intermediate_Dir ".\mod_statusD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_status" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_status
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_status
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_status.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_status
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_status.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_status
+ 
+ !ENDIF 
+ 
+diff --git a/modules/mappers/mod_rewrite.dsp b/modules/mappers/mod_rewrite.dsp
+index 99386b9..9acd4db 100644
+--- a/modules/mappers/mod_rewrite.dsp
++++ b/modules/mappers/mod_rewrite.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_rewrite" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_rewrite - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_rewriteR"
+-# PROP Intermediate_Dir ".\mod_rewriteR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "NO_DBM_REWRITEMAP" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "NO_DBM_REWRITEMAP" /Fd"Release\mod_rewrite" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_rewrite
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_rewrite
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_rewrite.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_rewrite
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_rewrite.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_rewrite
+ 
+ !ELSEIF  "$(CFG)" == "mod_rewrite - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_rewriteD"
+-# PROP Intermediate_Dir ".\mod_rewriteD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "NO_DBM_REWRITEMAP" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "NO_DBM_REWRITEMAP" /Fd"Debug\mod_rewrite" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_rewrite
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_rewrite
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_rewrite.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_rewrite
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_rewrite.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_rewrite
+ 
+ !ENDIF 
+ 
+diff --git a/modules/mappers/mod_speling.dsp b/modules/mappers/mod_speling.dsp
+index 5071ad3..3527bc9 100644
+--- a/modules/mappers/mod_speling.dsp
++++ b/modules/mappers/mod_speling.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_speling" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_speling - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_spelingR"
+-# PROP Intermediate_Dir ".\mod_spelingR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_speling" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_speling
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_speling
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_speling.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_speling
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_speling.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_speling
+ 
+ !ELSEIF  "$(CFG)" == "mod_speling - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_spelingD"
+-# PROP Intermediate_Dir ".\mod_spelingD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_speling" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_speling
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_speling
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_speling.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_speling
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_speling.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_speling
+ 
+ !ENDIF 
+ 
+diff --git a/modules/metadata/mod_cern_meta.dsp b/modules/metadata/mod_cern_meta.dsp
+index 87180e2..aabe151 100644
+--- a/modules/metadata/mod_cern_meta.dsp
++++ b/modules/metadata/mod_cern_meta.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_cern_meta" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_cern_meta - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_cern_metaR"
+-# PROP Intermediate_Dir ".\mod_cern_metaR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_cern_meta" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_cern_meta
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_cern_meta
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_cern_meta.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_cern_meta
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_cern_meta.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_cern_meta
+ 
+ !ELSEIF  "$(CFG)" == "mod_cern_meta - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_cern_metaD"
+-# PROP Intermediate_Dir ".\mod_cern_metaD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_cern_meta" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_cern_meta
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_cern_meta
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_cern_meta.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_cern_meta
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_cern_meta.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_cern_meta
+ 
+ !ENDIF 
+ 
+diff --git a/modules/metadata/mod_expires.dsp b/modules/metadata/mod_expires.dsp
+index 86d1f53..85fa82b 100644
+--- a/modules/metadata/mod_expires.dsp
++++ b/modules/metadata/mod_expires.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_expires" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_expires - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_expiresR"
+-# PROP Intermediate_Dir ".\mod_expiresR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_expires" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_expires
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_expires
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_expires.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_expires
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_expires.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_expires
+ 
+ !ELSEIF  "$(CFG)" == "mod_expires - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_expiresD"
+-# PROP Intermediate_Dir ".\mod_expiresD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_expires" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_expires
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_expires
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_expires.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_expires
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_expires.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_expires
+ 
+ !ENDIF 
+ 
+diff --git a/modules/metadata/mod_headers.dsp b/modules/metadata/mod_headers.dsp
+index d639ea5..7cb3f44 100644
+--- a/modules/metadata/mod_headers.dsp
++++ b/modules/metadata/mod_headers.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_headers" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_headers - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_headersR"
+-# PROP Intermediate_Dir ".\mod_headersR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_headers" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_headers
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_headers
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_headers.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_headers
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_headers.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_headers
+ 
+ !ELSEIF  "$(CFG)" == "mod_headers - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_headersD"
+-# PROP Intermediate_Dir ".\mod_headersD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_headers" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_headers
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_headers
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_headers.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_headers
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_headers.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_headers
+ 
+ !ENDIF 
+ 
+diff --git a/modules/metadata/mod_usertrack.dsp b/modules/metadata/mod_usertrack.dsp
+index 47d8467..0ef9ffe 100644
+--- a/modules/metadata/mod_usertrack.dsp
++++ b/modules/metadata/mod_usertrack.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_usertrack" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_usertrack - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,18 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\Release"
+-# PROP BASE Intermediate_Dir ".\Release"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_usertrackR"
+-# PROP Intermediate_Dir ".\mod_usertrackR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_usertrack" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -53,25 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_usertrack
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_usertrack
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_usertrack.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_usertrack
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_usertrack.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_usertrack
+ 
+ !ELSEIF  "$(CFG)" == "mod_usertrack - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\Debug"
+-# PROP BASE Intermediate_Dir ".\Debug"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_usertrackD"
+-# PROP Intermediate_Dir ".\mod_usertrackD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FD /c
+-# SUBTRACT CPP /YX
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\include" /I "..\..\os\win32" /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_usertrack" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -80,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_usertrack
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_usertrack
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_usertrack.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_usertrack
++# ADD LINK32 kernel32.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_usertrack.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_usertrack
+ 
+ !ENDIF 
+ 
+diff --git a/modules/proxy/mod_proxy.dsp b/modules/proxy/mod_proxy.dsp
+index b20c7d4..275daab 100644
+--- a/modules/proxy/mod_proxy.dsp
++++ b/modules/proxy/mod_proxy.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="mod_proxy" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=mod_proxy - Win32 Release
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -33,17 +32,17 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir ".\mod_proxyR"
+-# PROP BASE Intermediate_Dir ".\mod_proxyR"
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+-# PROP Output_Dir ".\mod_proxyR"
+-# PROP Intermediate_Dir ".\mod_proxyR"
++# PROP Output_Dir "Release"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /I "..\..\include" /I "..\..\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /YX /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /I "..\..\include" /I "..\..\os\win32" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Release\mod_proxy" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+@@ -52,24 +51,24 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_proxy
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\srclib\apr\Release" /base:@..\..\os\win32\BaseAddr.ref,mod_proxy
++# ADD BASE LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_proxy.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_proxy
++# ADD LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /out:"Release/mod_proxy.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_proxy
+ 
+ !ELSEIF  "$(CFG)" == "mod_proxy - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir ".\mod_proxyD"
+-# PROP BASE Intermediate_Dir ".\mod_proxyD"
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+-# PROP Output_Dir ".\mod_proxyD"
+-# PROP Intermediate_Dir ".\mod_proxyD"
++# PROP Output_Dir "Debug"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /I "..\..\include" /I "..\..\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /YX /FD /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\..\srclib\apr\include" /I "../../srclib/apr-util/include" /I "..\..\include" /I "..\..\os\win32" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /Fd"Debug\mod_proxy" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+@@ -78,9 +77,8 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_proxy
+-# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /debug /machine:I386 /libpath:"..\..\CoreD" /libpath:"..\..\srclib\apr\Debug" /base:@..\..\os\win32\BaseAddr.ref,mod_proxy
+-# SUBTRACT LINK32 /incremental:no /map
++# ADD BASE LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_proxy.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_proxy
++# ADD LINK32 kernel32.lib ws2_32.lib mswsock.lib /nologo /subsystem:windows /dll /incremental:no /map /debug /out:"Debug/mod_proxy.so" /machine:I386 /base:@..\..\os\win32\BaseAddr.ref,mod_proxy
+ 
+ !ENDIF 
+ 
+diff --git a/os/win32/ApacheCore.c b/os/win32/ApacheCore.c
+deleted file mode 100644
+index 8dddf18..0000000
+--- a/os/win32/ApacheCore.c
++++ /dev/null
+@@ -1,10 +0,0 @@
+-/*
+- * Placeholder to force ApacheCore.dll creation with no LNK4001 error
+- *
+- * However, this isn't a bad place to store dynamic-only functions 
+- * that determine which version of apr the application has loaded.
+- * These functions are of (less?) importance to static-bound apps.
+- *
+- * We may also need this hook to play with dll-oriented thread-local
+- * storage for modules on a per-thread DllMain() basis.
+- */
+diff --git a/os/win32/BaseAddr.ref b/os/win32/BaseAddr.ref
+index bd0a919..83b556a 100644
+--- a/os/win32/BaseAddr.ref
++++ b/os/win32/BaseAddr.ref
+@@ -8,7 +8,7 @@
+ 
+ ; module name      base-address      max-size
+ 
+-ApacheCore           0x6FF00000    0x000A0000
++libhttpd             0x6FF00000    0x000A0000
+ mod_auth_anon        0x6FEF0000    0x00010000
+ mod_auth_digest      0x6FED0000    0x00020000
+ mod_cern_meta        0x6FEC0000    0x00010000
+@@ -24,4 +24,3 @@ mod_file_cache       0x6FE00000    0x00020000
+ mod_auth_dbm         0x6FDF0000    0x00010000
+ mod_dav_fs           0x6FDE0000    0x00010000
+ mod_dav              0x6FDC0000    0x00020000
+-expatlib             0x6FD00000    0x00030000
+diff --git a/server/gen_test_char.dsp b/server/gen_test_char.dsp
+index df3b19b..4293448 100644
+--- a/server/gen_test_char.dsp
++++ b/server/gen_test_char.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="gen_test_char" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=gen_test_char - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -32,51 +31,49 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "gen_test"
+-# PROP BASE Intermediate_Dir "gen_test"
++# PROP BASE Output_Dir ""
++# PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+ # PROP Output_Dir ""
+-# PROP Intermediate_Dir "gen_test_char_R"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /I "..\include" /I "..\srclib\apr\include" /I "../srclib/apr-util/include" /I "..\os\win32" /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /I "..\include" /I "..\srclib\apr\include" /I "../srclib/apr-util/include" /I "..\os\win32" /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /Fd"Release\gen_test_char"/FD /c
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+ # ADD RSC /l 0x809 /d "NDEBUG"
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /machine:I386
+-# ADD LINK32 kernel32.lib /nologo /subsystem:console /pdb:none /map /machine:I386
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Release\gen_test_char.pdb" /machine:I386
++# ADD LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Release\gen_test_char.pdb" /machine:I386
+ 
+ !ELSEIF  "$(CFG)" == "gen_test_char - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "gen_tes0"
+-# PROP BASE Intermediate_Dir "gen_tes0"
++# PROP BASE Output_Dir ""
++# PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+ # PROP Output_Dir ""
+-# PROP Intermediate_Dir "gen_test_char_D"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /Gm /ZI /Od /I "..\include" /I "..\srclib\apr\include" /I "../srclib/apr-util/include" /I "..\os\win32" /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
+-# SUBTRACT CPP /Fr
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "..\include" /I "..\srclib\apr\include" /I "../srclib/apr-util/include" /I "..\os\win32" /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /Fd"Debug\gen_test_char" /FD /c
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+ # ADD RSC /l 0x809 /d "_DEBUG"
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /debug /machine:I386 /pdbtype:sept
+-# ADD LINK32 kernel32.lib /nologo /subsystem:console /pdb:none /debug /machine:I386
+-# SUBTRACT LINK32 /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Debug\gen_test_char.pdb" /debug /machine:I386 /pdbtype:sept
++# ADD LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Debug\gen_test_char.pdb" /debug /machine:I386
+ 
+ !ENDIF 
+ 
+diff --git a/server/gen_uri_delims.dsp b/server/gen_uri_delims.dsp
+index 043f04f..9b8ee48 100644
+--- a/server/gen_uri_delims.dsp
++++ b/server/gen_uri_delims.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="gen_uri_delims" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=gen_uri_delims - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -32,50 +31,49 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "Release"
++# PROP BASE Output_Dir ""
+ # PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+ # PROP Output_Dir ""
+-# PROP Intermediate_Dir "gen_uri_delims_R"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /Fd"Release\gen_uri_delims" /FD /c
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+ # ADD RSC /l 0x809 /d "NDEBUG"
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /machine:I386
+-# ADD LINK32 kernel32.lib /nologo /subsystem:console /pdb:none /map /machine:I386
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Release\gen_uri_delims.pdb" /machine:I386
++# ADD LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Release\gen_uri_delims.pdb" /machine:I386
+ 
+ !ELSEIF  "$(CFG)" == "gen_uri_delims - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "Debug"
++# PROP BASE Output_Dir ""
+ # PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+ # PROP Output_Dir ""
+-# PROP Intermediate_Dir "gen_uri_delims_D"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /Gm /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /Fd"Debug\gen_uri_delims" /FD /c
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+ # ADD RSC /l 0x809 /d "_DEBUG"
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /debug /machine:I386 /pdbtype:sept
+-# ADD LINK32 kernel32.lib /nologo /subsystem:console /pdb:none /debug /machine:I386
+-# SUBTRACT LINK32 /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Debug\gen_uri_delims.pdb" /debug /machine:I386
++# ADD LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Debug\gen_uri_delims.pdb" /debug /machine:I386
+ 
+ !ENDIF 
+ 
+diff --git a/srclib/expat-lite/expatlib.def b/srclib/expat-lite/expatlib.def
+deleted file mode 100644
+index c1f8167..0000000
+--- a/srclib/expat-lite/expatlib.def
++++ /dev/null
+@@ -1,51 +0,0 @@
+-; expatlib.def
+-
+-LIBRARY expatlib
+-DESCRIPTION ''
+-
+-EXPORTS
+-   XmlGetUtf16InternalEncoding
+-   XmlGetUtf8InternalEncoding
+-   XmlInitEncoding
+-   XmlInitUnknownEncoding
+-   XmlParseXmlDecl
+-   XmlPrologStateInit
+-   XmlSizeOfUnknownEncoding
+-   XmlUtf16Encode
+-   XmlUtf8Encode
+-
+-   XML_DefaultCurrent
+-   XML_ErrorString
+-   XML_ExternalEntityParserCreate
+-   XML_GetBase
+-   XML_GetBuffer
+-   XML_GetCurrentByteCount
+-   XML_GetCurrentByteIndex
+-   XML_GetCurrentColumnNumber
+-   XML_GetCurrentLineNumber
+-   XML_GetErrorCode
+-   XML_GetSpecifiedAttributeCount
+-   XML_Parse
+-   XML_ParseBuffer
+-   XML_ParserCreate
+-   XML_ParserCreateNS
+-   XML_ParserFree
+-   XML_SetBase
+-   XML_SetCdataSectionHandler
+-   XML_SetCharacterDataHandler
+-   XML_SetCommentHandler
+-   XML_SetDefaultHandler
+-   XML_SetDefaultHandlerExpand
+-   XML_SetElementHandler
+-   XML_SetEncoding
+-   XML_SetExternalEntityRefHandler
+-   XML_SetExternalEntityRefHandlerArg
+-   XML_SetNamespaceDeclHandler
+-   XML_SetNotStandaloneHandler
+-   XML_SetNotationDeclHandler
+-   XML_SetProcessingInstructionHandler
+-   XML_SetUnknownEncodingHandler
+-   XML_SetUnparsedEntityDeclHandler
+-   XML_SetUserData
+-   XML_UseParserAsHandlerArg
+-
+diff --git a/srclib/expat-lite/expatlib.dsp b/srclib/expat-lite/expatlib.dsp
+deleted file mode 100644
+index b89375a..0000000
+--- a/srclib/expat-lite/expatlib.dsp
++++ /dev/null
+@@ -1,122 +0,0 @@
+-# Microsoft Developer Studio Project File - Name="expatlib" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
+-# ** DO NOT EDIT **
+-
+-# TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+-
+-CFG=expatlib - Win32 Debug
+-!MESSAGE This is not a valid makefile. To build this project using NMAKE,
+-!MESSAGE use the Export Makefile command and run
+-!MESSAGE 
+-!MESSAGE NMAKE /f "expatlib.mak".
+-!MESSAGE 
+-!MESSAGE You can specify a configuration when running NMAKE
+-!MESSAGE by defining the macro CFG on the command line. For example:
+-!MESSAGE 
+-!MESSAGE NMAKE /f "expatlib.mak" CFG="expatlib - Win32 Debug"
+-!MESSAGE 
+-!MESSAGE Possible choices for configuration are:
+-!MESSAGE 
+-!MESSAGE "expatlib - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE "expatlib - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE 
+-
+-# Begin Project
+-# PROP AllowPerConfigDependencies 0
+-# PROP Scc_ProjName ""
+-# PROP Scc_LocalPath ""
+-CPP=cl.exe
+-MTL=midl.exe
+-RSC=rc.exe
+-
+-!IF  "$(CFG)" == "expatlib - Win32 Release"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "Release"
+-# PROP BASE Intermediate_Dir "Release"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 0
+-# PROP Output_Dir "Release"
+-# PROP Intermediate_Dir "Release"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MT /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /FD /c
+-# ADD CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /Fd"Release/expatlib" /FD /c
+-# ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+-# ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "NDEBUG"
+-# ADD RSC /l 0x409 /d "NDEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 /nologo /dll /machine:I386
+-# ADD LINK32 /nologo /dll /machine:I386 /base:@"..\..\os\win32\BaseAddr.ref",expatlib
+-# SUBTRACT LINK32 /pdb:none
+-
+-!ELSEIF  "$(CFG)" == "expatlib - Win32 Debug"
+-
+-# PROP BASE Use_MFC 0
+-# PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "Debug"
+-# PROP BASE Intermediate_Dir "Debug"
+-# PROP BASE Target_Dir ""
+-# PROP Use_MFC 0
+-# PROP Use_Debug_Libraries 1
+-# PROP Output_Dir "Debug"
+-# PROP Intermediate_Dir "Debug"
+-# PROP Ignore_Export_Lib 0
+-# PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /Fd"Debug/expatlib" /FD /c
+-# ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+-# ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+-# ADD BASE RSC /l 0x409 /d "_DEBUG"
+-# ADD RSC /l 0x409 /d "_DEBUG"
+-BSC32=bscmake.exe
+-# ADD BASE BSC32 /nologo
+-# ADD BSC32 /nologo
+-LINK32=link.exe
+-# ADD BASE LINK32 /nologo /dll /debug /machine:I386 
+-# ADD LINK32 /nologo /dll /debug /machine:I386 /base:@"..\..\os\win32\BaseAddr.ref",expatlib
+-# SUBTRACT LINK32 /pdb:none
+-
+-!ENDIF 
+-
+-# Begin Target
+-
+-# Name "expatlib - Win32 Release"
+-# Name "expatlib - Win32 Debug"
+-# Begin Source File
+-
+-SOURCE=".\hashtable.c"
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=".\xmlparse.c"
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=".\xmlparse.h"
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=".\dllmain.c"
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=".\xmlrole.c"
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=".\xmltok.c"
+-# End Source File
+-# Begin Source File
+-
+-SOURCE=".\expatlib.def"
+-# End Source File
+-
+-# End Target
+-# End Project
+diff --git a/srclib/expat-lite/libexpat.def b/srclib/expat-lite/libexpat.def
+index c1f8167..d7b7205 100644
+--- a/srclib/expat-lite/libexpat.def
++++ b/srclib/expat-lite/libexpat.def
+@@ -1,7 +1,7 @@
+-; expatlib.def
++; libexpat.def
+ 
+-LIBRARY expatlib
+-DESCRIPTION ''
++LIBRARY libexpat
++DESCRIPTION 'expat-lite XML Parsing Library'
+ 
+ EXPORTS
+    XmlGetUtf16InternalEncoding
+diff --git a/srclib/expat-lite/libexpat.dsp b/srclib/expat-lite/libexpat.dsp
+index b89375a..b0ce4b1 100644
+--- a/srclib/expat-lite/libexpat.dsp
++++ b/srclib/expat-lite/libexpat.dsp
+@@ -1,35 +1,34 @@
+-# Microsoft Developer Studio Project File - Name="expatlib" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Project File - Name="libexpat" - Package Owner=<4>
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+ 
+-CFG=expatlib - Win32 Debug
++CFG=libexpat - Win32 Debug
+ !MESSAGE This is not a valid makefile. To build this project using NMAKE,
+ !MESSAGE use the Export Makefile command and run
+ !MESSAGE 
+-!MESSAGE NMAKE /f "expatlib.mak".
++!MESSAGE NMAKE /f "libexpat.mak".
+ !MESSAGE 
+ !MESSAGE You can specify a configuration when running NMAKE
+ !MESSAGE by defining the macro CFG on the command line. For example:
+ !MESSAGE 
+-!MESSAGE NMAKE /f "expatlib.mak" CFG="expatlib - Win32 Debug"
++!MESSAGE NMAKE /f "libexpat.mak" CFG="libexpat - Win32 Debug"
+ !MESSAGE 
+ !MESSAGE Possible choices for configuration are:
+ !MESSAGE 
+-!MESSAGE "expatlib - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
+-!MESSAGE "expatlib - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
++!MESSAGE "libexpat - Win32 Release" (based on "Win32 (x86) Dynamic-Link Library")
++!MESSAGE "libexpat - Win32 Debug" (based on "Win32 (x86) Dynamic-Link Library")
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+ MTL=midl.exe
+ RSC=rc.exe
+ 
+-!IF  "$(CFG)" == "expatlib - Win32 Release"
++!IF  "$(CFG)" == "libexpat - Win32 Release"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+@@ -43,7 +42,7 @@ RSC=rc.exe
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+ # ADD BASE CPP /nologo /MT /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /FD /c
+-# ADD CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /Fd"Release/expatlib" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /Fd"Release/libexpat" /FD /c
+ # ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x409 /d "NDEBUG"
+@@ -52,11 +51,10 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 /nologo /dll /machine:I386
+-# ADD LINK32 /nologo /dll /machine:I386 /base:@"..\..\os\win32\BaseAddr.ref",expatlib
+-# SUBTRACT LINK32 /pdb:none
++# ADD BASE LINK32 /nologo /base:"0x6EC00000" /dll /incremental:no /map /dll /machine:I386
++# ADD LINK32 /nologo /base:"0x6EC00000" /dll /incremental:no /map /dll /machine:I386
+ 
+-!ELSEIF  "$(CFG)" == "expatlib - Win32 Debug"
++!ELSEIF  "$(CFG)" == "libexpat - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+@@ -69,8 +67,8 @@ LINK32=link.exe
+ # PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /Fd"Debug/expatlib" /FD /c
++# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /FD /c
++# ADD CPP /nologo /MDd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /D "XMLPARSE_EXPORTS" /Fd"Debug/libexpat" /FD /c
+ # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD BASE RSC /l 0x409 /d "_DEBUG"
+@@ -79,16 +77,15 @@ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 /nologo /dll /debug /machine:I386 
+-# ADD LINK32 /nologo /dll /debug /machine:I386 /base:@"..\..\os\win32\BaseAddr.ref",expatlib
+-# SUBTRACT LINK32 /pdb:none
++# ADD BASE LINK32 /nologo /base:"0x6EC00000" /dll /incremental:no /map /debug /machine:I386 
++# ADD LINK32 /nologo /base:"0x6EC00000" /dll /incremental:no /map /debug /machine:I386 
+ 
+ !ENDIF 
+ 
+ # Begin Target
+ 
+-# Name "expatlib - Win32 Release"
+-# Name "expatlib - Win32 Debug"
++# Name "libexpat - Win32 Release"
++# Name "libexpat - Win32 Debug"
+ # Begin Source File
+ 
+ SOURCE=".\hashtable.c"
+@@ -115,7 +112,7 @@ SOURCE=".\xmltok.c"
+ # End Source File
+ # Begin Source File
+ 
+-SOURCE=".\expatlib.def"
++SOURCE=".\libexpat.def"
+ # End Source File
+ 
+ # End Target
+diff --git a/srclib/expat-lite/xmlparse.dsp b/srclib/expat-lite/xmlparse.dsp
+index e00e0bc..cd4392e 100644
+--- a/srclib/expat-lite/xmlparse.dsp
++++ b/srclib/expat-lite/xmlparse.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="xmlparse" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=xmlparse - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -70,8 +69,8 @@ LINK32=link.exe
+ # PROP Intermediate_Dir "XMLParseD"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLPARSE_EXPORTS" /YX /FD /GZ /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLPARSE_EXPORTS" /FD /GZ /c
++# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLPARSE_EXPORTS" /YX /FD /GZ /c
++# ADD CPP /nologo /MDd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLPARSE_EXPORTS" /FD /GZ /c
+ # SUBTRACT CPP /YX
+ # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+diff --git a/srclib/expat-lite/xmltok.dsp b/srclib/expat-lite/xmltok.dsp
+index 89531f4..68f6d63 100644
+--- a/srclib/expat-lite/xmltok.dsp
++++ b/srclib/expat-lite/xmltok.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="xmltok" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
+@@ -22,7 +22,6 @@ CFG=xmltok - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -70,8 +69,8 @@ LINK32=link.exe
+ # PROP Intermediate_Dir "XMLTokD"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /YX /FD /GZ /c
+-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /FD /GZ /c
++# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /YX /FD /GZ /c
++# ADD CPP /nologo /MDd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "XMLTOK_EXPORTS" /FD /GZ /c
+ # SUBTRACT CPP /Fr /YX
+ # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+ # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
+diff --git a/srclib/pcre/dftables.dsp b/srclib/pcre/dftables.dsp
+index 995bba6..3b3f223 100644
+--- a/srclib/pcre/dftables.dsp
++++ b/srclib/pcre/dftables.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="dftables" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=dftables - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -32,50 +31,49 @@ RSC=rc.exe
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 0
+-# PROP BASE Output_Dir "Release"
++# PROP BASE Output_Dir ""
+ # PROP BASE Intermediate_Dir "Release"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 0
+ # PROP Output_Dir ""
+-# PROP Intermediate_Dir "dftables_R"
++# PROP Intermediate_Dir "Release"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
+-# ADD CPP /nologo /MD /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /Fd"Release\dftables" /FD /c
+ # ADD BASE RSC /l 0x809 /d "NDEBUG"
+ # ADD RSC /l 0x809 /d "NDEBUG"
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /machine:I386
+-# ADD LINK32 kernel32.lib /nologo /subsystem:console /pdb:none /map /machine:I386
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Release\dftables.pdb" /map /machine:I386
++# ADD LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Release\dftables.pdb" /map /machine:I386
+ 
+ !ELSEIF  "$(CFG)" == "dftables - Win32 Debug"
+ 
+ # PROP BASE Use_MFC 0
+ # PROP BASE Use_Debug_Libraries 1
+-# PROP BASE Output_Dir "Debug"
++# PROP BASE Output_Dir ""
+ # PROP BASE Intermediate_Dir "Debug"
+ # PROP BASE Target_Dir ""
+ # PROP Use_MFC 0
+ # PROP Use_Debug_Libraries 1
+ # PROP Output_Dir ""
+-# PROP Intermediate_Dir "dftables_D"
++# PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /Gm /ZI /Od /D "_WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD BASE CPP /nologo /MDd /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /D "_WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /Fd"Debug\dftables" /FD /c
+ # ADD BASE RSC /l 0x809 /d "_DEBUG"
+ # ADD RSC /l 0x809 /d "_DEBUG"
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+ LINK32=link.exe
+-# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /debug /machine:I386 /pdbtype:sept
+-# ADD LINK32 kernel32.lib /nologo /subsystem:console /pdb:none /debug /machine:I386
+-# SUBTRACT LINK32 /map
++# ADD BASE LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Debug\dftables.pdb" /map /debug /machine:I386 /pdbtype:sept
++# ADD LINK32 kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Debug\dftables.pdb" /map /debug /machine:I386
+ 
+ !ENDIF 
+ 
+diff --git a/srclib/pcre/pcre.dsp b/srclib/pcre/pcre.dsp
+index 05750dc..35f7d67 100644
+--- a/srclib/pcre/pcre.dsp
++++ b/srclib/pcre/pcre.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="pcre" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Static Library" 0x0104
+@@ -22,7 +22,6 @@ CFG=pcre - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -67,7 +66,7 @@ RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
+ # ADD BASE CPP /nologo /MDd /W3 /GX /Z7 /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /D "_WIN32" /D "_DEBUG" /D "_WINDOWS" /D "STATIC" /Fd"LibD/pcre" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /D "_WIN32" /D "_DEBUG" /D "_WINDOWS" /D "STATIC" /Fd"LibD/pcre" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+diff --git a/srclib/pcre/pcreposix.dsp b/srclib/pcre/pcreposix.dsp
+index f131e48..ee0f813 100644
+--- a/srclib/pcre/pcreposix.dsp
++++ b/srclib/pcre/pcreposix.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="pcreposix" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Static Library" 0x0104
+@@ -22,7 +22,6 @@ CFG=pcreposix - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -43,7 +42,7 @@ RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
+ # ADD BASE CPP /nologo /MD /W3 /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MD /W3 /O2 /D "_WIN32" /D "NDEBUG" /D "_WINDOWS" /D "STATIC" /FD /Fd"LibR/pcreposix" /c
++# ADD CPP /nologo /MD /W3 /O2 /D "_WIN32" /D "NDEBUG" /D "_WINDOWS" /D "STATIC" /Fd"LibR/pcreposix" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+@@ -67,7 +66,7 @@ RSC=rc.exe
+ # ADD BASE RSC /l 0x409
+ # ADD RSC /l 0x409
+ # ADD BASE CPP /nologo /MDd /W3 /GX /Z7 /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /D "_WIN32" /D "_DEBUG" /D "_WINDOWS" /D "STATIC" /Fd"LibD/pcreposix" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /D "_WIN32" /D "_DEBUG" /D "_WINDOWS" /D "STATIC" /Fd"LibD/pcreposix" /FD /c
+ BSC32=bscmake.exe
+ # ADD BASE BSC32 /nologo
+ # ADD BSC32 /nologo
+diff --git a/support/ab.dsp b/support/ab.dsp
+index f15e542..1b80836 100644
+--- a/support/ab.dsp
++++ b/support/ab.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="ab" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=ab - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -66,8 +65,8 @@ LINK32=link.exe
+ # PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/ab" /FD /c
++# ADD BASE CPP /nologo /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/ab" /FD /c
+ # SUBTRACT CPP /YX
+ # ADD BASE RSC /l 0x409 /d "_DEBUG"
+ # ADD RSC /l 0x409 /d "_DEBUG"
+diff --git a/support/htdigest.dsp b/support/htdigest.dsp
+index abba92a..f0b02b5 100644
+--- a/support/htdigest.dsp
++++ b/support/htdigest.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="htdigest" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=htdigest - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -66,8 +65,8 @@ LINK32=link.exe
+ # PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/htdigest" /FD /c
++# ADD BASE CPP /nologo /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/htdigest" /FD /c
+ # SUBTRACT CPP /YX
+ # ADD BASE RSC /l 0x409 /d "_DEBUG"
+ # ADD RSC /l 0x409 /d "_DEBUG"
+diff --git a/support/htpasswd.dsp b/support/htpasswd.dsp
+index b43c7c1..6e9360d 100644
+--- a/support/htpasswd.dsp
++++ b/support/htpasswd.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="htpasswd" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=htpasswd - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -66,8 +65,8 @@ LINK32=link.exe
+ # PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/htpasswd" /FD /c
++# ADD BASE CPP /nologo /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/htpasswd" /FD /c
+ # SUBTRACT CPP /YX
+ # ADD BASE RSC /l 0x409 /d "_DEBUG"
+ # ADD RSC /l 0x409 /d "_DEBUG"
+diff --git a/support/logresolve.dsp b/support/logresolve.dsp
+index 9190c29..7208712 100644
+--- a/support/logresolve.dsp
++++ b/support/logresolve.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="logresolve" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=logresolve - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -66,8 +65,8 @@ LINK32=link.exe
+ # PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/logresolve" /FD /c
++# ADD BASE CPP /nologo /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/logresolve" /FD /c
+ # SUBTRACT CPP /Fr
+ # ADD BASE RSC /l 0x409 /d "_DEBUG"
+ # ADD RSC /l 0x409 /d "_DEBUG"
+diff --git a/support/rotatelogs.dsp b/support/rotatelogs.dsp
+index a1b5b64..299b2f9 100644
+--- a/support/rotatelogs.dsp
++++ b/support/rotatelogs.dsp
+@@ -1,5 +1,5 @@
+ # Microsoft Developer Studio Project File - Name="rotatelogs" - Package Owner=<4>
+-# Microsoft Developer Studio Generated Build File, Format Version 6.00
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
+ # ** DO NOT EDIT **
+ 
+ # TARGTYPE "Win32 (x86) Console Application" 0x0103
+@@ -22,7 +22,6 @@ CFG=rotatelogs - Win32 Debug
+ !MESSAGE 
+ 
+ # Begin Project
+-# PROP AllowPerConfigDependencies 0
+ # PROP Scc_ProjName ""
+ # PROP Scc_LocalPath ""
+ CPP=cl.exe
+@@ -65,8 +64,8 @@ LINK32=link.exe
+ # PROP Intermediate_Dir "Debug"
+ # PROP Ignore_Export_Lib 0
+ # PROP Target_Dir ""
+-# ADD BASE CPP /nologo /W3 /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
+-# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/rotatelogs" /FD /c
++# ADD BASE CPP /nologo /W3 /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
++# ADD CPP /nologo /MDd /W3 /GX /Zi /Od /I "../srclib/apr/include" /I "../srclib/apr-util/include" /I "../include" /I "../os/win32" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "APR_DECLARE_STATIC" /D "AP_DECLARE_STATIC" /Fd"Debug/rotatelogs" /FD /c
+ # SUBTRACT CPP /YX
+ # ADD BASE RSC /l 0x409 /d "_DEBUG"
+ # ADD RSC /l 0x409 /d "_DEBUG"

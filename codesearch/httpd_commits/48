@@ -1,0 +1,76 @@
+commit 651be2ac8ba567277fc03eabe4269b24d14890d1
+Author: Jeff Trawick <trawick@apache.org>
+Date:   Wed Sep 11 15:37:34 2013 +0000
+
+    Add "default user id" capability for authorizers that handle
+    check_authn and return success but don't have a specific user
+    id to assign (e.g., guest users).
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1521909 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/docs/manual/mod/mod_authnz_fcgi.xml b/docs/manual/mod/mod_authnz_fcgi.xml
+index 19e6c2e..8261565 100644
+--- a/docs/manual/mod/mod_authnz_fcgi.xml
++++ b/docs/manual/mod/mod_authnz_fcgi.xml
+@@ -487,6 +487,14 @@ authentication hook.</description>
+          to run when this module has a FastCGI authorizer configured
+          and it fails the request.</dd>
+ 
++         <dt>DefaultUser <em>userid</em></dt>
++         <dd>When the authorizer returns success and <code>UserExpr</code>
++         is configured and evaluates to an empty string (e.g., authorizer
++         didn't return a variable), this value will be used as the user
++         id.  This is typically used when the authorizer has a concept of
++         guest, or unauthenticated, users and guest users are mapped to
++         some specific user id for logging and other purposes.</dd>
++
+          <dt>RequireBasicAuth On|Off (default Off)</dt>
+          <dd>This controls whether or not Basic auth is required
+          before passing the request to the authorizer.  If required,
+diff --git a/modules/aaa/mod_authnz_fcgi.c b/modules/aaa/mod_authnz_fcgi.c
+index 5bea1ea..6f6e275 100644
+--- a/modules/aaa/mod_authnz_fcgi.c
++++ b/modules/aaa/mod_authnz_fcgi.c
+@@ -44,7 +44,11 @@ typedef struct {
+ 
+ typedef struct {
+     const char *name; /* provider name */
+-    ap_expr_info_t *user_expr; /* expr to evaluate t set r->user */
++    const char *default_user; /* this is user if authorizer returns
++                               * success and a user expression yields
++                               * empty string
++                               */
++    ap_expr_info_t *user_expr; /* expr to evaluate to set r->user */
+     char authoritative; /* fail request if user is rejected? */
+     char require_basic_auth; /* fail if client didn't send credentials? */
+ } fcgi_dir_conf;
+@@ -859,6 +863,9 @@ static int fcgi_check_authn(request_rec *r)
+                               APLOGNO(02519) "%s: Setting user to '%s'",
+                               fn, r->user);
+             }
++            else if (user && dconf->default_user) {
++                r->user = apr_pstrdup(r->pool, dconf->default_user);
++            }
+             else if (user) {
+                 ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                               APLOGNO(02520) "%s: Failure extracting user "
+@@ -868,6 +875,7 @@ static int fcgi_check_authn(request_rec *r)
+                 r->status = HTTP_INTERNAL_SERVER_ERROR;
+             }
+             else {
++                /* unexpected error, not even an empty string was returned */
+                 ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                               APLOGNO(02521) "%s: Failure extracting user "
+                               "after calling authorizer: %s",
+@@ -1108,6 +1116,9 @@ static const char *fcgi_check_authn_provider(cmd_parms *cmd,
+                 badarg = 1;
+             }
+         }
++        else if (!strcasecmp(var, "DefaultUser")) {
++            dc->default_user = val;
++        }
+         else if (!strcasecmp(var, "RequireBasicAuth")) {
+             if (!strcasecmp(val, "On")) {
+                 dc->require_basic_auth = 1;

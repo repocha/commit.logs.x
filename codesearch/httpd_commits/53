@@ -1,0 +1,22 @@
+commit da807b0ce130ead3c6281db0b27a74a8528ccdd9
+Author: Eric Covener <covener@apache.org>
+Date:   Mon Jun 24 20:16:57 2013 +0000
+
+    attribute and error reason reversed
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1496194 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index a03436b..8747010 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -894,7 +894,7 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+                 ap_log_rerror(APLOG_MARK, APLOG_TRACE4, 0, r, APLOGNO(01719)
+                               "auth_ldap authorize: require group \"%s\": "
+                               "didn't match with attr %s [%s][%d - %s]",
+-                              t, ldc->reason, ent[i].name, result, 
++                              t, ent[i].name, ldc->reason, result, 
+                               ldap_err2string(result));
+         }
+     }

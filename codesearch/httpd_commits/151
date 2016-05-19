@@ -1,0 +1,909 @@
+commit 299a0c8fbc9d3877ce70c0b04cb6fb38e723685f
+Author: Paul J. Reder <rederpj@apache.org>
+Date:   Fri Jul 27 20:34:41 2007 +0000
+
+     mod_ldap, mod_authnzldap: Add support for nested groups (i.e. the ability
+         to authorize an authenticated user via a "require ldap-group X" directive
+         where the user is not in group X, but is in a subgroup contained in X.
+         PR 42891 [Paul J. Reder]
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@560373 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 235f259..4acc7d2 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2,6 +2,11 @@
+ Changes with Apache 2.3.0
+   [Remove entries to the current 2.0 and 2.2 section below, when backported]
+ 
++  *) mod_ldap, mod_authnzldap: Add support for nested groups (i.e. the ability
++     to authorize an authenticated user via a "require ldap-group X" directive
++     where the user is not in group X, but is in a subgroup contained in X.
++     PR 42891 [Paul J. Reder]
++
+   *) mod_filter: fix integer comparisons in dispatch rules
+      PR 41835 [Nick Kew]
+ 
+diff --git a/include/util_ldap.h b/include/util_ldap.h
+index d03e67f..fc069ae 100644
+--- a/include/util_ldap.h
++++ b/include/util_ldap.h
+@@ -144,6 +144,10 @@ typedef struct util_ldap_state_t {
+ 
+ } util_ldap_state_t;
+ 
++/* Used to store arrays of attribute labels/values. */
++struct mod_auth_ldap_groupattr_entry_t {
++    char *name;
++};
+ 
+ /**
+  * Open a connection to an LDAP server
+@@ -244,7 +248,8 @@ APR_DECLARE_OPTIONAL_FN(int,uldap_cache_comparedn,(request_rec *r, util_ldap_con
+  * @param attrib The attribute within the object we are comparing for.
+  * @param value The value of the attribute we are trying to compare for. 
+  * @tip Use this function to determine whether an attribute/value pair exists within an
+- *      object. Typically this would be used to determine LDAP group membership.
++ *      object. Typically this would be used to determine LDAP top-level group
++ *      membership.
+  * @fn int util_ldap_cache_compare(request_rec *r, util_ldap_connection_t *ldc,
+  *                                      const char *url, const char *dn, const char *attrib, const char *value)
+  */
+@@ -252,6 +257,36 @@ APR_DECLARE_OPTIONAL_FN(int,uldap_cache_compare,(request_rec *r, util_ldap_conne
+                             const char *url, const char *dn, const char *attrib, const char *value));
+ 
+ /**
++ * An LDAP function that checks if the specified user is a member of a subgroup.
++ * @param r The request record
++ * @param ldc The LDAP connection being used.
++ * @param url The URL of the LDAP connection - used for deciding which cache to use.
++ * @param dn The DN of the object in which we find subgroups to search within.
++ * @param attrib The attribute within group objects that identify users.
++ * @param value The user attribute value we are trying to compare for.
++ * @param subgroupAttrs The attributes within group objects that identify subgroups.
++ *                      Array of strings.
++ * @param subgroupclasses The objectClass values used to identify groups (and
++ *                      subgroups). apr_array_header_t *.
++ * @param cur_subgroup_depth Current recursive depth during subgroup processing.
++ * @param max_subgroup_depth Maximum depth of recursion allowed during subgroup
++ *                           processing.
++ * @tip Use this function to determine whether an attribute/value pair exists within a
++ *      starting group object or one of its nested subgroups. Typically this would be
++ *      used to determine LDAP nested group membership.
++ * @deffunc int util_ldap_cache_check_subgroups(request_rec *r, util_ldap_connection_t
++ *                                      *ldc, const char *url, const char *dn,
++ *                                      const char *attrib, const char value,
++ *                                      char **subgroupAttrs, apr_array_header_t
++ *                                      *subgroupclasses, int cur_subgroup_depth, int
++ *                                      max_subgroup_depth )
++ */
++APR_DECLARE_OPTIONAL_FN(int,uldap_cache_check_subgroups,(request_rec *r, util_ldap_connection_t *ldc,
++                                       const char *url, const char *dn, const char *attrib, const char *value,
++                                       char **subgroupAttrs, apr_array_header_t *subgroupclasses,
++                                       int cur_subgroup_depth, int max_subgroup_depth));
++
++/**
+  * Checks a username/password combination by binding to the LDAP server
+  * @param r The request record
+  * @param ldc The LDAP connection being used.
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index 38d83da..24acfc5 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -67,9 +67,14 @@ typedef struct {
+ 
+     int have_ldap_url;              /* Set if we have found an LDAP url */
+ 
+-    apr_array_header_t *groupattr;  /* List of Group attributes */
++    apr_array_header_t *groupattr;  /* List of Group attributes identifying user members. Default:"member uniqueMember" */
+     int group_attrib_is_dn;         /* If true, the group attribute is the DN, otherwise,
+                                         it's the exact string passed by the HTTP client */
++    apr_array_header_t *subgroupattrs; /* List of attributes used to find subgroup references
++                                          within a group directory entry. Default:"member uniqueMember" */
++    char **sgAttributes;            /* Array of strings constructed (post-config) from subgroupattrs. Last entry is NULL. */
++    apr_array_header_t *subgroupclasses; /* List of object classes of sub-groups. Default:"groupOfNames groupOfUniqueNames" */
++    int maxNestingDepth;            /* Maximum recursive nesting depth permitted during subgroup processing. Default: 10 */
+ 
+     int secure;                     /* True if SSL connections are requested */
+ } authn_ldap_config_t;
+@@ -82,16 +87,13 @@ typedef struct {
+ /* maximum group elements supported */
+ #define GROUPATTR_MAX_ELTS 10
+ 
+-struct mod_auth_ldap_groupattr_entry_t {
+-    char *name;
+-};
+-
+ module AP_MODULE_DECLARE_DATA authnz_ldap_module;
+ 
+ static APR_OPTIONAL_FN_TYPE(uldap_connection_close) *util_ldap_connection_close;
+ static APR_OPTIONAL_FN_TYPE(uldap_connection_find) *util_ldap_connection_find;
+ static APR_OPTIONAL_FN_TYPE(uldap_cache_comparedn) *util_ldap_cache_comparedn;
+ static APR_OPTIONAL_FN_TYPE(uldap_cache_compare) *util_ldap_cache_compare;
++static APR_OPTIONAL_FN_TYPE(uldap_cache_check_subgroups) *util_ldap_cache_check_subgroups;
+ static APR_OPTIONAL_FN_TYPE(uldap_cache_checkuserid) *util_ldap_cache_checkuserid;
+ static APR_OPTIONAL_FN_TYPE(uldap_cache_getuserdn) *util_ldap_cache_getuserdn;
+ static APR_OPTIONAL_FN_TYPE(uldap_ssl_supported) *util_ldap_ssl_supported;
+@@ -285,6 +287,10 @@ static void *create_authnz_ldap_dir_config(apr_pool_t *p, char *d)
+ */
+     sec->groupattr = apr_array_make(p, GROUPATTR_MAX_ELTS,
+                                     sizeof(struct mod_auth_ldap_groupattr_entry_t));
++    sec->subgroupattrs = apr_array_make(p, GROUPATTR_MAX_ELTS,
++                                    sizeof(struct mod_auth_ldap_groupattr_entry_t));
++    sec->subgroupclasses = apr_array_make(p, GROUPATTR_MAX_ELTS,
++                                    sizeof(struct mod_auth_ldap_groupattr_entry_t));
+ 
+     sec->have_ldap_url = 0;
+     sec->url = "";
+@@ -294,6 +300,8 @@ static void *create_authnz_ldap_dir_config(apr_pool_t *p, char *d)
+     sec->deref = always;
+     sec->group_attrib_is_dn = 1;
+     sec->secure = -1;   /*Initialize to unset*/
++    sec->maxNestingDepth = 10;
++    sec->sgAttributes = NULL;
+ 
+     sec->user_is_dn = 0;
+     sec->remote_user_attribute = NULL;
+@@ -648,7 +656,43 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+         grp = apr_array_push(sec->groupattr);
+         grp->name = "member";
+         grp = apr_array_push(sec->groupattr);
+-        grp->name = "uniquemember";
++        grp->name = "uniqueMember";
++#if APR_HAS_THREADS
++        apr_thread_mutex_unlock(sec->lock);
++#endif
++    }
++
++    /*
++     * If there are no elements in the sub group attribute array, the default
++     * should be member and uniquemember; populate the array now.
++     */
++    if (sec->subgroupattrs->nelts == 0) {
++        struct mod_auth_ldap_groupattr_entry_t *grp;
++#if APR_HAS_THREADS
++        apr_thread_mutex_lock(sec->lock);
++#endif
++        grp = apr_array_push(sec->subgroupattrs);
++        grp->name = "member";
++        grp = apr_array_push(sec->subgroupattrs);
++        grp->name = "uniqueMember";
++#if APR_HAS_THREADS
++        apr_thread_mutex_unlock(sec->lock);
++#endif
++    }
++
++    /*
++     * If there are no elements in the sub group classes array, the default
++     * should be groupOfNames and groupOfUniqueNames; populate the array now.
++     */
++    if (sec->subgroupclasses->nelts == 0) {
++        struct mod_auth_ldap_groupattr_entry_t *grp;
++#if APR_HAS_THREADS
++        apr_thread_mutex_lock(sec->lock);
++#endif
++        grp = apr_array_push(sec->subgroupclasses);
++        grp->name = "groupOfNames";
++        grp = apr_array_push(sec->subgroupclasses);
++        grp->name = "groupOfUniqueNames";
+ #if APR_HAS_THREADS
+         apr_thread_mutex_unlock(sec->lock);
+ #endif
+@@ -734,6 +778,45 @@ static authz_status ldapgroup_check_authorization(request_rec *r,
+                               getpid(), ent[i].name, ldc->reason, ldap_err2string(result));
+                 return AUTHZ_GRANTED;
+             }
++            case LDAP_COMPARE_FALSE: {
++                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
++                               "[%" APR_PID_T_FMT "] auth_ldap authorise: require group \"%s\": "
++                               "failed [%s][%d - %s], checking sub-groups",
++                               getpid(), t, ldc->reason, result, ldap_err2string(result));
++
++                if(sec->sgAttributes == NULL) {
++                    struct mod_auth_ldap_groupattr_entry_t *sg_ent = (struct mod_auth_ldap_groupattr_entry_t *) sec->subgroupattrs->elts;
++                    char **sg_attrs;
++                    int sga_index;
++
++                    /* Allocate a null-terminated array of attribute strings. */
++                    sg_attrs = apr_pcalloc(sec->pool, (sec->subgroupattrs->nelts+1) * sizeof(char *));
++                    for(sga_index = 0; sga_index < sec->subgroupattrs->nelts; sga_index++) {
++                        sg_attrs[sga_index] = apr_pstrdup(sec->pool, sg_ent[sga_index].name);
++                    }
++                    sg_attrs[sec->subgroupattrs->nelts] = NULL;
++                    sec->sgAttributes = sg_attrs;
++                }
++
++                result = util_ldap_cache_check_subgroups(r, ldc, sec->url, t, ent[i].name,
++                                                         sec->group_attrib_is_dn ? req->dn : req->user,
++                                                         sec->sgAttributes, sec->subgroupclasses,
++                                                         0, sec->maxNestingDepth);
++                if(result == LDAP_COMPARE_TRUE) {
++                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
++                                   "[%" APR_PID_T_FMT "] auth_ldap authorise: require group (sub-group): "
++                                   "authorisation successful (attribute %s) [%s][%d - %s]",
++                                   getpid(), ent[i].name, ldc->reason, result, ldap_err2string(result));
++                     return OK;
++                }
++                else {
++                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
++                                   "[%" APR_PID_T_FMT "] auth_ldap authorise: require group (sub-group) \"%s\": "
++                                   "authorisation failed [%s][%d - %s]",
++                                   getpid(), t, ldc->reason, result, ldap_err2string(result));
++                }
++                break;
++            }
+             default: {
+                 ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                               "[%" APR_PID_T_FMT "] auth_ldap authorize: require group \"%s\": "
+@@ -1249,6 +1332,47 @@ static const char *mod_auth_ldap_set_deref(cmd_parms *cmd, void *config, const c
+     return NULL;
+ }
+ 
++static const char *mod_auth_ldap_add_subgroup_attribute(cmd_parms *cmd, void *config, const char *arg)
++{
++    struct mod_auth_ldap_groupattr_entry_t *new;
++
++    authn_ldap_config_t *sec = config;
++
++    if (sec->subgroupattrs->nelts > GROUPATTR_MAX_ELTS)
++        return "Too many AuthLDAPSubGroupAttribute values";
++
++    new = apr_array_push(sec->subgroupattrs);
++    new->name = apr_pstrdup(cmd->pool, arg);
++
++    return NULL;
++}
++
++static const char *mod_auth_ldap_add_subgroup_class(cmd_parms *cmd, void *config, const char *arg)
++{
++    struct mod_auth_ldap_groupattr_entry_t *new;
++
++    authn_ldap_config_t *sec = config;
++
++    if (sec->subgroupclasses->nelts > GROUPATTR_MAX_ELTS)
++        return "Too many AuthLDAPSubGroupClass values";
++
++    new = apr_array_push(sec->subgroupclasses);
++    new->name = apr_pstrdup(cmd->pool, arg);
++
++    return NULL;
++}
++
++static const char *mod_auth_ldap_set_subgroup_maxdepth(cmd_parms *cmd,
++                                                       void *config,
++                                                       const char *max_depth)
++{
++    authn_ldap_config_t *sec = config;
++
++    sec->maxNestingDepth = atol(max_depth);
++
++    return NULL;
++}
++
+ static const char *mod_auth_ldap_add_group_attribute(cmd_parms *cmd, void *config, const char *arg)
+ {
+     struct mod_auth_ldap_groupattr_entry_t *new;
+@@ -1312,8 +1436,7 @@ static const command_rec authnz_ldap_cmds[] =
+                  "the REMOTE_USER variable will contain whatever value the remote user sent."),
+ 
+     AP_INIT_TAKE1("AuthLDAPRemoteUserAttribute", ap_set_string_slot,
+-                 (void *)APR_OFFSETOF(authn_ldap_config_t, 
+-                                      remote_user_attribute), OR_AUTHCFG,
++                 (void *)APR_OFFSETOF(authn_ldap_config_t, remote_user_attribute), OR_AUTHCFG,
+                  "Override the user supplied username and place the "
+                  "contents of this attribute in the REMOTE_USER "
+                  "environment variable."),
+@@ -1325,9 +1448,20 @@ static const command_rec authnz_ldap_cmds[] =
+                  "(at the expense of possible false matches). See the documentation for "
+                  "a complete description of this option."),
+ 
++    AP_INIT_ITERATE("AuthLDAPSubGroupAttribute", mod_auth_ldap_add_subgroup_attribute, NULL, OR_AUTHCFG,
++                    "Attribute labels used to define sub-group (or nested group) membership in groups - "
++                    "defaults to member and uniqueMember (one per directive)"),
++
++    AP_INIT_ITERATE("AuthLDAPSubGroupClass", mod_auth_ldap_add_subgroup_class, NULL, OR_AUTHCFG,
++                     "LDAP objectClass values used to identify sub-group instances - "
++                     "defaults to groupOfNames and groupOfUniqueNames (one per directive)"),
++
++    AP_INIT_TAKE1("AuthLDAPMaxSubGroupDepth", mod_auth_ldap_set_subgroup_maxdepth, NULL, OR_AUTHCFG,
++                      "Maximum subgroup nesting depth to be evaluated - defaults to 10 (top-level group = 0)"),
++
+     AP_INIT_ITERATE("AuthLDAPGroupAttribute", mod_auth_ldap_add_group_attribute, NULL, OR_AUTHCFG,
+-                    "A list of attributes used to define group membership - defaults to "
+-                    "member and uniquemember"),
++                    "A list of attribute labels used to identify the user members of groups - defaults to "
++                    "member and uniquemember (one per directive)"),
+ 
+     AP_INIT_FLAG("AuthLDAPGroupAttributeIsDN", ap_set_flag_slot,
+                  (void *)APR_OFFSETOF(authn_ldap_config_t, group_attrib_is_dn), OR_AUTHCFG,
+@@ -1336,7 +1470,7 @@ static const command_rec authnz_ldap_cmds[] =
+                  "provided by the client directly. Defaults to 'on'."),
+ 
+     AP_INIT_TAKE1("AuthLDAPDereferenceAliases", mod_auth_ldap_set_deref, NULL, OR_AUTHCFG,
+-                  "Determines how aliases are handled during a search. Can bo one of the"
++                  "Determines how aliases are handled during a search. Can be one of the"
+                   "values \"never\", \"searching\", \"finding\", or \"always\". "
+                   "Defaults to always."),
+ 
+@@ -1468,6 +1602,7 @@ static void ImportULDAPOptFn(void)
+     util_ldap_cache_checkuserid = APR_RETRIEVE_OPTIONAL_FN(uldap_cache_checkuserid);
+     util_ldap_cache_getuserdn   = APR_RETRIEVE_OPTIONAL_FN(uldap_cache_getuserdn);
+     util_ldap_ssl_supported     = APR_RETRIEVE_OPTIONAL_FN(uldap_ssl_supported);
++    util_ldap_cache_check_subgroups = APR_RETRIEVE_OPTIONAL_FN(uldap_cache_check_subgroups);
+ }
+ 
+ static void register_hooks(apr_pool_t *p)
+diff --git a/modules/ldap/util_ldap.c b/modules/ldap/util_ldap.c
+index a416ed2..b39310b 100644
+--- a/modules/ldap/util_ldap.c
++++ b/modules/ldap/util_ldap.c
+@@ -748,6 +748,8 @@ static int uldap_cache_compare(request_rec *r, util_ldap_connection_t *ldc,
+         the_compare_node.attrib = (char *)attrib;
+         the_compare_node.value = (char *)value;
+         the_compare_node.result = 0;
++        the_compare_node.sgl_processed = 0;
++        the_compare_node.subgroupList = NULL;
+ 
+         compare_nodep = util_ald_cache_fetch(curl->compare_cache,
+                                              &the_compare_node);
+@@ -760,24 +762,24 @@ static int uldap_cache_compare(request_rec *r, util_ldap_connection_t *ldc,
+             }
+             else {
+                 /* ...and it is good */
+-                /* unlock this read lock */
+-                LDAP_CACHE_UNLOCK();
+                 if (LDAP_COMPARE_TRUE == compare_nodep->result) {
+                     ldc->reason = "Comparison true (cached)";
+-                    return compare_nodep->result;
+                 }
+                 else if (LDAP_COMPARE_FALSE == compare_nodep->result) {
+                     ldc->reason = "Comparison false (cached)";
+-                    return compare_nodep->result;
+                 }
+                 else if (LDAP_NO_SUCH_ATTRIBUTE == compare_nodep->result) {
+                     ldc->reason = "Comparison no such attribute (cached)";
+-                    return compare_nodep->result;
+                 }
+                 else {
+                     ldc->reason = "Comparison undefined (cached)";
+-                    return compare_nodep->result;
+                 }
++
++                /* record the result code to return with the reason... */
++                result = compare_nodep->result;
++                /* and unlock this read lock */
++                LDAP_CACHE_UNLOCK();
++                return result;
+             }
+         }
+         /* unlock this read lock */
+@@ -789,6 +791,7 @@ start_over:
+         /* too many failures */
+         return result;
+     }
++
+     if (LDAP_SUCCESS != (result = uldap_connection_open(r, ldc))) {
+         /* connect failed */
+         return result;
+@@ -814,6 +817,8 @@ start_over:
+             LDAP_CACHE_LOCK();
+             the_compare_node.lastcompare = curtime;
+             the_compare_node.result = result;
++            the_compare_node.sgl_processed = 0;
++            the_compare_node.subgroupList = NULL;
+ 
+             /* If the node doesn't exist then insert it, otherwise just update
+              * it with the last results
+@@ -825,7 +830,12 @@ start_over:
+                 || (strcmp(the_compare_node.attrib,compare_nodep->attrib) != 0)
+                 || (strcmp(the_compare_node.value, compare_nodep->value) != 0))
+             {
+-                util_ald_cache_insert(curl->compare_cache, &the_compare_node);
++                void *junk;
++
++                junk = util_ald_cache_insert(curl->compare_cache, &the_compare_node);
++                if(junk == NULL) {
++                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, "[%" APR_PID_T_FMT "] cache_compare: Cache insertion failure.", getpid());
++                }
+             }
+             else {
+                 compare_nodep->lastcompare = curtime;
+@@ -849,6 +859,293 @@ start_over:
+     return result;
+ }
+ 
++/*
++ * Does a recursive lookup operation to try to find a user within (cached) nested
++ * groups. It accepts a cache that it will use to lookup previous compare attempts.
++ * We cache two kinds of compares (require group compares) and (require user
++ * compares). Each compare has a different cache node: require group includes the DN;
++ * require user does not because the require user cache is owned by the
++ *
++ * DON'T CALL THIS UNLESS YOU CALLED uldap_cache_compare FIRST!!!!!
++ */
++static int uldap_cache_check_subgroups(request_rec *r, util_ldap_connection_t *ldc,
++                                       const char *url, const char *dn,
++                                       const char *attrib, const char *value,
++                                       char **subgroupAttrs, apr_array_header_t *subgroupclasses,
++                                       int cur_subgroup_depth, int max_subgroup_depth)
++{
++    int result = LDAP_COMPARE_FALSE;
++    util_url_node_t *curl;
++    util_url_node_t curnode;
++    util_compare_node_t *compare_nodep;
++    util_compare_node_t the_compare_node;
++    util_compare_subgroup_t *tmp_local_sgl = NULL;
++    int failures = 0;
++    LDAPMessage *sga_res, *entry;
++    apr_array_header_t *subgroups = apr_array_make(r->pool, 20, sizeof(char *));
++
++    util_ldap_state_t *st = (util_ldap_state_t *)
++                            ap_get_module_config(r->server->module_config,
++                                                 &ldap_module);
++
++    /*
++     * 1. Call uldap_cache_compare for each subgroupclass value to check the generic,
++     *    user-agnostic, cached group entry. This will create a new generic cache entry if there
++     *    wasn't one. If nothing returns LDAP_COMPARE_TRUE skip to step 5 since we have no groups.
++     * 2. Lock The cache and get the generic cache entry.
++     * 3. Check if there is already a subgrouplist in this generic group's cache entry.
++     *    A. If there is, go to step 4.
++     *    B. If there isn't:
++     *       i) Use ldap_search to get the full list
++     *          of subgroup "members" (which may include non-group "members").
++     *       ii) Use uldap_cache_compare to strip the list down to just groups.
++     *       iii) Lock and add this stripped down list to the cache of the generic group.
++     * 4. Loop through the sgl and call uldap_cache_compare (using the user info) for each
++     *    subgroup to see if the subgroup contains the user and to get the subgroups added to the
++     *    cache (with user-afinity, if they aren't already there).
++     *    A. If the user is in the subgroup, then we'll be returning LDAP_COMPARE_TRUE.
++     *    B. if the user isn't in the subgroup (LDAP_COMPARE_FALSE via uldap_cache_compare) then
++     *       recursively call this function to get the sub-subgroups added...
++     * 5. Cleanup local allocations.
++     * 6. Return the final result.
++     */
++
++        /* Stop looking at deeper levels of nested groups if we have reached the max.
++         * Since we already checked the top-level group in uldap_cache_compare, we don't
++         * need to check it again here - so if max_subgroup_depth is set to 0, we won't
++         * check it (i.e. that is why we check < rather than <=).
++         * We'll be calling uldap_cache_compare from here to check if the user is in the
++         * next level before we recurse into that next level looking for more subgroups.
++         */
++    if (cur_subgroup_depth < max_subgroup_depth) {
++        int base_sgcIndex = 0;
++        int lcl_sgl_processedFlag = 0;
++        struct mod_auth_ldap_groupattr_entry_t *sgc_ents = (struct mod_auth_ldap_groupattr_entry_t *) subgroupclasses->elts;
++
++        /* 1. Check the "groupiness" of the specified basedn. Stopping at the first TRUE return. */
++        while ((base_sgcIndex < subgroupclasses->nelts) && (result != LDAP_COMPARE_TRUE)) {
++            result = uldap_cache_compare(r, ldc, url, dn, "objectClass", sgc_ents[base_sgcIndex].name);
++            if (result != LDAP_COMPARE_TRUE) {
++                base_sgcIndex++;
++            }
++        }
++
++        if (result != LDAP_COMPARE_TRUE) {
++            /* The dn we were handed doesn't seem to be a group, how can we check for SUB-groups if this
++             * isn't a group?!?!?!
++             */
++            ldc->reason = "DN failed group verification.";
++            return result;
++        }
++
++        /* 2. Find previously created cache entry and check if there is already a subgrouplist. */
++        LDAP_CACHE_LOCK();
++        curnode.url = url;
++        curl = util_ald_cache_fetch(st->util_ldap_cache, &curnode);
++        LDAP_CACHE_UNLOCK();
++
++        if (curl && curl->compare_cache) {
++            /* make a comparison to the cache */
++            LDAP_CACHE_LOCK();
++
++            the_compare_node.dn = (char *)dn;
++            the_compare_node.attrib = (char *)"objectClass";
++            the_compare_node.value = (char *)sgc_ents[base_sgcIndex].name;
++            the_compare_node.result = 0;
++            the_compare_node.sgl_processed = 0;
++            the_compare_node.subgroupList = NULL;
++
++            compare_nodep = util_ald_cache_fetch(curl->compare_cache, &the_compare_node);
++
++            if (compare_nodep == NULL) {
++                /* Didn't find it. This shouldn't happen since we just called uldap_cache_compare. */
++                LDAP_CACHE_UNLOCK();
++                ldc->reason = "check_subgroups failed to find cached element.";
++                return LDAP_COMPARE_FALSE;
++            }
++            else {
++                /* Found the generic group entry... but the user isn't in this group or we wouldn't be here. */
++                lcl_sgl_processedFlag = compare_nodep->sgl_processed;
++                if(compare_nodep->sgl_processed && compare_nodep->subgroupList) {
++                    /* Make a local copy of the subgroup list */
++                    int i;
++                    tmp_local_sgl = apr_pcalloc(r->pool, sizeof(util_compare_subgroup_t));
++                    tmp_local_sgl->len = compare_nodep->subgroupList->len;
++                    tmp_local_sgl->subgroupDNs = apr_pcalloc(r->pool, sizeof(char *) * compare_nodep->subgroupList->len);
++                    for (i = 0; i < compare_nodep->subgroupList->len; i++) {
++                        tmp_local_sgl->subgroupDNs[i] = apr_pstrdup(r->pool, compare_nodep->subgroupList->subgroupDNs[i]);
++                    }
++                }
++            }
++            /* unlock this read lock */
++            LDAP_CACHE_UNLOCK();
++        }
++        else {
++              /* If we get here, something is wrong. Caches should have been created and
++                 this group entry should be found in the cache. */
++            ldc->reason = "check_subgroups failed to find any caches.";
++            return LDAP_COMPARE_FALSE;
++        }
++
++        result = LDAP_COMPARE_FALSE;
++
++        /* No cache entry had a processed SGL. Retrieve from LDAP server */
++        if ((lcl_sgl_processedFlag == 0) && (!tmp_local_sgl)) {
++start_over:
++            /* 3.B. The cache didn't have any subgrouplist yet. Go check for subgroups. */
++            if (failures++ > 10) {
++                /* too many failures */
++                return result;
++            }
++
++            if (LDAP_SUCCESS != (result = uldap_connection_open(r, ldc))) {
++                /* connect failed */
++                return result;
++            }
++
++            /* try to do the search */
++            result = ldap_search_ext_s(ldc->ldap, (char *)dn, LDAP_SCOPE_BASE,
++                                       (char *)"cn=*", subgroupAttrs, 0,
++                                       NULL, NULL, NULL, APR_LDAP_SIZELIMIT, &sga_res);
++            if (result == LDAP_SERVER_DOWN) {
++                ldc->reason = "ldap_search_ext_s() for subgroups failed with server down";
++                uldap_connection_unbind(ldc);
++                goto start_over;
++            }
++
++            /* if there is an error (including LDAP_NO_SUCH_OBJECT) return now */
++            if (result != LDAP_SUCCESS) {
++                ldc->reason = "ldap_search_ext_s() for subgroups failed";
++                return result;
++            }
++
++            entry = ldap_first_entry(ldc->ldap, sga_res);
++
++            /*
++             * Get values for the provided sub-group attributes.
++             */
++            if (subgroupAttrs) {
++                int indx = 0, tmp_sgcIndex;
++
++                while (subgroupAttrs[indx]) {
++                    char **values;
++                    int val_index = 0;
++
++                    /* Get *all* matching "member" values from this group. */
++                    values = ldap_get_values(ldc->ldap, entry, subgroupAttrs[indx]);
++
++                    if (values) {
++                        val_index = 0;
++                        /*
++                         * Now we are going to pare the subgroup members of this group to *just*
++                         * the subgroups, add them to the compare_nodep, and then proceed to check
++                         * the new level of subgroups.
++                         */
++                        while (values[val_index]) {
++                            /* Check if this entry really is a group. */
++                            tmp_sgcIndex = 0;
++                            result = LDAP_COMPARE_FALSE;
++                            while ((tmp_sgcIndex < subgroupclasses->nelts) && (result != LDAP_COMPARE_TRUE)) {
++                                result = uldap_cache_compare(r, ldc, url, values[val_index], "objectClass",
++                                                             sgc_ents[tmp_sgcIndex].name);
++
++                                if (result != LDAP_COMPARE_TRUE) {
++                                    tmp_sgcIndex++;
++                                }
++                            }
++                            /* It's a group, so add it to the array.  */
++                            if (result == LDAP_COMPARE_TRUE) {
++                                char **newgrp = (char **) apr_array_push(subgroups);
++                                *newgrp = apr_pstrdup(r->pool, values[val_index]);
++                            }
++                            val_index++;
++                        }
++                        ldap_value_free(values);
++                    }
++                    indx++;
++                }
++            }
++
++            ldap_msgfree(sga_res);
++
++            if (subgroups->nelts > 0) {
++                /* We need to fill in tmp_local_subgroups using the data from LDAP */
++                int sgindex;
++                char **group;
++                tmp_local_sgl = apr_pcalloc(r->pool, sizeof(util_compare_subgroup_t));
++                tmp_local_sgl->subgroupDNs  = apr_pcalloc(r->pool, sizeof(char *) * (subgroups->nelts));
++                for (sgindex = 0; (group = apr_array_pop(subgroups)); sgindex++) {
++                    tmp_local_sgl->subgroupDNs[sgindex] = apr_pstrdup(r->pool, *group);
++                }
++                tmp_local_sgl->len = sgindex;
++            }
++
++            /* Find the generic group cache entry and add the sgl. */
++            LDAP_CACHE_LOCK();
++
++            the_compare_node.dn = (char *)dn;
++            the_compare_node.attrib = (char *)"objectClass";
++            the_compare_node.value = (char *)sgc_ents[base_sgcIndex].name;
++            the_compare_node.result = 0;
++            the_compare_node.sgl_processed = 0;
++            the_compare_node.subgroupList = NULL;
++
++            compare_nodep = util_ald_cache_fetch(curl->compare_cache, &the_compare_node);
++
++            if (compare_nodep == NULL) {
++                /* Didn't find it. This shouldn't happen since we just called uldap_cache_compare. */
++                LDAP_CACHE_UNLOCK();
++                ldc->reason = "check_subgroups failed to find the cache entry to add sub-group list to.";
++                return LDAP_COMPARE_FALSE;
++            }
++            else {
++                 /* overwrite SGL if it was previously updated between the last
++                 ** two times we looked at the cache
++                 */
++                 compare_nodep->sgl_processed = 1;
++                 if (tmp_local_sgl) {
++                     compare_nodep->subgroupList = util_ald_sgl_dup(curl->compare_cache, tmp_local_sgl);
++                 }
++                 else {
++                     /* We didn't find a single subgroup, next time save us from looking */
++                     compare_nodep->subgroupList = NULL;
++                 }
++            }
++            /* unlock this read lock */
++            LDAP_CACHE_UNLOCK();
++        }
++
++        /* tmp_local_sgl has either been created, or copied out of the cache */
++        /* If tmp_local_sgl is NULL, there are no subgroups to process and we'll return false */
++        result = LDAP_COMPARE_FALSE;
++        if (tmp_local_sgl) {
++            int sgindex = 0;
++            const char *group = NULL;
++            while ((result != LDAP_COMPARE_TRUE) && (sgindex < tmp_local_sgl->len)) {
++                group = tmp_local_sgl->subgroupDNs[sgindex];
++                /* 4. Now loop through the subgroupList and call uldap_cache_compare to check for the user. */
++                result = uldap_cache_compare(r, ldc, url, group, attrib, value);
++                if (result == LDAP_COMPARE_TRUE) {
++                    /* 4.A. We found the user in the subgroup. Return LDAP_COMPARE_TRUE. */
++                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, "[%" APR_PID_T_FMT "] util_ldap:"
++                                  " Found the user in a subgroup (%s) at level %d of %d. (7).",
++                                  getpid(), group, cur_subgroup_depth+1, max_subgroup_depth);
++                }
++                else {
++                    /* 4.B. We didn't find the user in this subgroup, so recurse into it and keep looking. */
++                    result = uldap_cache_check_subgroups(r, ldc, url, group, attrib,
++                                                         value, subgroupAttrs, subgroupclasses,
++                                                         cur_subgroup_depth+1, max_subgroup_depth);
++                }
++                sgindex++;
++            }
++        }
++    }
++
++    return result;
++}
++
++
+ static int uldap_cache_checkuserid(request_rec *r, util_ldap_connection_t *ldc,
+                                    const char *url, const char *basedn,
+                                    int scope, char **attrs, const char *filter,
+@@ -2106,6 +2403,7 @@ static void util_ldap_register_hooks(apr_pool_t *p)
+     APR_REGISTER_OPTIONAL_FN(uldap_cache_checkuserid);
+     APR_REGISTER_OPTIONAL_FN(uldap_cache_getuserdn);
+     APR_REGISTER_OPTIONAL_FN(uldap_ssl_supported);
++    APR_REGISTER_OPTIONAL_FN(uldap_cache_check_subgroups);
+ 
+     ap_hook_post_config(util_ldap_post_config,NULL,NULL,APR_HOOK_MIDDLE);
+     ap_hook_handler(util_ldap_handler, NULL, NULL, APR_HOOK_MIDDLE);
+diff --git a/modules/ldap/util_ldap_cache.c b/modules/ldap/util_ldap_cache.c
+index 7ae63be..afddb2d 100644
+--- a/modules/ldap/util_ldap_cache.c
++++ b/modules/ldap/util_ldap_cache.c
+@@ -259,12 +259,14 @@ void *util_ldap_compare_node_copy(util_ald_cache_t *cache, void *c)
+     if (node) {
+         if (!(node->dn = util_ald_strdup(cache, n->dn)) ||
+             !(node->attrib = util_ald_strdup(cache, n->attrib)) ||
+-            !(node->value = util_ald_strdup(cache, n->value))) {
++            !(node->value = util_ald_strdup(cache, n->value)) ||
++            ((n->subgroupList) && !(node->subgroupList = util_ald_sgl_dup(cache, n->subgroupList)))) {
+             util_ldap_compare_node_free(cache, node);
+             return NULL;
+         }
+         node->lastcompare = n->lastcompare;
+         node->result = n->result;
++        node->sgl_processed = n->sgl_processed;
+         return node;
+     }
+     else {
+@@ -275,6 +277,8 @@ void *util_ldap_compare_node_copy(util_ald_cache_t *cache, void *c)
+ void util_ldap_compare_node_free(util_ald_cache_t *cache, void *n)
+ {
+     util_compare_node_t *node = n;
++
++    util_ald_sgl_free(cache, &(node->subgroupList));
+     util_ald_free(cache, node->dn);
+     util_ald_free(cache, node->attrib);
+     util_ald_free(cache, node->value);
+@@ -286,6 +290,8 @@ void util_ldap_compare_node_display(request_rec *r, util_ald_cache_t *cache, voi
+     util_compare_node_t *node = n;
+     char date_str[APR_CTIME_LEN+1];
+     char *cmp_result;
++    char *sub_groups_val;
++    char *sub_groups_checked;
+ 
+     apr_ctime(date_str, node->lastcompare);
+ 
+@@ -299,6 +305,20 @@ void util_ldap_compare_node_display(request_rec *r, util_ald_cache_t *cache, voi
+         cmp_result = apr_itoa(r->pool, node->result);
+     }
+ 
++    if(node->subgroupList) {
++        sub_groups_val = "Yes";
++    }
++    else {
++        sub_groups_val = "No";
++    }
++
++    if(node->sgl_processed) {
++        sub_groups_checked = "Yes";
++    }
++    else {
++        sub_groups_checked = "No";
++    }
++
+     ap_rprintf(r,
+                "<tr valign='top'>"
+                "<td nowrap>%s</td>"
+@@ -306,12 +326,16 @@ void util_ldap_compare_node_display(request_rec *r, util_ald_cache_t *cache, voi
+                "<td nowrap>%s</td>"
+                "<td nowrap>%s</td>"
+                "<td nowrap>%s</td>"
++               "<td nowrap>%s</td>"
++               "<td nowrap>%s</td>"
+                "</tr>",
+                node->dn,
+                node->attrib,
+                node->value,
+                date_str,
+-               cmp_result);
++               cmp_result,
++               sub_groups_val,
++               sub_groups_checked);
+ }
+ 
+ /* ------------------------------------------------------------------ */
+diff --git a/modules/ldap/util_ldap_cache.h b/modules/ldap/util_ldap_cache.h
+index 0f67fc7..4c63e60 100644
+--- a/modules/ldap/util_ldap_cache.h
++++ b/modules/ldap/util_ldap_cache.h
+@@ -97,6 +97,14 @@ typedef struct util_url_node_t {
+ } util_url_node_t;
+ 
+ /*
++ * When a group is found, subgroups are stored in the group's cache entry.
++ */
++typedef struct util_compare_subgroup_t {
++    const char **subgroupDNs;
++    int len;
++} util_compare_subgroup_t;
++
++/*
+  * We cache every successful search and bind operation, using the username 
+  * as the key. Each node in the cache contains the returned DN, plus the 
+  * password used to bind.
+@@ -121,6 +129,8 @@ typedef struct util_compare_node_t {
+     const char *value;
+     apr_time_t lastcompare;
+     int result;
++    int sgl_processed;      /* 0 if no sgl processing yet. 1 if sgl has been processed (even if SGL is NULL). Saves repeat work on leaves. */
++    struct util_compare_subgroup_t *subgroupList;
+ } util_compare_node_t;
+ 
+ /*
+@@ -169,6 +179,8 @@ void util_ldap_dn_compare_node_display(request_rec *r, util_ald_cache_t *cache,
+ void util_ald_free(util_ald_cache_t *cache, const void *ptr);
+ void *util_ald_alloc(util_ald_cache_t *cache, unsigned long size);
+ const char *util_ald_strdup(util_ald_cache_t *cache, const char *s);
++util_compare_subgroup_t *util_ald_sgl_dup(util_ald_cache_t *cache, util_compare_subgroup_t *sgl);
++void util_ald_sgl_free(util_ald_cache_t *cache, util_compare_subgroup_t **sgl);
+ 
+ /* Cache managing function */
+ unsigned long util_ald_hash_string(int nstr, ...);
+diff --git a/modules/ldap/util_ldap_cache_mgr.c b/modules/ldap/util_ldap_cache_mgr.c
+index 56b8cbe..e016ae7 100644
+--- a/modules/ldap/util_ldap_cache_mgr.c
++++ b/modules/ldap/util_ldap_cache_mgr.c
+@@ -126,7 +126,8 @@ const char *util_ald_strdup(util_ald_cache_t *cache, const char *s)
+         else {
+             return NULL;
+         }
+-    } else {
++    }
++    else {
+         /* Cache shm is not used */
+         return strdup(s);
+     }
+@@ -135,6 +136,44 @@ const char *util_ald_strdup(util_ald_cache_t *cache, const char *s)
+ #endif
+ }
+ 
++/*
++ * Duplicate a subgroupList from one compare entry to another.
++ * Returns: ptr to a new copy of the subgroupList or NULL if allocation failed.
++ */
++util_compare_subgroup_t *util_ald_sgl_dup(util_ald_cache_t *cache, util_compare_subgroup_t *sgl_in)
++{
++    int i = 0;
++    util_compare_subgroup_t *sgl_out = NULL;
++
++    if (!sgl_in) return NULL;
++
++    sgl_out = (util_compare_subgroup_t *) util_ald_alloc(cache, sizeof(util_compare_subgroup_t));
++    sgl_out->subgroupDNs = util_ald_alloc(cache, sizeof(char *) * sgl_in->len);
++    sgl_out->len = sgl_in->len;
++
++    for (i = 0; i < sgl_in->len; i++) {
++        fprintf(stderr, "sgl_dup: Adding %s to sgl\n", sgl_in->subgroupDNs[i]); fflush(stderr);
++        sgl_out->subgroupDNs[i] = util_ald_strdup(cache, sgl_in->subgroupDNs[i]);
++    }
++
++    return sgl_out;
++}
++
++/*
++ * Delete an entire subgroupList.
++ */
++void util_ald_sgl_free(util_ald_cache_t *cache, util_compare_subgroup_t **sgl)
++{
++    int i = 0;
++    if (sgl == NULL || *sgl == NULL) {
++        return;
++    }
++
++    for (i = 0; i < (*sgl)->len; i++) {
++        util_ald_free(cache, (*sgl)->subgroupDNs[i]);
++    }
++    util_ald_free(cache, *sgl);
++}
+ 
+ /*
+  * Computes the hash on a set of strings. The first argument is the number
+@@ -365,9 +404,10 @@ void *util_ald_cache_fetch(util_ald_cache_t *cache, void *payload)
+     cache->fetches++;
+ 
+     hashval = (*cache->hash)(payload) % cache->size;
++
+     for (p = cache->nodes[hashval];
+          p && !(*cache->compare)(p->payload, payload);
+-    p = p->next) ;
++         p = p->next) ;
+ 
+     if (p != NULL) {
+         cache->hits++;
+@@ -676,6 +716,8 @@ char *util_ald_cache_display(request_rec *r, util_ldap_state_t *st)
+                              "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Value</b></font></td>"
+                              "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Last Compare</b></font></td>"
+                              "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Result</b></font></td>"
++                             "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Sub-groups?</b></font></td>"
++                             "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>S-G Checked?</b></font></td>"
+                              "</tr>\n", r
+                             );
+                     if (n) {

@@ -1,0 +1,491 @@
+commit 756cf31939a4fbc9cbd9a0c0fcb7abc164c4e41a
+Author: Ryan Bloom <rbb@apache.org>
+Date:   Mon Oct 4 16:38:16 1999 +0000
+
+    First patch to re-order function parameters.  This one gets the low hanging
+    fruit, and moves most of the result parameters to the first argument.
+    Future patches in this series will move the rest of the result parameters
+    to the beginning of the list, and will move the context's to the end of the
+    list
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@83927 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth.c b/modules/aaa/mod_auth.c
+index 7490609..590a1e3 100644
+--- a/modules/aaa/mod_auth.c
++++ b/modules/aaa/mod_auth.c
+@@ -157,7 +157,7 @@ static ap_table_t *groups_for_user(ap_context_t *p, char *user, char *grpfile)
+ 	return NULL;
+     }
+ 
+-    ap_create_context(p, &sp);
++    ap_create_context(&sp, p);
+ 
+     while (!(ap_cfg_getline(l, MAX_STRING_LEN, f))) {
+ 	if ((l[0] == '#') || (!l[0]))
+diff --git a/modules/generators/mod_asis.c b/modules/generators/mod_asis.c
+index a6bf897..cd6c96c 100644
+--- a/modules/generators/mod_asis.c
++++ b/modules/generators/mod_asis.c
+@@ -79,8 +79,8 @@ static int asis_handler(request_rec *r)
+ 	return NOT_FOUND;
+     }
+ 
+-    if (ap_open(r->pool, r->filename, APR_READ | APR_BUFFERED, 
+-                APR_OS_DEFAULT, &f) != APR_SUCCESS) {
++    if (ap_open(&f, r->pool, r->filename, APR_READ | APR_BUFFERED, 
++                APR_OS_DEFAULT) != APR_SUCCESS) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
+ 		    "file permissions deny server access: %s", r->filename);
+ 	return FORBIDDEN;
+diff --git a/modules/generators/mod_autoindex.c b/modules/generators/mod_autoindex.c
+index 3909bd4..0b4151b 100644
+--- a/modules/generators/mod_autoindex.c
++++ b/modules/generators/mod_autoindex.c
+@@ -986,8 +986,8 @@ static void emit_head(request_rec *r, char *header_fname, int suppress_amble,
+ 		 * the file's contents, any HTML header it had won't end up
+ 		 * where it belongs.
+ 		 */
+-		if (ap_open(r->pool, rr->filename, APR_READ | APR_BUFFERED,
+-                            APR_OS_DEFAULT, &f) == APR_SUCCESS) {
++		if (ap_open(&f, r->pool, rr->filename, APR_READ | APR_BUFFERED,
++                            APR_OS_DEFAULT) == APR_SUCCESS) {
+ 		    emit_preamble(r, title);
+ 		    emit_amble = 0;
+ 		    do_emit_plain(r, f);
+@@ -1054,8 +1054,8 @@ static void emit_tail(request_rec *r, char *readme_fname, int suppress_amble)
+ 		/*
+ 		 * If we can open the file, suppress the signature.
+ 		 */
+-		if (ap_open(r->pool, rr->filename, APR_READ | APR_BUFFERED,
+-                            APR_OS_DEFAULT, &f) == APR_SUCCESS) {
++		if (ap_open(&f, r->pool, rr->filename, APR_READ | APR_BUFFERED,
++                            APR_OS_DEFAULT) == APR_SUCCESS) {
+ 		    do_emit_plain(r, f);
+ 		    ap_close(f);
+ 		    suppress_sig = 1;
+@@ -1090,8 +1090,8 @@ static char *find_title(request_rec *r)
+ 			"text/html")
+ 	    || !strcmp(r->content_type, INCLUDES_MAGIC_TYPE))
+ 	&& !r->content_encoding) {
+-        if (ap_open(r->pool, r->filename, APR_READ | APR_BUFFERED,
+-                    APR_OS_DEFAULT, &thefile) != APR_SUCCESS) {
++        if (ap_open(&thefile, r->pool, r->filename, APR_READ | APR_BUFFERED,
++                    APR_OS_DEFAULT) != APR_SUCCESS) {
+ 	    return NULL;
+ 	}
+         n = sizeof(char) * (MAX_STRING_LEN - 1);
+@@ -1280,7 +1280,7 @@ static void output_directories(struct ent **ar, int n,
+     char *name_scratch;
+     char *pad_scratch;
+ 
+-    ap_create_context(r->pool, &scratch);
++    ap_create_context(&scratch, r->pool);
+     if (name[0] == '\0') {
+ 	name = "/";
+     }
+@@ -1513,7 +1513,7 @@ static int index_directory(request_rec *r,
+     char keyid;
+     char direction;
+ 
+-    if (ap_opendir(r->pool, name, &d) != APR_SUCCESS) {
++    if (ap_opendir(&d, r->pool, name) != APR_SUCCESS) {
+ 	ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
+ 		    "Can't open directory for index: %s", r->filename);
+ 	return HTTP_FORBIDDEN;
+@@ -1578,7 +1578,7 @@ static int index_directory(request_rec *r,
+     head = NULL;
+     while (ap_readdir(d)) {
+         char *d_name;
+-        ap_get_dir_filename(d, &d_name);
++        ap_get_dir_filename(&d_name, d);
+ 	p = make_autoindex_entry(d_name, autoindex_opts,
+ 				 autoindex_conf, r, keyid, direction);
+ 	if (p != NULL) {
+diff --git a/modules/http/http_core.c b/modules/http/http_core.c
+index d39fd71..2c306e3 100644
+--- a/modules/http/http_core.c
++++ b/modules/http/http_core.c
+@@ -399,7 +399,7 @@ void ap_core_reorder_directories(ap_context_t *p, server_rec *s)
+     elts = (void **)sec->elts;
+ 
+     /* we have to allocate tmp space to do a stable sort */
+-    ap_create_context(p, &tmp);
++    ap_create_context(&tmp, p);
+     sortbin = ap_palloc(tmp, sec->nelts * sizeof(*sortbin));
+     for (i = 0; i < nelts; ++i) {
+ 	sortbin[i].orig_index = i;
+@@ -2515,7 +2515,7 @@ static int default_handler(request_rec *r)
+         return METHOD_NOT_ALLOWED;
+     }
+ 	
+-    if (ap_open (r->pool, r->filename, APR_READ | APR_BINARY, 0, &fd) != APR_SUCCESS) {
++    if (ap_open (&fd, r->pool, r->filename, APR_READ | APR_BINARY, 0) != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
+ 		     "file permissions deny server access: %s", r->filename);
+         return FORBIDDEN;
+diff --git a/modules/http/http_protocol.c b/modules/http/http_protocol.c
+index 99f5d80..5836f61 100644
+--- a/modules/http/http_protocol.c
++++ b/modules/http/http_protocol.c
+@@ -927,7 +927,7 @@ request_rec *ap_read_request(conn_rec *conn)
+     const char *expect;
+     int access_status;
+ 
+-    ap_create_context(conn->pool, &p);
++    ap_create_context(&p, conn->pool);
+     r = ap_pcalloc(p, sizeof(request_rec));
+     r->pool            = p;
+     r->connection      = conn;
+diff --git a/modules/http/http_request.c b/modules/http/http_request.c
+index 684ad98..e4f4f81 100644
+--- a/modules/http/http_request.c
++++ b/modules/http/http_request.c
+@@ -740,7 +740,7 @@ static request_rec *make_sub_request(const request_rec *r)
+     ap_context_t *rrp;
+     request_rec *rr;
+     
+-    ap_create_context(r->pool, &rrp);
++    ap_create_context(&rrp, r->pool);
+     rr = ap_pcalloc(rrp, sizeof(request_rec));
+     rr->pool = rrp;
+     return rr;
+diff --git a/modules/loggers/mod_log_config.c b/modules/loggers/mod_log_config.c
+index 90025db..16267a7 100644
+--- a/modules/loggers/mod_log_config.c
++++ b/modules/loggers/mod_log_config.c
+@@ -1001,7 +1001,7 @@ static config_log_state *open_config_log(server_rec *s, ap_context_t *p,
+     }
+     else {
+         const char *fname = ap_server_root_relative(p, cls->fname);
+-        if (ap_open(p, fname, xfer_flags, xfer_mode, &cls->log_fd) != APR_SUCCESS) {
++        if (ap_open(&cls->log_fd, p, fname, xfer_flags, xfer_mode) != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_ERR, s,
+                          "could not open transfer log file %s.", fname);
+             exit(1);
+diff --git a/modules/mappers/mod_negotiation.c b/modules/mappers/mod_negotiation.c
+index 840a9d6..caa76ae 100644
+--- a/modules/mappers/mod_negotiation.c
++++ b/modules/mappers/mod_negotiation.c
+@@ -782,8 +782,8 @@ static int read_type_map(negotiation_state *neg, request_rec *rr)
+     /* We are not using multiviews */
+     neg->count_multiviews_variants = 0;
+ 
+-    if (ap_open(neg->pool, rr->filename, APR_READ | APR_BUFFERED,
+-                APR_OS_DEFAULT, &map) != APR_SUCCESS) {
++    if (ap_open(&map, neg->pool, rr->filename, APR_READ | APR_BUFFERED,
++                APR_OS_DEFAULT) != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
+                       "cannot access type map file: %s", rr->filename);
+         return HTTP_FORBIDDEN;
+@@ -908,7 +908,7 @@ static int read_types_multi(negotiation_state *neg)
+     ++filp;
+     prefix_len = strlen(filp);
+ 
+-    if (ap_opendir(neg->pool, neg->dir_name, &dirp) != APR_SUCCESS) {
++    if (ap_opendir(&dirp, neg->pool, neg->dir_name) != APR_SUCCESS) {
+         ap_log_rerror(APLOG_MARK, APLOG_ERR, r,
+                     "cannot read directory for multi: %s", neg->dir_name);
+         return HTTP_FORBIDDEN;
+@@ -918,7 +918,7 @@ static int read_types_multi(negotiation_state *neg)
+         request_rec *sub_req;
+         char *d_name;
+ 
+-        ap_get_dir_filename(dirp, &d_name);
++        ap_get_dir_filename(&d_name, dirp);
+         /* Do we have a match? */
+ 
+         if (strncmp(d_name, filp, prefix_len)) {
+diff --git a/server/config.c b/server/config.c
+index 0a4ba4f..bb10036 100644
+--- a/server/config.c
++++ b/server/config.c
+@@ -1251,7 +1251,7 @@ static server_rec *init_server_config(ap_context_t *p)
+     s->server_admin = DEFAULT_ADMIN;
+     s->server_hostname = NULL;
+     s->error_fname = DEFAULT_ERRORLOG;
+-    ap_put_os_file(p, &s->error_log, &errfile);
++    ap_put_os_file(&s->error_log, &errfile, p);
+     s->loglevel = DEFAULT_LOGLEVEL;
+     s->srm_confname = RESOURCE_CONFIG_FILE;
+     s->access_confname = ACCESS_CONFIG_FILE;
+diff --git a/server/listen.c b/server/listen.c
+index 32f5b1d..aa24b0d 100644
+--- a/server/listen.c
++++ b/server/listen.c
+@@ -176,7 +176,7 @@ static void alloc_listener(char *addr, unsigned int port)
+     /* XXX - We need to deal with freeing this structure properly. */
+     new = malloc(sizeof(ap_listen_rec));
+     new->active = 0;
+-    if (ap_create_tcp_socket(NULL, &new->sd) != APR_SUCCESS) {
++    if (ap_create_tcp_socket(&new->sd, NULL) != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_CRIT, NULL,
+                  "make_sock: failed to get a socket for %s", addr);
+         return;
+diff --git a/server/log.c b/server/log.c
+index a2c67c0..f9f7cc8 100644
+--- a/server/log.c
++++ b/server/log.c
+@@ -209,7 +209,7 @@ static void open_error_log(server_rec *s, ap_context_t *p)
+ 	}
+ 
+         dummyno = fileno(dummy);
+-	ap_put_os_file(p, &s->error_log, &dummyno);
++	ap_put_os_file(&s->error_log, &dummyno, p);
+     }
+ 
+ #ifdef HAVE_SYSLOG
+@@ -236,8 +236,8 @@ static void open_error_log(server_rec *s, ap_context_t *p)
+     else {
+ 	fname = ap_server_root_relative(p, s->error_fname);
+ 	/*  Change to AP funcs. */
+-        if (ap_open(p, fname, APR_BUFFERED | APR_APPEND | APR_READ | APR_WRITE, 
+-                      APR_OS_DEFAULT, &s->error_log) != APR_SUCCESS) {
++        if (ap_open(&s->error_log, p, fname, APR_BUFFERED | APR_APPEND | 
++                    APR_READ | APR_WRITE, APR_OS_DEFAULT) != APR_SUCCESS) {
+             perror("fopen");
+             fprintf(stderr, "%s: could not open error log file %s.\n",
+ 		    ap_server_argv0, fname);
+@@ -321,7 +321,7 @@ static void log_error_core(const char *file, int line, int level,
+ 	if (((level & APLOG_LEVELMASK) != APLOG_NOTICE) &&
+ 	    ((level & APLOG_LEVELMASK) > DEFAULT_LOGLEVEL))
+ 	    return;
+-	ap_put_os_file(NULL, &logf, &errfileno);
++	ap_put_os_file(&logf, &errfileno, NULL);
+     }
+     else if (s->error_log) {
+ 	/*
+@@ -773,7 +773,7 @@ API_EXPORT(piped_log *) ap_open_piped_log(ap_context_t *p, const char *program)
+     pl = ap_palloc(p, sizeof (*pl));
+     pl->p = p;
+     dummyno = fileno(dummy);
+-    ap_put_os_file(p, &pl->write_f, &dummyno);
++    ap_put_os_file(&pl->write_f, &dummyno, p);
+ 
+     return pl;
+ }
+diff --git a/server/main.c b/server/main.c
+index 87981a8..5d11726 100644
+--- a/server/main.c
++++ b/server/main.c
+@@ -267,10 +267,10 @@ int main(int argc, char **argv)
+     ap_util_init();
+     ap_util_uri_init();
+ 
+-    ap_create_context(NULL, &pglobal);
++    ap_create_context(&pglobal, NULL);
+     g_pHookPool=pglobal;
+ 
+-    ap_create_context(pglobal, &pcommands);
++    ap_create_context(&pcommands, pglobal);
+     ap_server_pre_read_config  = ap_make_array(pcommands, 1, sizeof(char *));
+     ap_server_post_read_config = ap_make_array(pcommands, 1, sizeof(char *));
+     ap_server_config_defines   = ap_make_array(pcommands, 1, sizeof(char *));
+@@ -317,9 +317,9 @@ int main(int argc, char **argv)
+ 	}
+     }
+ 
+-    ap_create_context(pglobal, &pconf);
+-    ap_create_context(pglobal, &plog);
+-    ap_create_context(pconf, &ptemp);
++    ap_create_context(&pconf, pglobal);
++    ap_create_context(&plog, pglobal);
++    ap_create_context(&ptemp, pconf);
+ 
+     /* for legacy reasons, we read the configuration twice before
+ 	we actually serve any requests */
+@@ -340,7 +340,7 @@ int main(int argc, char **argv)
+ 
+     for (;;) {
+ 	ap_clear_pool(pconf);
+-	ap_create_context(pconf, &ptemp);
++	ap_create_context(&ptemp, pconf);
+ 	ap_server_root = def_server_root;
+ 	ap_run_pre_config(pconf, plog, ptemp);
+ 	server_conf = ap_read_config(pconf, ptemp, confname);
+diff --git a/server/mpm/dexter/dexter.c b/server/mpm/dexter/dexter.c
+index df33c89..9b6d32d 100644
+--- a/server/mpm/dexter/dexter.c
++++ b/server/mpm/dexter/dexter.c
+@@ -858,9 +858,9 @@ static void *worker_thread(void *arg)
+     int native_socket;
+ 
+     pthread_mutex_lock(&thread_pool_create_mutex);
+-    ap_create_context(thread_pool_parent, &tpool);
++    ap_create_context(&tpool, thread_pool_parent);
+     pthread_mutex_unlock(&thread_pool_create_mutex);
+-    ap_create_context(tpool, &ptrans);
++    ap_create_context(&ptrans, tpool);
+ 
+     while (!workers_may_exit) {
+         workers_may_exit |= (max_requests_per_child != 0) && (requests_this_child <= 0);
+@@ -923,7 +923,7 @@ static void *worker_thread(void *arg)
+                     /* XXX: Should we check for POLLERR? */
+                     if (listenfds[curr_pollfd].revents & POLLIN) {
+                         last_pollfd = curr_pollfd;
+-                        ap_put_os_sock(tpool, &sd, &listenfds[curr_pollfd].fd);
++                        ap_put_os_sock(&sd, &listenfds[curr_pollfd].fd, tpool);
+                         goto got_fd;
+                     }
+                 } while (curr_pollfd != last_pollfd);
+@@ -931,7 +931,7 @@ static void *worker_thread(void *arg)
+         }
+     got_fd:
+         if (!workers_may_exit) {
+-            ap_accept(sd, &csd);
++            ap_accept(&csd, sd);
+             SAFE_ACCEPT(accept_mutex_off(0));
+             SAFE_ACCEPT(intra_mutex_off(0));
+ 	    pthread_mutex_lock(&idle_thread_count_mutex);
+@@ -981,7 +981,7 @@ static void child_main(int child_num_arg)
+ 
+     my_pid = getpid();
+     child_num = child_num_arg;
+-    ap_create_context(pconf, &pchild);
++    ap_create_context(&pchild, pconf);
+ 
+     /*stuff to do before we switch id's, so we have permissions.*/
+ 
+@@ -1026,7 +1026,7 @@ static void child_main(int child_num_arg)
+     for (i = 0; i < max_threads; i++) {
+         worker_thread_free_ids[i] = i;
+     }
+-    ap_create_context(pchild, &thread_pool_parent);
++    ap_create_context(&thread_pool_parent, pchild);
+     pthread_mutex_init(&thread_pool_create_mutex, NULL);
+     pthread_mutex_init(&idle_thread_count_mutex, NULL);
+     pthread_mutex_init(&worker_thread_count_mutex, NULL);
+diff --git a/server/mpm/mpmt_pthread/mpmt_pthread.c b/server/mpm/mpmt_pthread/mpmt_pthread.c
+index bff711e..1a7edfb 100644
+--- a/server/mpm/mpmt_pthread/mpmt_pthread.c
++++ b/server/mpm/mpmt_pthread/mpmt_pthread.c
+@@ -809,7 +809,7 @@ static void * worker_thread(void * dummy)
+ 
+     free(ti);
+ 
+-    ap_create_context(tpool, &ptrans);
++    ap_create_context(&ptrans, tpool);
+ 
+     pthread_mutex_lock(&worker_thread_count_mutex);
+     worker_thread_count++;
+@@ -867,7 +867,7 @@ static void * worker_thread(void * dummy)
+                     /* XXX: Should we check for POLLERR? */
+                     if (listenfds[curr_pollfd].revents & POLLIN) {
+                         last_pollfd = curr_pollfd;
+-                        ap_put_os_sock(tpool, &sd, &listenfds[curr_pollfd].fd); 
++                        ap_put_os_sock(&sd, &listenfds[curr_pollfd].fd, tpool); 
+                         goto got_fd;
+                     }
+                 } while (curr_pollfd != last_pollfd);
+@@ -875,7 +875,7 @@ static void * worker_thread(void * dummy)
+         }
+     got_fd:
+         if (!workers_may_exit) {
+-            ap_accept(sd, &csd);
++            ap_accept(&csd, sd);
+             SAFE_ACCEPT(accept_mutex_off(0));
+             SAFE_ACCEPT(intra_mutex_off(0));
+         }
+@@ -918,7 +918,7 @@ static void child_main(int child_num_arg)
+     ap_listen_rec *lr;
+ 
+     my_pid = getpid();
+-    ap_create_context(pconf, &pchild);
++    ap_create_context(&pchild, pconf);
+ 
+     /*stuff to do before we switch id's, so we have permissions.*/
+     reopen_scoreboard(pchild);
+@@ -972,7 +972,7 @@ static void child_main(int child_num_arg)
+ 	my_info->pid = my_child_num;
+         my_info->tid = i;
+ 	my_info->sd = 0;
+-	ap_create_context(pchild, &my_info->tpool);
++	ap_create_context(&my_info->tpool, pchild);
+ 	
+ 	/* We are creating threads right now */
+ 	(void) ap_update_child_status(my_child_num, i, SERVER_STARTING, 
+diff --git a/server/mpm/prefork/prefork.c b/server/mpm/prefork/prefork.c
+index 043eb15..1c2deeb 100644
+--- a/server/mpm/prefork/prefork.c
++++ b/server/mpm/prefork/prefork.c
+@@ -542,8 +542,8 @@ static void accept_mutex_init(ap_context_t *p)
+     unlock_it.l_pid = 0;		/* pid not actually interesting */
+ 
+     expand_lock_fname(p);
+-    ap_open(p, ap_lock_fname, APR_CREATE | APR_WRITE | APR_EXCL,
+-            APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD, &tempfile);
++    ap_open(&tempfile, p, ap_lock_fname, APR_CREATE | APR_WRITE | APR_EXCL,
++            APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD);
+     ap_get_os_file(tempfile, &lock_fd);
+     if (lock_fd == -1) {
+ 	perror("open");
+@@ -605,7 +605,7 @@ static void accept_mutex_child_init(ap_context_t *p)
+ {
+     ap_file_t *tempfile;
+ 
+-    ap_open(p, ap_lock_fname, APR_WRITE, APR_UREAD|APR_UWRITE, &tempfile);
++    ap_open(&tempfile, p, ap_lock_fname, APR_WRITE, APR_UREAD|APR_UWRITE);
+     if (!tempfile) {
+ 	ap_log_error(APLOG_MARK, APLOG_EMERG, server_conf,
+ 		    "Child cannot open lock file: %s", ap_lock_fname);
+@@ -1957,9 +1957,9 @@ static void child_main(int child_num_arg)
+     /* Get a sub ap_context_t for global allocations in this child, so that
+      * we can have cleanups occur when the child exits.
+      */
+-    ap_create_context(pconf, &pchild);
++    ap_create_context(&pchild, pconf);
+ 
+-    ap_create_context(pchild, &ptrans);
++    ap_create_context(&ptrans, pchild);
+ 
+     /* needs to be done before we switch UIDs so we have permissions */
+     reopen_scoreboard(pchild);
+@@ -2078,7 +2078,7 @@ static void child_main(int child_num_arg)
+ 		    clean_child_exit(0);
+ 		}
+ 		clen = sizeof(sa_client);
+-		stat = ap_accept(sd, &csd);
++		stat = ap_accept(&csd, sd);
+ 		if (stat == APR_SUCCESS || stat != APR_EINTR)
+ 		    break;
+ 	    }
+diff --git a/server/rfc1413.c b/server/rfc1413.c
+index 0fd9ef2..c3d8be2 100644
+--- a/server/rfc1413.c
++++ b/server/rfc1413.c
+@@ -222,7 +222,7 @@ char *ap_rfc1413(conn_rec *conn, server_rec *srv)
+ 
+     result = FROM_UNKNOWN;
+ 
+-    if (ap_create_tcp_socket(conn->pool, &sock) != APR_SUCCESS) {
++    if (ap_create_tcp_socket(&sock, conn->pool) != APR_SUCCESS) {
+ 	ap_log_error(APLOG_MARK, APLOG_CRIT, srv,
+ 		    "socket: rfc1413: error creating socket");
+ 	conn->remote_logname = result;
+diff --git a/server/util.c b/server/util.c
+index ab897f0..b2ca60e 100644
+--- a/server/util.c
++++ b/server/util.c
+@@ -885,7 +885,7 @@ API_EXPORT(configfile_t *) ap_pcfg_openfile(ap_context_t *p, const char *name)
+         return NULL;
+     }
+  
+-    stat = ap_open(p, name, APR_READ | APR_BUFFERED, APR_OS_DEFAULT, &file);
++    stat = ap_open(&file, p, name, APR_READ | APR_BUFFERED, APR_OS_DEFAULT);
+ #ifdef DEBUG
+     saved_errno = errno;
+     ap_log_error(APLOG_MARK, APLOG_DEBUG | APLOG_NOERRNO, NULL,
+diff --git a/server/util_script.c b/server/util_script.c
+index da65906..a71221f 100644
+--- a/server/util_script.c
++++ b/server/util_script.c
+@@ -696,7 +696,7 @@ API_EXPORT(int) ap_call_exec(request_rec *r, ap_child_info_t *pinfo, char *argv0
+      * since that is better than allowing errors to go unnoticed.  Don't do
+      * this on Win32, though, since we haven't fork()'d.
+      */
+-    ap_put_os_file(r->pool, &r->server->error_log, &errfileno);
++    ap_put_os_file(&r->server->error_log, &errfileno, r->pool);
+ #endif
+ 
+     /* TODO: all that RLimit stuff should become part of the spawning API,

@@ -1,0 +1,26 @@
+commit 3853dde9b259ad96e08fcc0c56efa775975ad0b3
+Author: Jeff Trawick <trawick@apache.org>
+Date:   Wed Dec 2 17:34:33 2009 +0000
+
+    fix this:
+    mod_auth_digest.c: In function ‘set_shmem_size’:
+    mod_auth_digest.c:681: warning: format ‘%ld’ expects type ‘long int’, but argument 7 has type ‘apr_size_t’
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@886213 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index fa0c8a5..84744eb 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -677,8 +677,8 @@ static const char *set_shmem_size(cmd_parms *cmd, void *config,
+         num_buckets = 1;
+     }
+     ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, cmd->server,
+-                 "Digest: Set shmem-size: %ld, num-buckets: %ld", shmem_size,
+-                 num_buckets);
++                 "Digest: Set shmem-size: %" APR_SIZE_T_FMT ", num-buckets: %ld", 
++                 shmem_size, num_buckets);
+ 
+     return NULL;
+ }

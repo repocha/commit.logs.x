@@ -1,0 +1,274 @@
+commit c2bdbf10fe9d405db38955de4b5f11592d8f6ea1
+Author: Doug MacEachern <dougm@apache.org>
+Date:   Tue Feb 13 23:32:28 2001 +0000
+
+    doh.  need a spellchekker for these rename scripts.  s/apr_lock_aquire/apr_lock_acquire/g;
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@88150 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index fa7c4e7..02a1213 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -724,7 +724,7 @@ static client_entry *get_client(unsigned long key, const request_rec *r)
+     bucket = key % client_list->tbl_len;
+     entry  = client_list->table[bucket];
+ 
+-    apr_lock_aquire(client_lock /*, MM_LOCK_RD */);
++    apr_lock_acquire(client_lock /*, MM_LOCK_RD */);
+ 
+     while(entry && key != entry->key) {
+ 	prev  = entry;
+@@ -801,7 +801,7 @@ static client_entry *add_client(unsigned long key, client_entry *info,
+     bucket = key % client_list->tbl_len;
+     entry  = client_list->table[bucket];
+ 
+-    apr_lock_aquire(client_lock /*, MM_LOCK_RW */);
++    apr_lock_acquire(client_lock /*, MM_LOCK_RW */);
+ 
+     /* try to allocate a new entry */
+ 
+@@ -1056,7 +1056,7 @@ static client_entry *gen_client(const request_rec *r)
+ 
+     if (!opaque_cntr)  return NULL;
+ 
+-    apr_lock_aquire(opaque_lock /*, MM_LOCK_RW */);
++    apr_lock_acquire(opaque_lock /*, MM_LOCK_RW */);
+     op = (*opaque_cntr)++;
+     apr_lock_release(opaque_lock);
+ 
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 1ee96e1..3f83fb3 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -186,7 +186,7 @@ static cache *cachep;
+ static int proxy_available;
+ 
+ static const char *lockname;
+-static apr_lock_t *rewrite_mapr_lock_aquire = NULL;
++static apr_lock_t *rewrite_mapr_lock_acquire = NULL;
+ static apr_lock_t *rewrite_log_lock = NULL;
+ 
+ /*
+@@ -980,10 +980,10 @@ static void init_child(apr_pool_t *p, server_rec *s)
+ 
+     if (lockname != NULL && *(lockname) != '\0')
+     {
+-        rv = apr_lock_child_init (&rewrite_mapr_lock_aquire, lockname, p);
++        rv = apr_lock_child_init (&rewrite_mapr_lock_acquire, lockname, p);
+         if (rv != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+-                         "mod_rewrite: could not init rewrite_mapr_lock_aquire "
++                         "mod_rewrite: could not init rewrite_mapr_lock_acquire "
+                          "in child");
+         }
+     }
+@@ -2899,8 +2899,8 @@ static char *lookup_map_program(request_rec *r, apr_file_t *fpin,
+ 
+     /* take the lock */
+ 
+-    if (rewrite_mapr_lock_aquire) {
+-        apr_lock_aquire(rewrite_mapr_lock_aquire);
++    if (rewrite_mapr_lock_acquire) {
++        apr_lock_acquire(rewrite_mapr_lock_acquire);
+     }
+ 
+     /* write out the request key */
+@@ -2934,8 +2934,8 @@ static char *lookup_map_program(request_rec *r, apr_file_t *fpin,
+     buf[i] = '\0';
+ 
+     /* give the lock back */
+-    if (rewrite_mapr_lock_aquire) {
+-        apr_lock_release(rewrite_mapr_lock_aquire);
++    if (rewrite_mapr_lock_acquire) {
++        apr_lock_release(rewrite_mapr_lock_acquire);
+     }
+ 
+     if (strcasecmp(buf, "NULL") == 0) {
+@@ -3186,7 +3186,7 @@ static void rewritelog(request_rec *r, int level, const char *text, ...)
+                 (unsigned long)(r->server), (unsigned long)r,
+                 type, redir, level, str2);
+ 
+-    apr_lock_aquire(rewrite_log_lock);
++    apr_lock_acquire(rewrite_log_lock);
+     nbytes = strlen(str3);
+     apr_file_write(conf->rewritelogfp, str3, &nbytes);
+     apr_lock_release(rewrite_log_lock);
+@@ -3236,7 +3236,7 @@ static void rewritelock_create(server_rec *s, apr_pool_t *p)
+     lockname = ap_server_root_relative(p, lockname);
+ 
+     /* create the lockfile */
+-    rc = apr_lock_create (&rewrite_mapr_lock_aquire, APR_MUTEX, APR_LOCKALL, lockname, p);
++    rc = apr_lock_create (&rewrite_mapr_lock_acquire, APR_MUTEX, APR_LOCKALL, lockname, p);
+     if (rc != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_ERR, rc, s,
+                      "mod_rewrite: Parent could not create RewriteLock "
+@@ -3255,8 +3255,8 @@ static apr_status_t rewritelock_remove(void *data)
+     }
+ 
+     /* destroy the rewritelock */
+-    apr_lock_destroy (rewrite_mapr_lock_aquire);
+-    rewrite_mapr_lock_aquire = NULL;
++    apr_lock_destroy (rewrite_mapr_lock_acquire);
++    rewrite_mapr_lock_acquire = NULL;
+     lockname = NULL;
+     return(0);
+ }
+diff --git a/server/mpm/beos/beos.c b/server/mpm/beos/beos.c
+index 067573b..4eb06c2 100644
+--- a/server/mpm/beos/beos.c
++++ b/server/mpm/beos/beos.c
+@@ -344,7 +344,7 @@ static int32 worker_thread(void * dummy)
+ 
+     apr_pool_create(&ptrans, tpool);
+ 
+-    apr_lock_aquire(worker_thread_count_mutex);
++    apr_lock_acquire(worker_thread_count_mutex);
+     worker_thread_count++;
+     apr_lock_release(worker_thread_count_mutex);
+ 
+@@ -363,7 +363,7 @@ static int32 worker_thread(void * dummy)
+         (void) ap_update_child_status(0, child_slot, SERVER_READY,
+                                       (request_rec*)NULL);
+ 
+-        apr_lock_aquire(accept_mutex);
++        apr_lock_acquire(accept_mutex);
+         while (!this_worker_should_exit) {
+             apr_int16_t event;
+             apr_status_t ret = apr_poll(pollset, &srv, -1);
+@@ -433,7 +433,7 @@ static int32 worker_thread(void * dummy)
+ 
+     ap_update_child_status(0, child_slot, SERVER_DEAD, (request_rec*)NULL);
+     
+-    apr_lock_aquire(worker_thread_count_mutex);
++    apr_lock_acquire(worker_thread_count_mutex);
+     worker_thread_count--;
+     apr_lock_release(worker_thread_count_mutex);
+ 
+diff --git a/server/mpm/experimental/perchild/perchild.c b/server/mpm/experimental/perchild/perchild.c
+index 34c76a7..15b0ef1 100644
+--- a/server/mpm/experimental/perchild/perchild.c
++++ b/server/mpm/experimental/perchild/perchild.c
+@@ -596,10 +596,10 @@ static void *worker_thread(void *arg)
+             pthread_mutex_unlock(&thread_accept_mutex);
+             break;
+         }
+-        if ((rv = SAFE_ACCEPT(apr_lock_aquire(process_accept_mutex)))
++        if ((rv = SAFE_ACCEPT(apr_lock_acquire(process_accept_mutex)))
+             != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, ap_server_conf,
+-                         "apr_lock_aquire failed. Attempting to shutdown "
++                         "apr_lock_acquire failed. Attempting to shutdown "
+                          "process gracefully.");
+             workers_may_exit = 1;
+         }
+diff --git a/server/mpm/mpmt_pthread/mpmt_pthread.c b/server/mpm/mpmt_pthread/mpmt_pthread.c
+index e017f28..c680173 100644
+--- a/server/mpm/mpmt_pthread/mpmt_pthread.c
++++ b/server/mpm/mpmt_pthread/mpmt_pthread.c
+@@ -477,10 +477,10 @@ static void * worker_thread(void * dummy)
+ 
+         (void) ap_update_child_status(process_slot, thread_slot, SERVER_READY, 
+                                       (request_rec *) NULL);
+-        if ((rv = SAFE_ACCEPT(apr_lock_aquire(accept_mutex)))
++        if ((rv = SAFE_ACCEPT(apr_lock_acquire(accept_mutex)))
+             != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, ap_server_conf,
+-                         "apr_lock_aquire failed. Attempting to shutdown "
++                         "apr_lock_acquire failed. Attempting to shutdown "
+                          "process gracefully.");
+             workers_may_exit = 1;
+         }
+diff --git a/server/mpm/perchild/perchild.c b/server/mpm/perchild/perchild.c
+index 34c76a7..15b0ef1 100644
+--- a/server/mpm/perchild/perchild.c
++++ b/server/mpm/perchild/perchild.c
+@@ -596,10 +596,10 @@ static void *worker_thread(void *arg)
+             pthread_mutex_unlock(&thread_accept_mutex);
+             break;
+         }
+-        if ((rv = SAFE_ACCEPT(apr_lock_aquire(process_accept_mutex)))
++        if ((rv = SAFE_ACCEPT(apr_lock_acquire(process_accept_mutex)))
+             != APR_SUCCESS) {
+             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, ap_server_conf,
+-                         "apr_lock_aquire failed. Attempting to shutdown "
++                         "apr_lock_acquire failed. Attempting to shutdown "
+                          "process gracefully.");
+             workers_may_exit = 1;
+         }
+diff --git a/server/mpm/prefork/prefork.c b/server/mpm/prefork/prefork.c
+index 9095fc5..fc64021 100644
+--- a/server/mpm/prefork/prefork.c
++++ b/server/mpm/prefork/prefork.c
+@@ -275,7 +275,7 @@ static void accept_mutex_init(apr_pool_t *p)
+ 
+ static void accept_mutex_on(void)
+ {
+-    apr_status_t rv = apr_lock_aquire(accept_lock);
++    apr_status_t rv = apr_lock_acquire(accept_lock);
+     if (rv != APR_SUCCESS) {
+         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, NULL, "couldn't grab the accept mutex");
+         exit(APEXIT_CHILDFATAL);
+diff --git a/server/mpm/spmt_os2/spmt_os2.c b/server/mpm/spmt_os2/spmt_os2.c
+index 156891f..0036ded 100644
+--- a/server/mpm/spmt_os2/spmt_os2.c
++++ b/server/mpm/spmt_os2/spmt_os2.c
+@@ -184,7 +184,7 @@ static void accept_mutex_init(apr_pool_t *p)
+ 
+ static void accept_mutex_on(void)
+ {
+-    apr_status_t rc = apr_lock_aquire(accept_mutex);
++    apr_status_t rc = apr_lock_acquire(accept_mutex);
+ 
+     if (rc != APR_SUCCESS) {
+ 	ap_log_error(APLOG_MARK, APLOG_EMERG, rc, ap_server_conf,
+diff --git a/server/mpm/winnt/mpm_winnt.c b/server/mpm/winnt/mpm_winnt.c
+index 8febaed..0352eac 100644
+--- a/server/mpm/winnt/mpm_winnt.c
++++ b/server/mpm/winnt/mpm_winnt.c
+@@ -651,7 +651,7 @@ static void add_job(int sock)
+     new_job->next = NULL;
+     new_job->sock = sock;
+ 
+-    apr_lock_aquire(allowed_globals.jobmutex);
++    apr_lock_acquire(allowed_globals.jobmutex);
+ 
+     if (allowed_globals.jobtail != NULL)
+ 	allowed_globals.jobtail->next = new_job;
+@@ -670,7 +670,7 @@ static int remove_job(void)
+     int sock;
+ 
+     acquire_semaphore(allowed_globals.jobsemaphore);
+-    apr_lock_aquire(allowed_globals.jobmutex);
++    apr_lock_acquire(allowed_globals.jobmutex);
+ 
+     if (shutdown_in_progress && !allowed_globals.jobhead) {
+         apr_lock_release(allowed_globals.jobmutex);
+@@ -1089,7 +1089,7 @@ static PCOMP_CONTEXT winnt_get_connection(PCOMP_CONTEXT context)
+      * but only if we are not in the process of shutting down
+      */
+     if (!shutdown_in_progress) {
+-        apr_lock_aquire(allowed_globals.jobmutex);
++        apr_lock_acquire(allowed_globals.jobmutex);
+         context->lr->count--;
+         if (context->lr->count < 2) {
+             SetEvent(maintenance_event);
+@@ -1284,7 +1284,7 @@ static void child_main()
+      * start_mutex is used to ensure that only one child ever
+      * goes into the listen/accept loop at once.
+      */
+-    status = apr_lock_aquire(start_mutex);
++    status = apr_lock_acquire(start_mutex);
+     if (status != APR_SUCCESS) {
+ 	ap_log_error(APLOG_MARK,APLOG_ERR, status, server_conf,
+                      "Child %d: Failed to acquire the start_mutex. Process will exit.", my_pid);
+@@ -1389,7 +1389,7 @@ static void child_main()
+         workers_may_exit = 1;
+ 
+         /* Unblock threads blocked on the completion port */
+-        apr_lock_aquire(allowed_globals.jobmutex);
++        apr_lock_acquire(allowed_globals.jobmutex);
+         while (g_blocked_threads > 0) {
+             ap_log_error(APLOG_MARK,APLOG_INFO, APR_SUCCESS, server_conf, 
+                          "Child %d: %d threads blocked on the completion port", my_pid, g_blocked_threads);

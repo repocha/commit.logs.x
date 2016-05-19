@@ -1,0 +1,170 @@
+commit 2d469488a7ed77972a5aae1d91e7d28259cd1a74
+Author: Bill Stoddard <stoddard@apache.org>
+Date:   Fri Apr 21 22:12:43 2000 +0000
+
+    Win32: Get mod_auth_digest compiling and added to the Windows
+    build environment. Not tested and I'd be suprised if it
+    actually works.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@85012 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/Makefile.win b/Makefile.win
+index 06b18b5..897d176 100644
+--- a/Makefile.win
++++ b/Makefile.win
+@@ -79,6 +79,7 @@ _build:
+          nmake /nologo CFG="ApacheModuleStatus - Win32 $(LONG)" -f ApacheModuleStatus.mak RECURSE=0 $(CTARGET)
+ #        nmake /nologo CFG"=ApacheModuleInfo - Win32 $(LONG)" -f ApacheModuleInfo.mak RECURSE=0 $(CTARGET)
+ 	 nmake /nologo CFG="ApacheModuleAuthAnon - Win32 $(LONG)" -f ApacheModuleAuthAnon.mak RECURSE=0 $(CTARGET)
++	 nmake /nologo CFG="ApacheModuleAuthDigest - Win32 $(LONG)" -f ApacheModuleAuthDigest.mak RECURSE=0 $(CTARGET)
+ 	 nmake /nologo CFG="ApacheModuleCERNMeta - Win32 $(LONG)" -f ApacheModuleCERNMeta.mak RECURSE=0 $(CTARGET)
+ 	 nmake /nologo CFG="ApacheModuleExpires - Win32 $(LONG)" -f ApacheModuleExpires.mak RECURSE=0 $(CTARGET)
+ 	 nmake /nologo CFG="ApacheModuleHeaders - Win32 $(LONG)" -f ApacheModuleHeaders.mak RECURSE=0 $(CTARGET)
+@@ -102,6 +103,7 @@ _install:
+         copy os\win32\ApacheModuleStatus$(SHORT)\ApacheModuleStatus.dll $(INSTDIR)\modules
+ #       copy os\win32\ApacheModuleInfo$(SHORT)\ApacheModuleInfo.dll $(INSTDIR)\modules
+ 	copy os\win32\ApacheModuleAuthAnon$(SHORT)\ApacheModuleAuthAnon.dll $(INSTDIR)\modules
++	copy os\win32\ApacheModuleAuthDigest$(SHORT)\ApacheModuleAuthDigest.dll $(INSTDIR)\modules
+ 	copy os\win32\ApacheModuleCERNMeta$(SHORT)\ApacheModuleCERNMeta.dll $(INSTDIR)\modules
+ 	copy os\win32\ApacheModuleExpires$(SHORT)\ApacheModuleExpires.dll $(INSTDIR)\modules
+ 	copy os\win32\ApacheModuleHeaders$(SHORT)\ApacheModuleHeaders.dll $(INSTDIR)\modules
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 026e007..d37096f 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -84,7 +84,9 @@
+  *   - expired nonces give amaya fits.  
+  */
+ 
++#ifndef WIN32
+ #include "ap_config_auto.h"
++#endif
+ #include "httpd.h"
+ #include "http_config.h"
+ #include "http_conf_globals.h"
+@@ -257,7 +259,7 @@ static void initialize_secret(server_rec *s)
+ 	ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_CRIT, 0, s,
+ 		     "Digest: error generating secret: %s", 
+ 		     /*ap_strerror(status)*/ "need ap_strerror here");
+-	exit(EXIT_FAILURE);
++	exit(1);
+     }
+ 
+     ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 0, s, "Digest: done");
+diff --git a/modules/aaa/mod_auth_digest.dsp b/modules/aaa/mod_auth_digest.dsp
+new file mode 100644
+index 0000000..2f70057
+--- /dev/null
++++ b/modules/aaa/mod_auth_digest.dsp
+@@ -0,0 +1,97 @@
++# Microsoft Developer Studio Project File - Name="ApacheModuleAuthDigest" - Package Owner=<4>
++# Microsoft Developer Studio Generated Build File, Format Version 5.00
++# ** DO NOT EDIT **
++
++# TARGTYPE "Win32 (x86) Dynamic-Link Library" 0x0102
++
++CFG=ApacheModuleAuthDigest - Win32 Debug
++!MESSAGE This is not a valid makefile. To build this project using NMAKE,
++!MESSAGE use the Export Makefile command and run
++!MESSAGE 
++!MESSAGE NMAKE /f "ApacheModuleAuthDigest.mak".
++!MESSAGE 
++!MESSAGE You can specify a configuration when running NMAKE
++!MESSAGE by defining the macro CFG on the command line. For example:
++!MESSAGE 
++!MESSAGE NMAKE /f "ApacheModuleAuthDigest.mak"\
++ CFG="ApacheModuleAuthDigest - Win32 Debug"
++!MESSAGE 
++!MESSAGE Possible choices for configuration are:
++!MESSAGE 
++!MESSAGE "ApacheModuleAuthDigest - Win32 Release" (based on\
++ "Win32 (x86) Dynamic-Link Library")
++!MESSAGE "ApacheModuleAuthDigest - Win32 Debug" (based on\
++ "Win32 (x86) Dynamic-Link Library")
++!MESSAGE 
++
++# Begin Project
++# PROP Scc_ProjName ""
++# PROP Scc_LocalPath ""
++CPP=cl.exe
++MTL=midl.exe
++RSC=rc.exe
++
++!IF  "$(CFG)" == "ApacheModuleAuthDigest - Win32 Release"
++
++# PROP BASE Use_MFC 0
++# PROP BASE Use_Debug_Libraries 0
++# PROP BASE Output_Dir "Release"
++# PROP BASE Intermediate_Dir "Release"
++# PROP BASE Target_Dir ""
++# PROP Use_MFC 0
++# PROP Use_Debug_Libraries 0
++# PROP Output_Dir ".\ApacheModuleAuthDigestR"
++# PROP Intermediate_Dir ".\ApacheModuleAuthDigestR"
++# PROP Ignore_Export_Lib 0
++# PROP Target_Dir ""
++# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /FD /c
++# ADD CPP /nologo /MT /W3 /GX /O2 /I "..\..\include" /I ".\\" /I "..\..\lib\apr\include" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "SHARED_MODULE" /YX /FD /c
++# ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /o NUL /win32
++# ADD MTL /nologo /D "NDEBUG" /mktyplib203 /o NUL /win32
++# ADD BASE RSC /l 0x409 /d "NDEBUG"
++# ADD RSC /l 0x409 /d "NDEBUG"
++BSC32=bscmake.exe
++# ADD BASE BSC32 /nologo
++# ADD BSC32 /nologo
++LINK32=link.exe
++# ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386
++# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /machine:I386 /libpath:"..\..\CoreR" /libpath:"..\..\lib\apr\Release"
++
++!ELSEIF  "$(CFG)" == "ApacheModuleAuthDigest - Win32 Debug"
++
++# PROP BASE Use_MFC 0
++# PROP BASE Use_Debug_Libraries 1
++# PROP BASE Output_Dir "Debug"
++# PROP BASE Intermediate_Dir "Debug"
++# PROP BASE Target_Dir ""
++# PROP Use_MFC 0
++# PROP Use_Debug_Libraries 1
++# PROP Output_Dir ".\ApacheModuleAuthDigestD"
++# PROP Intermediate_Dir ".\ApacheModuleAuthDigestD"
++# PROP Ignore_Export_Lib 0
++# PROP Target_Dir ""
++# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /FD /c
++# ADD CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /I "..\..\include" /I ".\\" /I "..\..\lib\apr\include" /D "_DEBUG" /D "SHARED_MODULE" /D "WIN32" /D "_WINDOWS" /YX /FD /c
++# ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /o NUL /win32
++# ADD MTL /nologo /D "_DEBUG" /mktyplib203 /o NUL /win32
++# ADD BASE RSC /l 0x409 /d "_DEBUG"
++# ADD RSC /l 0x409 /d "_DEBUG"
++BSC32=bscmake.exe
++# ADD BASE BSC32 /nologo
++# ADD BSC32 /nologo
++LINK32=link.exe
++# ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /pdbtype:sept
++# ADD LINK32 ApacheCore.lib aprlib.lib kernel32.lib /nologo /subsystem:windows /dll /map /debug /machine:I386 /pdbtype:sept /libpath:"..\..\CoreD" /libpath:"..\..\lib\apr\Debug"
++
++!ENDIF 
++
++# Begin Target
++
++# Name "ApacheModuleAuthDigest - Win32 Release"
++# Name "ApacheModuleAuthDigest - Win32 Debug"
++# Begin Source File
++
++SOURCE=..\..\modules\standard\mod_auth_digest.c
++# End Source File
++# End Target
++# End Project
+diff --git a/os/win32/BaseAddr.ref b/os/win32/BaseAddr.ref
+index 7f5a7f6..23279ef 100644
+--- a/os/win32/BaseAddr.ref
++++ b/os/win32/BaseAddr.ref
+@@ -13,7 +13,7 @@ aprlib               0x6FFA0000    0x00060000
+ ApacheCore           0x6FF00000    0x000A0000
+ mod_auth_anon        0x6FEF0000    0x00010000
+ mod_cern_meta        0x6FEE0000    0x00010000
+-mod_digest           0x6FED0000    0x00010000
++mod_auth_digest      0x6FED0000    0x00010000
+ mod_expires          0x6FEC0000    0x00010000
+ mod_headers          0x6FEB0000    0x00010000
+ mod_info             0x6FEA0000    0x00010000

@@ -1,0 +1,220 @@
+commit 2a70b9801586eb30be681daae0466dc91d8425c9
+Author: Brian Havard <bjh@apache.org>
+Date:   Tue Nov 2 15:15:08 1999 +0000
+
+    De-errno ap_pcfg_openfile().
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@84091 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/httpd.h b/include/httpd.h
+index 35740a2..3debe5b 100644
+--- a/include/httpd.h
++++ b/include/httpd.h
+@@ -1004,7 +1004,7 @@ typedef struct {
+ } configfile_t;
+ 
+ /* Open a configfile_t as FILE, return open configfile_t struct pointer */
+-API_EXPORT(configfile_t *) ap_pcfg_openfile(ap_context_t *p, const char *name);
++API_EXPORT(ap_status_t) ap_pcfg_openfile(configfile_t **, ap_context_t *p, const char *name);
+ 
+ /* Allocate a configfile_t handle with user defined functions and params */
+ API_EXPORT(configfile_t *) ap_pcfg_open_custom(ap_context_t *p, const char *descr,
+diff --git a/modules/aaa/mod_auth.c b/modules/aaa/mod_auth.c
+index 98782b7..37508e9 100644
+--- a/modules/aaa/mod_auth.c
++++ b/modules/aaa/mod_auth.c
+@@ -122,9 +122,10 @@ static char *get_pw(request_rec *r, char *user, char *auth_pwfile)
+     configfile_t *f;
+     char l[MAX_STRING_LEN];
+     const char *rpw, *w;
++    ap_status_t status;
+ 
+-    if (!(f = ap_pcfg_openfile(r->pool, auth_pwfile))) {
+-	ap_log_rerror(APLOG_MARK, APLOG_ERR, errno, r,
++    if ((status = ap_pcfg_openfile(&f, r->pool, auth_pwfile)) != APR_SUCCESS) {
++	ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+ 		    "Could not open password file: %s", auth_pwfile);
+ 	return NULL;
+     }
+@@ -150,8 +151,9 @@ static ap_table_t *groups_for_user(ap_context_t *p, char *user, char *grpfile)
+     ap_context_t *sp;
+     char l[MAX_STRING_LEN];
+     const char *group_name, *ll, *w;
++    ap_status_t status;
+ 
+-    if (!(f = ap_pcfg_openfile(p, grpfile))) {
++    if ((status = ap_pcfg_openfile(&f, p, grpfile)) != APR_SUCCESS) {
+ /*add?	aplog_error(APLOG_MARK, APLOG_ERR, NULL,
+ 		    "Could not open group file: %s", grpfile);*/
+ 	return NULL;
+diff --git a/modules/http/mod_mime.c b/modules/http/mod_mime.c
+index 01cb6c0..3c598cf 100644
+--- a/modules/http/mod_mime.c
++++ b/modules/http/mod_mime.c
+@@ -245,14 +245,15 @@ static void mime_post_config(ap_context_t *p, ap_context_t *plog, ap_context_t *
+     char l[MAX_STRING_LEN];
+     int x;
+     const char *types_confname = ap_get_module_config(s->module_config, &mime_module);
++    ap_status_t status;
+ 
+     if (!types_confname)
+         types_confname = TYPES_CONFIG_FILE;
+ 
+     types_confname = ap_server_root_relative(p, types_confname);
+ 
+-    if (!(f = ap_pcfg_openfile(p, types_confname))) {
+-        ap_log_error(APLOG_MARK, APLOG_ERR, errno, s,
++    if ((status = ap_pcfg_openfile(&f, p, types_confname)) != APR_SUCCESS) {
++        ap_log_error(APLOG_MARK, APLOG_ERR, status, s,
+ 		     "could not open mime types log file %s.", types_confname);
+         exit(1);
+     }
+diff --git a/modules/mappers/mod_imap.c b/modules/mappers/mod_imap.c
+index 361f3db..a97dbaa 100644
+--- a/modules/mappers/mod_imap.c
++++ b/modules/mappers/mod_imap.c
+@@ -603,6 +603,7 @@ static int imap_handler(request_rec *r)
+     char *mapdflt;
+     char *closest = NULL;
+     double closest_yet = -1;
++    ap_status_t status;
+ 
+     double testpoint[2];
+     double pointarray[MAXVERTS + 1][2];
+@@ -624,9 +625,9 @@ static int imap_handler(request_rec *r)
+ 	return DECLINED;
+     }
+ 
+-    imap = ap_pcfg_openfile(r->pool, r->filename);
++    status = ap_pcfg_openfile(&imap, r->pool, r->filename);
+ 
+-    if (!imap) {
++    if (status != APR_SUCCESS) {
+         return NOT_FOUND;
+     }
+ 
+diff --git a/server/config.c b/server/config.c
+index 318cf8b..b8beb52 100644
+--- a/server/config.c
++++ b/server/config.c
+@@ -1040,8 +1040,8 @@ void ap_process_resource_config(server_rec *s, const char *fname, ap_context_t *
+     parms.server = s;
+     parms.override = (RSRC_CONF | OR_ALL) & ~(OR_AUTHCFG | OR_LIMIT);
+ 
+-    if (!(parms.config_file = ap_pcfg_openfile(p,fname))) {
+-	perror("fopen");
++    if (ap_pcfg_openfile(&parms.config_file, p, fname) != APR_SUCCESS) {
++        /* ZZZ  use ap_strerror() once it exists to print an error message */
+ 	fprintf(stderr, "%s: could not open document config file %s\n",
+ 		ap_server_argv0, fname);
+ 	exit(1);
+@@ -1070,6 +1070,7 @@ int ap_parse_htaccess(void **result, request_rec *r, int override,
+     const struct htaccess_result *cache;
+     struct htaccess_result *new;
+     void *dc = NULL;
++    ap_status_t status;
+ 
+ /* firstly, search cache */
+     for (cache = r->htaccess; cache != NULL; cache = cache->next)
+@@ -1091,8 +1092,9 @@ int ap_parse_htaccess(void **result, request_rec *r, int override,
+     while (access_name[0]) {
+         filename = ap_make_full_path(r->pool, d,
+                                      ap_getword_conf(r->pool, &access_name));
++        status = ap_pcfg_openfile(&f, r->pool, filename);
+ 
+-        if ((f = ap_pcfg_openfile(r->pool, filename)) != NULL) {
++        if (status == APR_SUCCESS) {
+ 
+             dc = ap_create_per_dir_config(r->pool);
+ 
+@@ -1110,7 +1112,7 @@ int ap_parse_htaccess(void **result, request_rec *r, int override,
+             *result = dc;
+             break;
+         }
+-        else if (errno != ENOENT && errno != ENOTDIR) {
++        else if (status != APR_ENOENT && status != APR_ENOTDIR) {
+             ap_log_rerror(APLOG_MARK, APLOG_CRIT, errno, r,
+                           "%s pcfg_openfile: unable to check htaccess file, "
+                           "ensure it is readable",
+diff --git a/server/util.c b/server/util.c
+index d45246e..fc3d2fb 100644
+--- a/server/util.c
++++ b/server/util.c
+@@ -855,41 +855,40 @@ static void *cfg_getstr(void *buf, size_t bufsiz, void *param)
+ }
+ 
+ /* Open a configfile_t as FILE, return open configfile_t struct pointer */
+-API_EXPORT(configfile_t *) ap_pcfg_openfile(ap_context_t *p, const char *name)
++API_EXPORT(ap_status_t) ap_pcfg_openfile(configfile_t **ret_cfg, ap_context_t *p, const char *name)
+ {
+     configfile_t *new_cfg;
+     ap_file_t *file;
+-    int saved_errno;
+     ap_status_t stat;
+     ap_filetype_e type;
+ 
+     if (name == NULL) {
+         ap_log_error(APLOG_MARK, APLOG_ERR | APLOG_NOERRNO, 0, NULL,
+                "Internal error: pcfg_openfile() called with NULL filename");
+-        return NULL;
++        return APR_EBADF;
+     }
+ 
+     if (!ap_os_is_filename_valid(name)) {
+         ap_log_error(APLOG_MARK, APLOG_ERR | APLOG_NOERRNO, 0, NULL,
+                     "Access to config file %s denied: not a valid filename",
+                     name);
+-	errno = EACCES;
+-        return NULL;
++        return APR_EACCES;
+     }
+- 
++
+     stat = ap_open(&file, name, APR_READ | APR_BUFFERED, APR_OS_DEFAULT, p);
+ #ifdef DEBUG
+-    saved_errno = errno;
+     ap_log_error(APLOG_MARK, APLOG_DEBUG | APLOG_NOERRNO, NULL,
+                 "Opening config file %s (%s)",
+                 name, (stat != APR_SUCCESS) ? strerror(errno) : "successful");
+-    errno = saved_errno;
+ #endif
+     if (stat != APR_SUCCESS)
+-        return NULL;
++        return stat;
+ 
+-    if (ap_get_filetype(&type, file) == APR_SUCCESS &&
+-        type != APR_REG &&
++    stat = ap_get_filetype(&type, file);
++    if (stat != APR_SUCCESS)
++        return stat;
++
++    if (type != APR_REG &&
+ #if defined(WIN32) || defined(OS2)
+         !(strcasecmp(name, "nul") == 0 ||
+           (strlen(name) >= 4 &&
+@@ -897,13 +896,11 @@ API_EXPORT(configfile_t *) ap_pcfg_openfile(ap_context_t *p, const char *name)
+ #else
+         strcmp(name, "/dev/null") != 0) {
+ #endif /* WIN32 || OS2 */
+-	saved_errno = errno;
+         ap_log_error(APLOG_MARK, APLOG_ERR | APLOG_NOERRNO, 0, NULL,
+                     "Access to file %s denied by server: not a regular file",
+                     name);
+         ap_close(file);
+-	errno = saved_errno;
+-        return NULL;
++        return APR_EBADF;
+     }
+ 
+     new_cfg = ap_palloc(p, sizeof(*new_cfg));
+@@ -913,7 +910,8 @@ API_EXPORT(configfile_t *) ap_pcfg_openfile(ap_context_t *p, const char *name)
+     new_cfg->getstr = (void *(*)(void *, size_t, void *)) cfg_getstr;
+     new_cfg->close = (int (*)(void *)) cfg_close;
+     new_cfg->line_number = 0;
+-    return new_cfg;
++    *ret_cfg = new_cfg;
++    return APR_SUCCESS;
+ }
+ 
+ 

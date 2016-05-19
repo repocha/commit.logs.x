@@ -1,0 +1,110 @@
+commit 3e62f0dd251526633223d9b5f972b888eaeac71d
+Author: Jeff Trawick <trawick@apache.org>
+Date:   Tue Nov 24 14:47:55 2009 +0000
+
+    tweaks to r883540:
+      watchdog: use better mutex type name
+      ldap/digest: use same FOO_mutex_type variable name as other modules
+        for easier searching
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@883708 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 878525c..63c9575 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -180,8 +180,8 @@ static unsigned long  *opaque_cntr;
+ static apr_time_t     *otn_counter;     /* one-time-nonce counter */
+ static apr_global_mutex_t *client_lock = NULL;
+ static apr_global_mutex_t *opaque_lock = NULL;
+-static const char     *client_lock_type = "authdigest-client";
+-static const char     *opaque_lock_type = "authdigest-opaque";
++static const char     *client_mutex_type = "authdigest-client";
++static const char     *opaque_mutex_type = "authdigest-opaque";
+ static const char     *client_shm_filename;
+ 
+ #define DEF_SHMEM_SIZE  1000L           /* ~ 12 entries */
+@@ -322,7 +322,7 @@ static int initialize_tables(server_rec *s, apr_pool_t *ctx)
+     client_list->tbl_len     = num_buckets;
+     client_list->num_entries = 0;
+ 
+-    sts = ap_global_mutex_create(&client_lock, client_lock_type, NULL, s, ctx, 0);
++    sts = ap_global_mutex_create(&client_lock, client_mutex_type, NULL, s, ctx, 0);
+     if (sts != APR_SUCCESS) {
+         log_error_and_cleanup("failed to create lock (client_lock)", sts, s);
+         return !OK;
+@@ -338,7 +338,7 @@ static int initialize_tables(server_rec *s, apr_pool_t *ctx)
+     }
+     *opaque_cntr = 1UL;
+ 
+-    sts = ap_global_mutex_create(&opaque_lock, opaque_lock_type, NULL, s, ctx, 0);
++    sts = ap_global_mutex_create(&opaque_lock, opaque_mutex_type, NULL, s, ctx, 0);
+     if (sts != APR_SUCCESS) {
+         log_error_and_cleanup("failed to create lock (opaque_lock)", sts, s);
+         return !OK;
+@@ -366,9 +366,9 @@ static int pre_init(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
+ {
+     apr_status_t rv;
+ 
+-    rv = ap_mutex_register(pconf, client_lock_type, NULL, APR_LOCK_DEFAULT, 0);
++    rv = ap_mutex_register(pconf, client_mutex_type, NULL, APR_LOCK_DEFAULT, 0);
+     if (rv == APR_SUCCESS) {
+-        rv = ap_mutex_register(pconf, opaque_lock_type, NULL, APR_LOCK_DEFAULT,
++        rv = ap_mutex_register(pconf, opaque_mutex_type, NULL, APR_LOCK_DEFAULT,
+                                0);
+     }
+     if (rv != APR_SUCCESS) {
+diff --git a/modules/core/mod_watchdog.c b/modules/core/mod_watchdog.c
+index cff5a95..8342dbf 100644
+--- a/modules/core/mod_watchdog.c
++++ b/modules/core/mod_watchdog.c
+@@ -66,7 +66,7 @@ static wd_server_conf_t *wd_server_conf = NULL;
+ static apr_interval_time_t wd_interval = AP_WD_TM_INTERVAL;
+ static int wd_interval_set = 0;
+ static int mpm_is_forked = AP_MPMQ_NOT_SUPPORTED;
+-static const char *wd_proc_mutex_type = "wd-proc";
++static const char *wd_proc_mutex_type = "watchdog-callback";
+ 
+ static apr_status_t wd_worker_cleanup(void *data)
+ {
+diff --git a/modules/ldap/util_ldap.c b/modules/ldap/util_ldap.c
+index 8fbe808..e7d8a80 100644
+--- a/modules/ldap/util_ldap.c
++++ b/modules/ldap/util_ldap.c
+@@ -64,7 +64,7 @@
+ #define AP_LDAP_CHASEREFERRALS_ON 1
+ 
+ module AP_MODULE_DECLARE_DATA ldap_module;
+-static const char *ldap_cache_lock_type = "ldap-cache";
++static const char *ldap_cache_mutex_type = "ldap-cache";
+ 
+ #define LDAP_CACHE_LOCK() do {                                  \
+     if (st->util_ldap_cache_lock)                               \
+@@ -2521,7 +2521,7 @@ static int util_ldap_pre_config(apr_pool_t *pconf, apr_pool_t *plog,
+ {
+     apr_status_t result;
+ 
+-    result = ap_mutex_register(pconf, ldap_cache_lock_type, NULL,
++    result = ap_mutex_register(pconf, ldap_cache_mutex_type, NULL,
+                                APR_LOCK_DEFAULT, 0);
+     if (result != APR_SUCCESS) {
+         return result;
+@@ -2580,7 +2580,7 @@ static int util_ldap_post_config(apr_pool_t *p, apr_pool_t *plog,
+         }
+ 
+         result = ap_global_mutex_create(&st->util_ldap_cache_lock,
+-                                        ldap_cache_lock_type, NULL, s, p, 0);
++                                        ldap_cache_mutex_type, NULL, s, p, 0);
+         if (result != APR_SUCCESS) {
+             return result;
+         }
+@@ -2682,7 +2682,7 @@ static void util_ldap_child_init(apr_pool_t *p, server_rec *s)
+         ap_log_error(APLOG_MARK, APLOG_CRIT, sts, s,
+                      "Failed to initialise global mutex %s in child process %"
+                      APR_PID_T_FMT ".",
+-                     ldap_cache_lock_type, getpid());
++                     ldap_cache_mutex_type, getpid());
+     }
+ }
+ 

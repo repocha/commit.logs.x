@@ -1,0 +1,59 @@
+commit 03479f09b3ce198097e1005c920be66760217b6b
+Author: Christophe Jaillet <jailletc36@apache.org>
+Date:   Tue May 20 04:02:49 2014 +0000
+
+    Fix duplicate APLOGNO
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1596108 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/docs/log-message-tags/next-number b/docs/log-message-tags/next-number
+index 1c4c2de..7432773 100644
+--- a/docs/log-message-tags/next-number
++++ b/docs/log-message-tags/next-number
+@@ -1 +1 @@
+-2634
++2638
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index a97fc8d..11bc735 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -1454,7 +1454,7 @@ static authz_status ldapsearch_check_authorization(request_rec *r,
+                                   apr_pool_cleanup_null);
+     }
+     else {
+-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, APLOGNO(01738)
++        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, APLOGNO(02636)
+                       "auth_ldap authorize: no sec->host - weird...?");
+         return AUTHZ_DENIED;
+     }
+diff --git a/modules/ssl/mod_ssl_ct.c b/modules/ssl/mod_ssl_ct.c
+index 32075d5..7abaacb 100644
+--- a/modules/ssl/mod_ssl_ct.c
++++ b/modules/ssl/mod_ssl_ct.c
+@@ -929,11 +929,11 @@ static void daemon_maint(int reason, void *data, apr_wait_t status)
+             }
+             if (!stopping) {
+                 if (status == DAEMON_STARTUP_ERROR) {
+-                    ap_log_error(APLOG_MARK, APLOG_CRIT, 0, ap_server_conf, APLOGNO(01238)
++                    ap_log_error(APLOG_MARK, APLOG_CRIT, 0, ap_server_conf, APLOGNO(02634)
+                                  DAEMON_NAME " failed to initialize");
+                 }
+                 else {
+-                    ap_log_error(APLOG_MARK, APLOG_ERR, 0, ap_server_conf, APLOGNO(01239)
++                    ap_log_error(APLOG_MARK, APLOG_ERR, 0, ap_server_conf, APLOGNO(02635)
+                                  DAEMON_NAME " process died, restarting");
+                     daemon_start(root_pool, root_server, proc);
+                 }
+diff --git a/modules/test/mod_dialup.c b/modules/test/mod_dialup.c
+index b46097a..ad5bcb4 100644
+--- a/modules/test/mod_dialup.c
++++ b/modules/test/mod_dialup.c
+@@ -153,7 +153,7 @@ dialup_handler(request_rec *r)
+ 
+     rv = ap_mpm_query(AP_MPMQ_CAN_SUSPEND, &mpm_can_suspend);
+     if (!mpm_can_suspend) {
+-        ap_log_rerror (APLOG_MARK, LOG_NOTICE, rv, r, APLOGNO(02617)
++        ap_log_rerror (APLOG_MARK, LOG_NOTICE, rv, r, APLOGNO(02637)
+                 "dialup: MPM doesn't support suspending");
+         return DECLINED;
+     }

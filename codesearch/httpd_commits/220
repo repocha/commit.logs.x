@@ -1,0 +1,2574 @@
+commit a3040aca8a5de38c018ae0c3309c29ea87f97dda
+Author: Ryan Bloom <rbb@apache.org>
+Date:   Tue Oct 16 21:32:41 2001 +0000
+
+    Remove all of the ldap modules.  These have been moved to their own
+    repository, httpd-ldap, and they now form their own sub-project of the
+    httpd project.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@91508 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 35a447f..486a144 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,5 +1,8 @@
+ Changes with Apache 2.0.27-dev
+ 
++  *) Moved all ldap modules from the core to httpd-ldap sub-project
++     [Ryan Bloom]
++
+   *) Exit when we can't listen on any of the configured ports.  This
+      is the same behavior as 1.3, and it avoids having the MPMs to
+      deal with bogus ap_listen_rec structures.  [Jeff Trawick]
+diff --git a/modules/aaa/config.m4 b/modules/aaa/config.m4
+index d1fa10b..5200b58 100644
+--- a/modules/aaa/config.m4
++++ b/modules/aaa/config.m4
+@@ -41,8 +41,6 @@ APACHE_MODULE(auth_digest, RFC2617 Digest authentication, , , most, [
+   CPPFLAGS=$ap_old_cppflags
+ ])
+ 
+-APACHE_MODULE(auth_ldap, LDAP based authentication, , , no)
+-
+ APR_ADDTO(LT_LDFLAGS,-export-dynamic)
+ 
+ APACHE_MODPATH_FINISH
+diff --git a/modules/aaa/mod_auth_ldap.c b/modules/aaa/mod_auth_ldap.c
+deleted file mode 100644
+index 6be891c..0000000
+--- a/modules/aaa/mod_auth_ldap.c
++++ /dev/null
+@@ -1,862 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2001 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- */
+-
+-/*
+- * mod_auth_ldap.c: LDAP authentication module
+- * 
+- * Original code from auth_ldap module for Apache v1.3:
+- * Copyright 1998, 1999 Enbridge Pipelines Inc. 
+- * Copyright 1999-2001 Dave Carrigan
+- */
+-
+-#include <apr_ldap.h>
+-#include <apr_strings.h>
+-
+-#include "ap_config.h"
+-#if APR_HAVE_UNISTD_H
+-/* for getpid() */
+-#include <unistd.h>
+-#endif
+-#include <ctype.h>
+-
+-#include "httpd.h"
+-#include "http_config.h"
+-#include "http_core.h"
+-#include "http_log.h"
+-#include "http_protocol.h"
+-#include "http_request.h"
+-#include "util_ldap.h"
+-
+-/* per directory configuration */
+-typedef struct {
+-    apr_pool_t *pool;			/* Pool that this config is allocated from */
+-    apr_lock_t *lock;			/* Lock for this config */
+-    int auth_authoritative;		/* Is this auth method the one and only? */
+-    int enabled;			/* Is auth_ldap enabled in this directory? */
+-
+-    /* These parameters are all derived from the AuthLDAPURL directive */
+-    char *url;				/* String representation of the URL */
+-
+-    char *host;				/* Name of the LDAP server (or space separated list) */
+-    int port;				/* Port of the LDAP server */
+-    char *basedn;			/* Base DN to do all searches from */
+-    char *attribute;			/* Attribute to search for */
+-    char **attributes;			/* Array of all the attributes to return */
+-    int scope;				/* Scope of the search */
+-    char *filter;			/* Filter to further limit the search  */
+-    deref_options deref;		/* how to handle alias dereferening */
+-    char *binddn;			/* DN to bind to server (can be NULL) */
+-    char *bindpw;			/* Password to bind to server (can be NULL) */
+-
+-    int frontpage_hack;			/* Hack for frontpage support */
+-    int user_is_dn;			/* If true, connection->user is DN instead of userid */
+-    int compare_dn_on_server;		/* If true, will use server to do DN compare */
+-
+-    int have_ldap_url;			/* Set if we have found an LDAP url */
+- 
+-    apr_array_header_t *groupattr;	/* List of Group attributes */
+-    int group_attrib_is_dn;		/* If true, the group attribute is the DN, otherwise, 
+-					   it's the exact string passed by the HTTP client */
+-
+-    int netscapessl;			/* True if Netscape SSL is enabled */
+-    int starttls;                       /* True if StartTLS is enabled */
+-} mod_auth_ldap_config_t;
+-
+-typedef struct mod_auth_ldap_request_t {
+-    char *dn;				/* The saved dn from a successful search */
+-    char *user;				/* The username provided by the client */
+-} mod_auth_ldap_request_t;
+-
+-/* maximum group elements supported */
+-#define GROUPATTR_MAX_ELTS 10
+-
+-struct mod_auth_ldap_groupattr_entry_t {
+-    char *name;
+-};
+-
+-module AP_MODULE_DECLARE_DATA auth_ldap_module;
+-
+-/* function prototypes */
+-void mod_auth_ldap_build_filter(char *filtbuf, 
+-                                request_rec *r, 
+-                                mod_auth_ldap_config_t *sec);
+-int mod_auth_ldap_check_user_id(request_rec *r);
+-int mod_auth_ldap_auth_checker(request_rec *r);
+-void *mod_auth_ldap_create_dir_config(apr_pool_t *p, char *d);
+-
+-/* ---------------------------------------- */
+-
+-
+-/*
+- * Build the search filter, or at least as much of the search filter that
+- * will fit in the buffer. We don't worry about the buffer not being able
+- * to hold the entire filter. If the buffer wasn't big enough to hold the
+- * filter, ldap_search_s will complain, but the only situation where this
+- * is likely to happen is if the client sent a really, really long
+- * username, most likely as part of an attack.
+- *
+- * The search filter consists of the filter provided with the URL,
+- * combined with a filter made up of the attribute provided with the URL,
+- * and the actual username passed by the HTTP client. For example, assume
+- * that the LDAP URL is
+- * 
+- *   ldap://ldap.airius.com/ou=People, o=Airius?uid??(posixid=*)
+- *
+- * Further, assume that the userid passed by the client was `userj'.  The
+- * search filter will be (&(posixid=*)(uid=userj)).
+- */
+-#define FILTER_LENGTH MAX_STRING_LEN
+-void mod_auth_ldap_build_filter(char *filtbuf, 
+-                                request_rec *r, 
+-                                mod_auth_ldap_config_t *sec)
+-{
+-    char *p, *q, *filtbuf_end;
+-    /* 
+-     * Create the first part of the filter, which consists of the 
+-     * config-supplied portions.
+-     */
+-    apr_snprintf(filtbuf, FILTER_LENGTH, "(&(%s)(%s=", sec->filter, sec->attribute);
+-
+-    /* 
+-     * Now add the client-supplied username to the filter, ensuring that any
+-     * LDAP filter metachars are escaped.
+-     */
+-    filtbuf_end = filtbuf + FILTER_LENGTH - 1;
+-    for (p = r->user, q=filtbuf + strlen(filtbuf);
+-         *p && q < filtbuf_end; *q++ = *p++) {
+-        if (strchr("*()\\", *p) != NULL) {
+-            *q++ = '\\';
+-            if (q >= filtbuf_end) {
+-	        break;
+-	    }
+-        }
+-    }
+-    *q = '\0';
+-
+-    /* 
+-     * Append the closing parens of the filter, unless doing so would 
+-     * overrun the buffer.
+-     */
+-    if (q + 2 <= filtbuf_end)
+-        strcat(filtbuf, "))");
+-}
+-
+-
+-/*
+- * Authentication Phase
+- * --------------------
+- *
+- * This phase authenticates the credentials the user has sent with
+- * the request (ie the username and password are checked). This is done
+- * by making an attempt to bind to the LDAP server using this user's
+- * DN and the supplied password.
+- *
+- */
+-int mod_auth_ldap_check_user_id(request_rec *r)
+-{
+-    const char **vals = NULL;
+-    char filtbuf[FILTER_LENGTH];
+-    mod_auth_ldap_config_t *sec =
+-        (mod_auth_ldap_config_t *)ap_get_module_config(r->per_dir_config, &auth_ldap_module);
+-
+-    util_ldap_connection_t *ldc = NULL;
+-    const char *sent_pw;
+-    int result = 0;
+-    const char *dn = NULL;
+-
+-    mod_auth_ldap_request_t *req =
+-        (mod_auth_ldap_request_t *)apr_pcalloc(r->pool, sizeof(mod_auth_ldap_request_t));
+-    ap_set_module_config(r->request_config, &auth_ldap_module, req);
+-
+-    if (!sec->enabled) {
+-        return DECLINED;
+-    }
+-
+-    /* 
+-     * Basic sanity checks before any LDAP operations even happen.
+-     */
+-    if (!sec->have_ldap_url) {
+-        return DECLINED;
+-    }
+-
+-    /* There is a good AuthLDAPURL, right? */
+-    if (sec->host) {
+-        ldc = util_ldap_connection_find(r, sec->host, sec->port,
+-                                       sec->binddn, sec->bindpw, sec->deref,
+-                                       sec->netscapessl, sec->starttls);
+-    }
+-    else {
+-        ap_log_rerror(APLOG_MARK, APLOG_WARNING|APLOG_NOERRNO, 0, r, 
+-                      "[%d] auth_ldap authenticate: no sec->host - weird...?", getpid());
+-        return sec->auth_authoritative? HTTP_UNAUTHORIZED : DECLINED;
+-    }
+-
+-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
+-		  "[%d] auth_ldap authenticate: using URL %s", getpid(), sec->url);
+-
+-    /* Get the password that the client sent */
+-    if ((result = ap_get_basic_auth_pw(r, &sent_pw))) {
+-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
+-		      "[%d] auth_ldap authenticate: "
+-		      "ap_get_basic_auth_pw() returns %d", getpid(), result);
+-        util_ldap_connection_close(ldc);
+-        return result;
+-    }
+-
+-    /* build the username filter */
+-    mod_auth_ldap_build_filter(filtbuf, r, sec);
+-
+-    /* do the user search */
+-    result = util_ldap_cache_checkuserid(r, ldc, sec->url, sec->basedn, sec->scope,
+-                                         sec->attributes, filtbuf, sent_pw, &dn, &vals);
+-    util_ldap_connection_close(ldc);
+-
+-    if (result != LDAP_SUCCESS) {
+-        ap_log_rerror(APLOG_MARK, APLOG_WARNING|APLOG_NOERRNO, 0, r, 
+-                      "[%d] auth_ldap authenticate: "
+-                      "user %s authentication failed; URI %s [%s][%s]",
+-		      getpid(), r->user, r->uri, ldc->reason, ldap_err2string(result));
+-        if (LDAP_INVALID_CREDENTIALS == result) {
+-            ap_note_basic_auth_failure(r);
+-            return HTTP_UNAUTHORIZED;
+-        }
+-        else {
+-            return sec->auth_authoritative? HTTP_UNAUTHORIZED: DECLINED;
+-        }
+-    }
+-
+-    /* mark the user and DN */
+-    req->dn = apr_pstrdup(r->pool, dn);
+-    req->user = r->user;
+-    if (sec->user_is_dn) {
+-        r->user = req->dn;
+-    }
+-
+-    /* add environment variables */
+-    if (sec->attributes && vals) {
+-        apr_table_t *e = r->subprocess_env;
+-        int i = 0;
+-        while (sec->attributes[i]) {
+-            char *str = apr_pstrcat(r->pool, "AUTHENTICATE_", sec->attributes[i], NULL);
+-            int j = 13;
+-            while (str[j]) {
+-                if (str[j] >= 'a' && str[j] <= 'z') {
+-                    str[j] = str[j] - ('a' - 'A');
+-                }
+-                j++;
+-            }
+-            apr_table_setn(e, str, vals[i]);
+-            i++;
+-        }
+-    }
+-
+-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-		  "[%d] auth_ldap authenticate: accepting %s", getpid(), r->user);
+-
+-    return OK;
+-}
+-
+-
+-/*
+- * Authorisation Phase
+- * -------------------
+- *
+- * After checking whether the username and password are correct, we need
+- * to check whether that user is authorised to view this resource. The
+- * require directive is used to do this:
+- *
+- *  require valid-user		Any authenticated is allowed in.
+- *  require user <username>	This particular user is allowed in.
+- *  require group <groupname>	The user must be a member of this group
+- *                              in order to be allowed in.
+- *  require dn <dn>             The user must have the following DN in the
+- *                              LDAP tree to be let in.
+- *
+- */
+-int mod_auth_ldap_auth_checker(request_rec *r)
+-{
+-    int result = 0;
+-    mod_auth_ldap_request_t *req =
+-        (mod_auth_ldap_request_t *)ap_get_module_config(r->request_config,
+-        &auth_ldap_module);
+-    mod_auth_ldap_config_t *sec =
+-        (mod_auth_ldap_config_t *)ap_get_module_config(r->per_dir_config, 
+-        &auth_ldap_module);
+-
+-    util_ldap_connection_t *ldc = NULL;
+-    int m = r->method_number;
+-
+-    const apr_array_header_t *reqs_arr = ap_requires(r);
+-    require_line *reqs = reqs_arr ? (require_line *)reqs_arr->elts : NULL;
+-
+-    register int x;
+-    const char *t;
+-    char *w;
+-    int method_restricted = 0;
+-
+-    if (!sec->enabled) {
+-        return DECLINED;
+-    }
+-
+-    if (!sec->have_ldap_url) {
+-        return DECLINED;
+-    }
+-
+-    if (sec->host) {
+-        ldc = util_ldap_connection_find(r, sec->host, sec->port,
+-                                       sec->binddn, sec->bindpw, sec->deref,
+-                                       sec->netscapessl, sec->starttls);
+-    }
+-    else {
+-        ap_log_rerror(APLOG_MARK, APLOG_WARNING|APLOG_NOERRNO, 0, r, 
+-                      "[%d] auth_ldap authorise: no sec->host - weird...?", getpid());
+-        return sec->auth_authoritative? HTTP_UNAUTHORIZED : DECLINED;
+-    }
+-
+-    /* 
+-     * If there are no elements in the group attribute array, the default should be
+-     * member and uniquemember; populate the array now.
+-     */
+-    if (sec->groupattr->nelts == 0) {
+-        struct mod_auth_ldap_groupattr_entry_t *grp;
+-        apr_lock_acquire(sec->lock);
+-        grp = apr_array_push(sec->groupattr);
+-        grp->name = "member";
+-        grp = apr_array_push(sec->groupattr);
+-        grp->name = "uniquemember";
+-        apr_lock_release(sec->lock);
+-    }
+-
+-    if (!reqs_arr) {
+-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
+-		      "[%d] auth_ldap authorise: no requirements array", getpid());
+-        return sec->auth_authoritative? HTTP_UNAUTHORIZED : DECLINED;
+-    }
+-
+-    /* Loop through the requirements array until there's no elements
+-     * left, or something causes a return from inside the loop */
+-    for(x=0; x < reqs_arr->nelts; x++) {
+-        if (! (reqs[x].method_mask & (1 << m))) {
+-            continue;
+-        }
+-        method_restricted = 1;
+-	
+-        t = reqs[x].requirement;
+-        w = ap_getword(r->pool, &t, ' ');
+-    
+-        if (strcmp(w, "valid-user") == 0) {
+-            /*
+-             * Valid user will always be true if we authenticated with ldap,
+-             * but when using front page, valid user should only be true if
+-             * he exists in the frontpage password file. This hack will get
+-             * auth_ldap to look up the user in the the pw file to really be
+-             * sure that he's valid. Naturally, it requires mod_auth to be
+-             * compiled in, but if mod_auth wasn't in there, then the need
+-             * for this hack wouldn't exist anyway.
+-             */
+-            if (sec->frontpage_hack) {
+-	        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-			      "[%d] auth_ldap authorise: "
+-			      "deferring authorisation to mod_auth (FP Hack)", 
+-			      getpid());
+-                return OK;
+-            }
+-            else {
+-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                              "[%d] auth_ldap authorise: "
+-                              "successful authorisation because user "
+-                              "is valid-user", getpid());
+-                return OK;
+-            }
+-        }
+-        else if (strcmp(w, "user") == 0) {
+-            if (req->dn == NULL || strlen(req->dn) == 0) {
+-	        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
+-                              "[%d] auth_ldap authorise: "
+-                              "require user: user's DN has not been defined; failing authorisation", 
+-                              getpid());
+-                return sec->auth_authoritative? HTTP_UNAUTHORIZED : DECLINED;
+-            }
+-            /* 
+-             * First do a whole-line compare, in case it's something like
+-             *   require user Babs Jensen
+-             */
+-            result = util_ldap_cache_compare(r, ldc, sec->url, req->dn, sec->attribute, t);
+-            switch(result) {
+-                case LDAP_COMPARE_TRUE: {
+-                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                                  "[%d] auth_ldap authorise: "
+-                                  "require user: authorisation successful", getpid());
+-                    return OK;
+-                }
+-                default: {
+-                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                                  "[%d] auth_ldap authorise: require user: "
+-                                  "authorisation failed [%s][%s]", getpid(),
+-                                  ldc->reason, ldap_err2string(result));
+-                }
+-            }
+-            /* 
+-             * Now break apart the line and compare each word on it 
+-             */
+-            while (t[0]) {
+-	        w = ap_getword_conf(r->pool, &t);
+-                result = util_ldap_cache_compare(r, ldc, sec->url, req->dn, sec->attribute, w);
+-                switch(result) {
+-                    case LDAP_COMPARE_TRUE: {
+-                        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                                      "[%d] auth_ldap authorise: "
+-                                      "require user: authorisation successful", getpid());
+-                        return OK;
+-                    }
+-                    default: {
+-                        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                                      "[%d] auth_ldap authorise: "
+-                                      "require user: authorisation failed [%s][%s]",
+-                                      getpid(), ldc->reason, ldap_err2string(result));
+-                    }
+-                }
+-            }
+-        }
+-        else if (strcmp(w, "dn") == 0) {
+-            if (req->dn == NULL || strlen(req->dn) == 0) {
+-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
+-                              "[%d] auth_ldap authorise: "
+-                              "require dn: user's DN has not been defined; failing authorisation", 
+-                              getpid());
+-                return sec->auth_authoritative? HTTP_UNAUTHORIZED : DECLINED;
+-            }
+-
+-            result = util_ldap_cache_comparedn(r, ldc, sec->url, req->dn, t, sec->compare_dn_on_server);
+-            switch(result) {
+-                case LDAP_COMPARE_TRUE: {
+-                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                                  "[%d] auth_ldap authorise: "
+-                                  "require dn: authorisation successful", getpid());
+-                    return OK;
+-                }
+-                default: {
+-                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                                  "[%d] auth_ldap authorise: "
+-                                  "require dn: LDAP error [%s][%s]",
+-                                  getpid(), ldc->reason, ldap_err2string(result));
+-                }
+-            }
+-        }
+-        else if (strcmp(w, "group") == 0) {
+-            struct mod_auth_ldap_groupattr_entry_t *ent = (struct mod_auth_ldap_groupattr_entry_t *) sec->groupattr->elts;
+-            int i;
+-
+-            if (sec->group_attrib_is_dn) {
+-                if (req->dn == NULL || strlen(req->dn) == 0) {
+-                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r,
+-                                  "[%d] auth_ldap authorise: require group: user's DN has not been defined; failing authorisation", 
+-                                  getpid());
+-                    return sec->auth_authoritative? HTTP_UNAUTHORIZED : DECLINED;
+-                }
+-            }
+-            else {
+-                if (req->user == NULL || strlen(req->user) == 0) {
+-	            /* We weren't called in the authentication phase, so we didn't have a 
+-                     * chance to set the user field. Do so now. */
+-                    req->user = r->user;
+-                }
+-            }
+-
+-            ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                          "[%d] auth_ldap authorise: require group: testing for group membership in `%s'", 
+-		          getpid(), t);
+-
+-            for (i = 0; i < sec->groupattr->nelts; i++) {
+-	        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                              "[%d] auth_ldap authorise: require group: testing for %s: %s (%s)", getpid(),
+-                              ent[i].name, sec->group_attrib_is_dn ? req->dn : req->user, t);
+-
+-                result = util_ldap_cache_compare(r, ldc, sec->url, t, ent[i].name, 
+-                                     sec->group_attrib_is_dn ? req->dn : req->user);
+-                switch(result) {
+-                    case LDAP_COMPARE_TRUE: {
+-                        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                                      "[%d] auth_ldap authorise: require group: "
+-                                      "authorisation successful (attribute %s) [%s][%s]",
+-                                      getpid(), ent[i].name, ldc->reason, ldap_err2string(result));
+-                        return OK;
+-                    }
+-                    default: {
+-                        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                                      "[%d] auth_ldap authorise: require group: "
+-                                      "authorisation failed [%s][%s]",
+-                                      getpid(), ldc->reason, ldap_err2string(result));
+-                    }
+-                }
+-            }
+-        }
+-    }
+-
+-    if (!method_restricted) {
+-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                      "[%d] auth_ldap authorise: agreeing because non-restricted", 
+-                      getpid());
+-        return OK;
+-    }
+-
+-    if (!sec->auth_authoritative) {
+-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                      "[%d] auth_ldap authorise: declining to authorise", getpid());
+-        return DECLINED;
+-    }
+-
+-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, r, 
+-                  "[%d] auth_ldap authorise: authorisation denied", getpid());
+-    ap_note_basic_auth_failure (r);
+-
+-    return HTTP_UNAUTHORIZED;
+-}
+-
+-
+-/* ---------------------------------------- */
+-/* config directives */
+-
+-
+-void *mod_auth_ldap_create_dir_config(apr_pool_t *p, char *d)
+-{
+-    mod_auth_ldap_config_t *sec = 
+-        (mod_auth_ldap_config_t *)apr_pcalloc(p, sizeof(mod_auth_ldap_config_t));
+-
+-    sec->pool = p;
+-    apr_lock_create(&sec->lock, APR_MUTEX, APR_INTRAPROCESS, NULL, p);
+-    sec->auth_authoritative = 1;
+-    sec->enabled = 1;
+-    sec->groupattr = apr_array_make(p, GROUPATTR_MAX_ELTS, 
+-				   sizeof(struct mod_auth_ldap_groupattr_entry_t));
+-
+-    sec->have_ldap_url = 0;
+-    sec->url = "";
+-    sec->host = NULL;
+-    sec->binddn = NULL;
+-    sec->bindpw = NULL;
+-    sec->deref = always;
+-    sec->group_attrib_is_dn = 1;
+-
+-    sec->frontpage_hack = 0;
+-    sec->netscapessl = 0;
+-    sec->starttls = 0;
+-
+-    sec->user_is_dn = 0;
+-    sec->compare_dn_on_server = 0;
+-
+-    return sec;
+-}
+-
+-/* 
+- * Use the ldap url parsing routines to break up the ldap url into
+- * host and port.
+- */
+-static const char *mod_auth_ldap_parse_url(cmd_parms *cmd, 
+-                                    void *config,
+-                                    const char *url)
+-{
+-    int result;
+-    LDAPURLDesc *urld;
+-
+-    mod_auth_ldap_config_t *sec = config;
+-
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-	         cmd->server, "[%d] auth_ldap url parse: `%s'", 
+-	         getpid(), url);
+-
+-    result = ldap_url_parse(url, &(urld));
+-    if (result != LDAP_SUCCESS) {
+-        switch (result) {
+-        case LDAP_URL_ERR_NOTLDAP:
+-            return "LDAP URL does not begin with ldap://";
+-        case LDAP_URL_ERR_NODN:
+-            return "LDAP URL does not have a DN";
+-        case LDAP_URL_ERR_BADSCOPE:
+-            return "LDAP URL has an invalid scope";
+-        case LDAP_URL_ERR_MEM:
+-            return "Out of memory parsing LDAP URL";
+-        default:
+-            return "Could not parse LDAP URL";
+-        }
+-    }
+-    sec->url = apr_pstrdup(cmd->pool, url);
+-
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-	         cmd->server, "[%d] auth_ldap url parse: Host: %s", getpid(), urld->lud_host);
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-	         cmd->server, "[%d] auth_ldap url parse: Port: %d", getpid(), urld->lud_port);
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-	         cmd->server, "[%d] auth_ldap url parse: DN: %s", getpid(), urld->lud_dn);
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-	         cmd->server, "[%d] auth_ldap url parse: attrib: %s", getpid(), urld->lud_attrs? urld->lud_attrs[0] : "(null)");
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-	         cmd->server, "[%d] auth_ldap url parse: scope: %s", getpid(), 
+-	         (urld->lud_scope == LDAP_SCOPE_SUBTREE? "subtree" : 
+-		 urld->lud_scope == LDAP_SCOPE_BASE? "base" : 
+-		 urld->lud_scope == LDAP_SCOPE_ONELEVEL? "onelevel" : "unknown"));
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-	         cmd->server, "[%d] auth_ldap url parse: filter: %s", getpid(), urld->lud_filter);
+-
+-    /* Set all the values, or at least some sane defaults */
+-    if (sec->host) {
+-        char *p = apr_palloc(cmd->pool, strlen(sec->host) + strlen(urld->lud_host) + 2);
+-        strcpy(p, urld->lud_host);
+-        strcat(p, " ");
+-        strcat(p, sec->host);
+-        sec->host = p;
+-    }
+-    else {
+-        sec->host = urld->lud_host? apr_pstrdup(cmd->pool, urld->lud_host) : "localhost";
+-    }
+-    sec->basedn = urld->lud_dn? apr_pstrdup(cmd->pool, urld->lud_dn) : "";
+-    if (urld->lud_attrs && urld->lud_attrs[0]) {
+-        int i = 1;
+-        while (urld->lud_attrs[i]) {
+-            i++;
+-        }
+-        sec->attributes = apr_pcalloc(cmd->pool, sizeof(char *) * (i+1));
+-        i = 0;
+-        while (urld->lud_attrs[i]) {
+-            sec->attributes[i] = apr_pstrdup(cmd->pool, urld->lud_attrs[i]);
+-            i++;
+-        }
+-        sec->attribute = sec->attributes[0];
+-    }
+-    else {
+-        sec->attribute = "uid";
+-    }
+-
+-    sec->scope = urld->lud_scope == LDAP_SCOPE_ONELEVEL ?
+-        LDAP_SCOPE_ONELEVEL : LDAP_SCOPE_SUBTREE;
+-
+-    if (urld->lud_filter) {
+-        if (urld->lud_filter[0] == '(') {
+-            /* 
+-	     * Get rid of the surrounding parens; later on when generating the
+-	     * filter, they'll be put back.
+-             */
+-            sec->filter = apr_pstrdup(cmd->pool, urld->lud_filter+1);
+-            sec->filter[strlen(sec->filter)-1] = '\0';
+-        }
+-        else {
+-            sec->filter = apr_pstrdup(cmd->pool, urld->lud_filter);
+-        }
+-    }
+-    else {
+-        sec->filter = "objectclass=*";
+-    }
+-    if (strncmp(url, "ldaps", 5) == 0) {
+-        ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-		     cmd->server, "[%d] auth_ldap parse url: requesting secure LDAP", getpid());
+-#ifdef APU_HAS_LDAP_STARTTLS
+-        sec->port = urld->lud_port? urld->lud_port : LDAPS_PORT;
+-        sec->starttls = 1;
+-#else
+-#ifdef APU_HAS_LDAP_NETSCAPE_SSL
+-        sec->port = urld->lud_port? urld->lud_port : LDAPS_PORT;
+-        sec->netscapessl = 1;
+-#else
+-        return "Secure LDAP (ldaps://) not supported. Rebuild APR-Util";
+-#endif
+-#endif
+-    }
+-    else {
+-        ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0,
+-		     cmd->server, "[%d] auth_ldap parse url: not requesting secure LDAP", getpid());
+-        sec->netscapessl = 0;
+-        sec->starttls = 0;
+-        sec->port = urld->lud_port? urld->lud_port : LDAP_PORT;
+-    }
+-
+-    sec->have_ldap_url = 1;
+-    ldap_free_urldesc(urld);
+-    return NULL;
+-}
+-
+-static const char *mod_auth_ldap_set_deref(cmd_parms *cmd, void *config, const char *arg)
+-{
+-    mod_auth_ldap_config_t *sec = config;
+-
+-    if (strcmp(arg, "never") == 0 || strcasecmp(arg, "off") == 0) {
+-        sec->deref = never;
+-    }
+-    else if (strcmp(arg, "searching") == 0) {
+-        sec->deref = searching;
+-    }
+-    else if (strcmp(arg, "finding") == 0) {
+-        sec->deref = finding;
+-    }
+-    else if (strcmp(arg, "always") == 0 || strcasecmp(arg, "on") == 0) {
+-        sec->deref = always;
+-    }
+-    else {
+-        return "Unrecognized value for AuthLDAPAliasDereference directive";
+-    }
+-    return NULL;
+-}
+-
+-static const char *mod_auth_ldap_add_group_attribute(cmd_parms *cmd, void *config, const char *arg)
+-{
+-    struct mod_auth_ldap_groupattr_entry_t *new;
+-
+-    mod_auth_ldap_config_t *sec = config;
+-
+-    if (sec->groupattr->nelts > GROUPATTR_MAX_ELTS)
+-        return "Too many AuthLDAPGroupAttribute directives";
+-
+-    new = apr_array_push(sec->groupattr);
+-    new->name = apr_pstrdup(cmd->pool, arg);
+-  
+-    return NULL;
+-}
+-
+-command_rec mod_auth_ldap_cmds[] = {
+-    AP_INIT_TAKE1("AuthLDAPURL", mod_auth_ldap_parse_url, NULL, OR_AUTHCFG, 
+-                  "URL to define LDAP connection. This should be an RFC 2255 complaint\n"
+-                  "URL of the form ldap://host[:port]/basedn[?attrib[?scope[?filter]]].\n"
+-                  "<ul>\n"
+-                  "<li>Host is the name of the LDAP server. Use a space separated list of hosts \n"
+-                  "to specify redundant servers.\n"
+-                  "<li>Port is optional, and specifies the port to connect to.\n"
+-                  "<li>basedn specifies the base DN to start searches from\n"
+-                  "<li>Attrib specifies what attribute to search for in the directory. If not "
+-                  "provided, it defaults to <b>uid</b>.\n"
+-                  "<li>Scope is the scope of the search, and can be either <b>sub</b> or "
+-                  "<b>one</b>. If not provided, the default is <b>sub</b>.\n"
+-                  "<li>Filter is a filter to use in the search. If not provided, "
+-                  "defaults to <b>(objectClass=*)</b>.\n"
+-                  "</ul>\n"
+-                  "Searches are performed using the attribute and the filter combined. "
+-                  "For example, assume that the\n"
+-                  "LDAP URL is <b>ldap://ldap.airius.com/ou=People, o=Airius?uid?sub?(posixid=*)</b>. "
+-                  "Searches will\n"
+-                  "be done using the filter <b>(&((posixid=*))(uid=<i>username</i>))</b>, "
+-                  "where <i>username</i>\n"
+-                  "is the user name passed by the HTTP client. The search will be a subtree "
+-                  "search on the branch <b>ou=People, o=Airius</b>."),
+-
+-    AP_INIT_TAKE1("AuthLDAPBindDN", ap_set_string_slot,
+-                  (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, binddn), OR_AUTHCFG,
+-                  "DN to use to bind to LDAP server. If not provided, will do an anonymous bind."),
+-
+-    AP_INIT_TAKE1("AuthLDAPBindPassword", ap_set_string_slot,
+-                  (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, bindpw), OR_AUTHCFG,
+-                  "Password to use to bind to LDAP server. If not provided, will do an anonymous bind."),
+-
+-    AP_INIT_FLAG("AuthLDAPRemoteUserIsDN", ap_set_flag_slot,
+-                 (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, user_is_dn), OR_AUTHCFG,
+-                 "Set to 'on' to set the REMOTE_USER environment variable to be the full "
+-                 "DN of the remote user. By default, this is set to off, meaning that "
+-                 "the REMOTE_USER variable will contain whatever value the remote user sent."),
+-
+-    AP_INIT_FLAG("AuthLDAPAuthoritative", ap_set_flag_slot,
+-                 (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, auth_authoritative), OR_AUTHCFG,
+-                 "Set to 'off' to allow access control to be passed along to lower modules if "
+-                 "the UserID and/or group is not known to this module"),
+-
+-    AP_INIT_FLAG("AuthLDAPCompareDNOnServer", ap_set_flag_slot,
+-                 (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, compare_dn_on_server), OR_AUTHCFG,
+-                 "Set to 'on' to force auth_ldap to do DN compares (for the \"require dn\" "
+-                 "directive) using the server, and set it 'off' to do the compares locally "
+-                 "(at the expense of possible false matches). See the documentation for "
+-                 "a complete description of this option."),
+-
+-    AP_INIT_ITERATE("AuthLDAPGroupAttribute", mod_auth_ldap_add_group_attribute, NULL, OR_AUTHCFG,
+-                    "A list of attributes used to define group membership - defaults to "
+-                    "member and uniquemember"),
+-
+-    AP_INIT_FLAG("AuthLDAPGroupAttributeIsDN", ap_set_flag_slot,
+-                 (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, group_attrib_is_dn), OR_AUTHCFG,
+-                 "If set to 'on', auth_ldap uses the DN that is retrieved from the server for"
+-                 "subsequent group comparisons. If set to 'off', auth_ldap uses the string"
+-                 "provided by the client directly. Defaults to 'on'."),
+-
+-    AP_INIT_TAKE1("AuthLDAPDereferenceAliases", mod_auth_ldap_set_deref, NULL, OR_AUTHCFG,
+-                  "Determines how aliases are handled during a search. Can bo one of the"
+-                  "values \"never\", \"searching\", \"finding\", or \"always\". "
+-                  "Defaults to always."),
+-
+-    AP_INIT_FLAG("AuthLDAPEnabled", ap_set_flag_slot,
+-                 (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, enabled), OR_AUTHCFG,
+-                 "Set to off to disable auth_ldap, even if it's been enabled in a higher tree"),
+- 
+-    AP_INIT_FLAG("AuthLDAPFrontPageHack", ap_set_flag_slot,
+-                 (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, frontpage_hack), OR_AUTHCFG,
+-                 "Set to 'on' to support Microsoft FrontPage"),
+-
+-#ifdef APU_HAS_LDAP_STARTTLS
+-    AP_INIT_FLAG("AuthLDAPStartTLS", ap_set_flag_slot,
+-                 (void *)APR_XtOffsetOf(mod_auth_ldap_config_t, starttls), OR_AUTHCFG,
+-                 "Set to 'on' to start TLS after connecting to the LDAP server."),
+-#endif /* APU_HAS_LDAP_STARTTLS */
+-
+-    {NULL}
+-};
+-
+-static void mod_auth_ldap_register_hooks(apr_pool_t *p)
+-{
+-    ap_hook_check_user_id(mod_auth_ldap_check_user_id, NULL, NULL, APR_HOOK_MIDDLE);
+-    ap_hook_auth_checker(mod_auth_ldap_auth_checker, NULL, NULL, APR_HOOK_MIDDLE);
+-}
+-
+-module auth_ldap_module = {
+-   STANDARD20_MODULE_STUFF,
+-   mod_auth_ldap_create_dir_config,	/* dir config creater */
+-   NULL,				/* dir merger --- default is to override */
+-   NULL,				/* server config */
+-   NULL,				/* merge server config */
+-   mod_auth_ldap_cmds,			/* command table */
+-   mod_auth_ldap_register_hooks,	/* set up request processing hooks */
+-};
+diff --git a/modules/ldap/Makefile.in b/modules/ldap/Makefile.in
+deleted file mode 100644
+index 167b343..0000000
+--- a/modules/ldap/Makefile.in
++++ /dev/null
+@@ -1,3 +0,0 @@
+-
+-include $(top_srcdir)/build/special.mk
+-
+diff --git a/modules/ldap/config2.m4 b/modules/ldap/config2.m4
+deleted file mode 100644
+index 0cc65bf..0000000
+--- a/modules/ldap/config2.m4
++++ /dev/null
+@@ -1,8 +0,0 @@
+-dnl modules enabled in this directory by default
+-
+-APACHE_MODPATH_INIT(ldap)
+-
+-ldap_objects="util_ldap.lo util_ldap_cache.lo util_ldap_cache_mgr.lo"
+-APACHE_MODULE(ldap, LDAP caching and connection pooling services, $ldap_objects, , no)
+-
+-APACHE_MODPATH_FINISH
+diff --git a/modules/ldap/util_ldap.c b/modules/ldap/util_ldap.c
+deleted file mode 100644
+index 4e9ca0e..0000000
+--- a/modules/ldap/util_ldap.c
++++ /dev/null
+@@ -1,1105 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2001 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- */
+-
+-/*
+- * util_ldap.c: LDAP things
+- * 
+- * Original code from auth_ldap module for Apache v1.3:
+- * Copyright 1998, 1999 Enbridge Pipelines Inc. 
+- * Copyright 1999-2001 Dave Carrigan
+- */
+-
+-#include <apr_ldap.h>
+-
+-#ifdef APU_HAS_LDAP
+-
+-#include <apr_lock.h>
+-#include <apr_strings.h>
+-
+-#include "ap_config.h"
+-#include "httpd.h"
+-#include "http_config.h"
+-#include "http_core.h"
+-#include "http_log.h"
+-#include "http_protocol.h"
+-#include "http_request.h"
+-#include "util_ldap.h"
+-#include "util_ldap_cache.h"
+-
+-#if APR_HAVE_UNISTD_H
+-#include <unistd.h>
+-#endif
+-
+-module AP_MODULE_DECLARE_DATA ldap_module;
+-
+-int util_ldap_handler(request_rec *r);
+-void *util_ldap_create_config(apr_pool_t *p, server_rec *s);
+-
+-
+-/*
+- * Some definitions to help between various versions of apache.
+- */
+-
+-#ifndef DOCTYPE_HTML_2_0
+-#define DOCTYPE_HTML_2_0  "<!DOCTYPE HTML PUBLIC \"-//IETF//" \
+-                          "DTD HTML 2.0//EN\">\n"
+-#endif
+-
+-#ifndef DOCTYPE_HTML_3_2
+-#define DOCTYPE_HTML_3_2  "<!DOCTYPE HTML PUBLIC \"-//W3C//" \
+-                          "DTD HTML 3.2 Final//EN\">\n"
+-#endif
+-
+-#ifndef DOCTYPE_HTML_4_0S
+-#define DOCTYPE_HTML_4_0S "<!DOCTYPE HTML PUBLIC \"-//W3C//" \
+-                          "DTD HTML 4.0//EN\"\n" \
+-                          "\"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+-#endif
+-
+-#ifndef DOCTYPE_HTML_4_0T
+-#define DOCTYPE_HTML_4_0T "<!DOCTYPE HTML PUBLIC \"-//W3C//" \
+-                          "DTD HTML 4.0 Transitional//EN\"\n" \
+-                          "\"http://www.w3.org/TR/REC-html40/loose.dtd\">\n"
+-#endif
+-
+-#ifndef DOCTYPE_HTML_4_0F
+-#define DOCTYPE_HTML_4_0F "<!DOCTYPE HTML PUBLIC \"-//W3C//" \
+-                          "DTD HTML 4.0 Frameset//EN\"\n" \
+-                          "\"http://www.w3.org/TR/REC-html40/frameset.dtd\">\n"
+-#endif
+-
+-/*
+- * Status Handler
+- * --------------
+- *
+- * This handler generates a status page about the current performance of
+- * the LDAP cache. It is enabled as follows:
+- *
+- * <Location /ldap-status>
+- *   SetHandler ldap-status
+- * </Location>
+- *
+- */
+-int util_ldap_handler(request_rec *r)
+-{
+-
+-    r->allowed |= (1 << M_GET);
+-    if (r->method_number != M_GET)
+-        return DECLINED;
+-
+-    if (strcmp(r->handler, "ldap-status")) {
+-        return DECLINED;
+-    }
+-
+-    r->content_type = "text/html";
+-    if (r->header_only)
+-        return OK;
+-
+-    ap_rputs(DOCTYPE_HTML_3_2
+-             "<html><head><title>LDAP Cache Information</title></head>\n", r);
+-    ap_rputs("<body bgcolor='#ffffff'><h1 align=center>LDAP Cache Information</h1>\n", r);
+-
+-    ap_rputs("<p>\n"
+-             "<table border='0'>\n"
+-             "<tr bgcolor='#000000'>\n"
+-             "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Cache Name</b></font></td>"
+-             "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Entries</b></font></td>"
+-             "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Avg. Chain Len.</b></font></td>"
+-             "<td colspan='2'><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Hits</b></font></td>"
+-             "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Ins/Rem</b></font></td>"
+-             "<td colspan='2'><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Purges</b></font></td>"
+-             "<td><font size='-1' face='Arial,Helvetica' color='#ffffff'><b>Avg Purge Time</b></font></td>"
+-             "</tr>\n", r
+-            );
+-
+-    ap_rputs(util_ald_cache_display(r->pool), r);
+-
+-    ap_rputs("</table>\n</p>\n", r);
+-
+-    return OK;
+-}
+-
+-/* ------------------------------------------------------------------ */
+-
+-
+-/*
+- * Closes an LDAP connection by unlocking it. The next time
+- * util_ldap_connection_find() is called this connection will be
+- * available for reuse.
+- */
+-void util_ldap_connection_close(util_ldap_connection_t *ldc)
+-{
+-
+-    /*
+-     * QUESTION:
+-     *
+-     * Is it safe leaving bound connections floating around between the
+-     * different modules? Keeping the user bound is a performance boost,
+-     * but it is also a potential security problem - maybe.
+-     *
+-     * For now we unbind the user when we finish with a connection, but
+-     * we don't have to...
+-     */
+-
+-    /* mark our connection as available for reuse */
+-    apr_lock_release(ldc->lock);
+-
+-}
+-
+-
+-/*
+- * Destroys an LDAP connection by unbinding. This function is registered
+- * with the pool cleanup function - causing the LDAP connections to be
+- * shut down cleanly on graceful restart.
+- */
+-apr_status_t util_ldap_connection_destroy(void *param)
+-{
+-    util_ldap_connection_t *ldc = param;
+-
+-    /* unbinding from the LDAP server */
+-    if (ldc->ldap) {
+-        ldap_unbind_s(ldc->ldap);
+-        ldc->bound = 0;
+-        ldc->ldap = NULL;
+-    }
+-
+-    /* release the lock we were using */
+-    apr_lock_release(ldc->lock);
+-
+-    return APR_SUCCESS;
+-}
+-
+-
+-/*
+- * Connect to the LDAP server and binds. Does not connect if already
+- * connected (i.e. ldc->ldap is non-NULL.) Does not bind if already bound.
+- *
+- * Returns LDAP_SUCCESS on success; and an error code on failure
+- */
+-int util_ldap_connection_open(util_ldap_connection_t *ldc)
+-{
+-    int result = 0;
+-    int failures = 0;
+-
+-
+-start_over:
+-    if (failures++ > 10) {
+-	/* too many failures - leave */
+-        return result;
+-    }
+-
+-    if (!ldc->ldap) {
+-        ldc->bound = 0;
+-
+-	/* opening connection to LDAP server */
+-        if ((ldc->ldap = ldap_init(ldc->host, ldc->port)) == NULL) {
+-	    /* couldn't connect */
+-            ldc->reason = "ldap_init() failed";
+-            return -1;
+-        }
+-
+-	/* add the cleanup to the pool */
+-        apr_pool_cleanup_register(ldc->pool, ldc,
+-                                  util_ldap_connection_destroy,
+-                                  apr_pool_cleanup_null);
+-
+-        /* Set the alias dereferencing option */
+-#if LDAP_VERSION_MAX == 2
+-        ldc->ldap->ld_deref = ldc->deref;
+-#else
+-        result = ldap_set_option(ldc->ldap, LDAP_OPT_DEREF, &(ldc->deref));
+-        if (result != LDAP_SUCCESS) {
+-	    /* setting LDAP dereference option failed */
+-	    /* we ignore this error */
+-        }
+-#endif /* LDAP_VERSION_MAX */
+-
+-#ifdef APU_HAS_LDAP_NETSCAPE_SSL
+-        if (ldc->netscapessl) {
+-            if (!ldc->certdb) {
+-		/* secure LDAP requested, but no CA cert defined */
+-                ldc->reason = "secure LDAP requested, but no CA cert defined";
+-                return -1;
+-            } else {
+-                result = ldapssl_install_routines(ldc->ldap);
+-                if (result != LDAP_SUCCESS) {
+-		    /* SSL initialisation failed */
+-                    ldc->reason = "ldapssl_install_routines() failed";
+-                    return result;
+-                }
+-                result = ldap_set_option(ldc->ldap, LDAP_OPT_SSL, LDAP_OPT_ON);
+-                if (result != LDAP_SUCCESS) {
+-		    /* SSL option failed */
+-                    ldc->reason = "ldap_set_option() failed trying to set LDAP_OPT_SSL";
+-                    return result;
+-                }
+-            }
+-        }
+-#endif /* APU_HAS_LDAP_NETSCAPE_SSL */
+-
+-#ifdef APU_HAS_LDAP_STARTTLS
+-        if (ldc->starttls) {
+-            int version = LDAP_VERSION3;
+-
+-            /* Also we have to set the connection to use protocol version 3,
+-             * since we're using TLS. */
+-            if ((result = ldap_set_option(ldc->ldap, LDAP_OPT_PROTOCOL_VERSION,
+-                                         &version)) != LDAP_SUCCESS) {
+-		/* setting LDAP version failed - ignore error */
+-            }
+-
+-            /* 
+-             * In util_ldap_connection_find, we compare ldc->withtls to
+-             * sec->starttls to see if we have a cache match. On the off
+-             * chance that apache's config processing rotines set starttls to
+-             * some other true value besides 1, we set it to 1 here to ensure
+-             * that the comparison succeeds.
+-             */
+-            ldc->starttls = 1;
+-
+-            result = ldap_start_tls_s(ldc->ldap, NULL, NULL);
+-            if (result != LDAP_SUCCESS) {
+-		/* start TLS failed */
+-		ldc->withtls = 0;
+-                ldc->reason = "ldap_start_tls_s() failed";
+-	        return result;
+-            }
+-            ldc->withtls = 1;
+-        } else {
+-            ldc->withtls = 0;
+-        }
+-#endif /* APU_HAS_LDAP_STARTTLS */
+-    }
+-
+-    /* 
+-     * At this point the LDAP connection is guaranteed alive. If bound says
+-     * that we're bound already, we can just return.
+-     */
+-    if (ldc->bound) {
+-        ldc->reason = "LDAP connection open successful (already bound)";
+-        return LDAP_SUCCESS;
+-    }
+-
+-    /* 
+-     * Now bind with the username/password provided by the
+-     * configuration. It will be an anonymous bind if no u/p was
+-     * provided. 
+-     */
+-    if ((result = ldap_simple_bind_s(ldc->ldap, ldc->binddn, ldc->bindpw))
+-        == LDAP_SERVER_DOWN) {
+-	/* couldn't connect - try again */
+-        ldc->reason = "ldap_simple_bind_s() failed with server down";
+-        goto start_over;
+-    }
+-
+-    if (result != LDAP_SUCCESS) {
+-	/* LDAP fatal error occured */
+-        ldc->reason = "ldap_simple_bind_s() failed";
+-        return result;
+-    }
+-
+-    /* note how we are bound */
+-    ldc->bound = 1;
+-
+-    ldc->reason = "LDAP connection open successful";
+-    return LDAP_SUCCESS;
+-}
+-
+-
+-/*
+- * Find an existing ldap connection struct that matches the
+- * provided ldap connection parameters.
+- *
+- * If not found in the cache, a new ldc structure will be allocated from st->pool
+- * and returned to the caller. If found in the cache, a pointer to the existing
+- * ldc structure will be returned.
+- */
+-util_ldap_connection_t *util_ldap_connection_find(request_rec *r, const char *host, int port,
+-                                              const char *binddn, const char *bindpw, deref_options deref,
+-                                              int netscapessl, int starttls)
+-{
+-    struct util_ldap_connection_t *l, *p;	/* To traverse the linked list */
+-
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(r->server->module_config,
+-        &ldap_module);
+-
+-
+-    /* mutex lock this function */
+-    if (!st->mutex) {
+-        apr_lock_create(&st->mutex, APR_MUTEX, APR_INTRAPROCESS, NULL, st->pool);
+-    }
+-    apr_lock_acquire(st->mutex);
+-
+-    /* Search for an exact connection match in the list that is not
+-     * being used.
+-     */
+-    for (l=st->connections,p=NULL; l; l=l->next) {
+-        if ( (APR_SUCCESS == apr_lock_tryacquire(l->lock))
+-            && l->port == port
+-	    && strcmp(l->host, host) == 0
+-	    && ( (!l->binddn && !binddn) || (l->binddn && binddn && !strcmp(l->binddn, binddn)) )
+-	    && ( (!l->bindpw && !bindpw) || (l->bindpw && bindpw && !strcmp(l->bindpw, bindpw)) )
+-            && l->deref == deref
+-#ifdef APU_HAS_LDAP_NETSCAPE_SSL
+-            && l->netscapessl == netscapessl
+-#endif
+-#ifdef APU_HAS_LDAP_STARTTLS
+-	    && l->withtls == starttls
+-#endif
+-            )
+-            break;
+-        p = l;
+-    }
+-
+-    /* If nothing found, search again, but we don't care about the
+-     * binddn and bindpw this time.
+-     */
+-    if (!l) {
+-        for (l=st->connections,p=NULL; l; l=l->next) {
+-            if ( (APR_SUCCESS == apr_lock_tryacquire(l->lock))
+-                && l->port == port
+-	        && strcmp(l->host, host) == 0
+-                && l->deref == deref
+-#ifdef APU_HAS_LDAP_NETSCAPE_SSL
+-                && l->netscapessl == netscapessl
+-#endif
+-#ifdef APU_HAS_LDAP_STARTTLS
+-                && l->withtls == starttls
+-#endif
+-                ) {
+-                /* the bind credentials have changed */
+-                l->bound = 0;
+-                l->binddn = apr_pstrdup(st->pool, binddn);
+-                l->bindpw = apr_pstrdup(st->pool, bindpw);
+-                break;
+-            }
+-            p = l;
+-        }
+-    }
+-
+-/* artificially disable cache */
+-//l = NULL;
+-
+-    /* If no connection what found after the second search, we
+-     * must create one.
+-     */
+-    if (!l) {
+-
+-        /* 
+-         * Add the new connection entry to the linked list. Note that we
+-         * don't actually establish an LDAP connection yet; that happens
+-         * the first time authentication is requested.
+-         */
+-        /* create the details to the pool in st */
+-        l = apr_pcalloc(st->pool, sizeof(util_ldap_connection_t));
+-        apr_lock_create(&l->lock, APR_MUTEX, APR_INTRAPROCESS, NULL, st->pool);
+-        apr_lock_acquire(l->lock);
+-        l->pool = st->pool;
+-        l->bound = 0;
+-        l->host = apr_pstrdup(st->pool, host);
+-        l->port = port;
+-        l->deref = deref;
+-        l->binddn = apr_pstrdup(st->pool, binddn);
+-        l->bindpw = apr_pstrdup(st->pool, bindpw);
+-        l->netscapessl = netscapessl;
+-        l->starttls = starttls;
+-        l->withtls = 0;
+-
+-        if (p) {
+-            p->next = l;
+-        }
+-        else {
+-            st->connections = l;
+-        }
+-    }
+-
+-    apr_lock_release(st->mutex);
+-    return l;
+-}
+-
+-/* ------------------------------------------------------------------ */
+-
+-/*
+- * Compares two DNs to see if they're equal. The only way to do this correctly is to 
+- * search for the dn and then do ldap_get_dn() on the result. This should match the 
+- * initial dn, since it would have been also retrieved with ldap_get_dn(). This is
+- * expensive, so if the configuration value compare_dn_on_server is
+- * false, just does an ordinary strcmp.
+- *
+- * The lock for the ldap cache should already be acquired.
+- */
+-int util_ldap_cache_comparedn(request_rec *r, util_ldap_connection_t *ldc, 
+-                            const char *url, const char *dn, const char *reqdn, 
+-                            int compare_dn_on_server)
+-{
+-    int result = 0;
+-    util_url_node_t *curl; 
+-    util_url_node_t curnode;
+-    util_dn_compare_node_t *node;
+-    util_dn_compare_node_t newnode;
+-    int failures = 0;
+-    LDAPMessage *res, *entry;
+-    char *searchdn;
+-
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(r->server->module_config,
+-        &ldap_module);
+-
+-
+-    /* read lock this function */
+-    if (!util_ldap_cache_lock) {
+-        apr_lock_create(&util_ldap_cache_lock, APR_READWRITE, APR_INTRAPROCESS, NULL, st->pool);
+-    }
+-
+-    /* get cache entry (or create one) */
+-    apr_lock_acquire_rw(util_ldap_cache_lock, APR_WRITER);
+-    curnode.url = url;
+-    curl = util_ald_cache_fetch(util_ldap_cache, &curnode);
+-    if (curl == NULL) {
+-        curl = util_ald_create_caches(st, url);
+-    }
+-    apr_lock_release(util_ldap_cache_lock);
+-
+-    /* a simple compare? */
+-    if (!compare_dn_on_server) {
+-        /* unlock this read lock */
+-        if (strcmp(dn, reqdn)) {
+-            ldc->reason = "DN Comparison FALSE (direct strcmp())";
+-            return LDAP_COMPARE_FALSE;
+-        }
+-        else {
+-            ldc->reason = "DN Comparison TRUE (direct strcmp())";
+-            return LDAP_COMPARE_TRUE;
+-        }
+-    }
+-
+-    /* no - it's a server side compare */
+-    apr_lock_acquire_rw(util_ldap_cache_lock, APR_READER);
+-
+-    /* is it in the compare cache? */
+-    newnode.reqdn = (char *)reqdn;
+-    node = util_ald_cache_fetch(curl->dn_compare_cache, &newnode);
+-    if (node != NULL) {
+-        /* If it's in the cache, it's good */
+-        /* unlock this read lock */
+-        apr_lock_release(util_ldap_cache_lock);
+-        ldc->reason = "DN Comparison TRUE (cached)";
+-        return LDAP_COMPARE_TRUE;
+-    }
+-
+-    /* unlock this read lock */
+-    apr_lock_release(util_ldap_cache_lock);
+-
+-start_over:
+-    if (failures++ > 10) {
+-	/* too many failures */
+-        return result;
+-    }
+-
+-    /* make a server connection */
+-    if (LDAP_SUCCESS != (result = util_ldap_connection_open(ldc))) {
+-	/* connect to server failed */
+-        return result;
+-    }
+-
+-    /* search for reqdn */
+-    if ((result = ldap_search_ext_s(ldc->ldap, const_cast(reqdn), LDAP_SCOPE_BASE, 
+-				    "(objectclass=*)", NULL, 1, 
+-				    NULL, NULL, NULL, -1, &res)) == LDAP_SERVER_DOWN) {
+-        util_ldap_connection_close(ldc);
+-        ldc->reason = "DN Comparison ldap_search_ext_s() failed with server down";
+-        goto start_over;
+-    }
+-    if (result != LDAP_SUCCESS) {
+-        /* search for reqdn failed - no match */
+-        ldc->reason = "DN Comparison ldap_search_ext_s() failed";
+-        return result;
+-    }
+-
+-    entry = ldap_first_entry(ldc->ldap, res);
+-    searchdn = ldap_get_dn(ldc->ldap, entry);
+-
+-    ldap_msgfree(res);
+-    if (strcmp(dn, searchdn) != 0) {
+-        /* compare unsuccessful */
+-        ldc->reason = "DN Comparison FALSE (checked on server)";
+-        result = LDAP_COMPARE_FALSE;
+-    }
+-    else {
+-        /* compare successful - add to the compare cache */
+-        apr_lock_acquire_rw(util_ldap_cache_lock, APR_READER);
+-        newnode.reqdn = (char *)reqdn;
+-        newnode.dn = (char *)dn;
+-        util_ald_cache_insert(curl->dn_compare_cache, &newnode);
+-        apr_lock_release(util_ldap_cache_lock);
+-        ldc->reason = "DN Comparison TRUE (checked on server)";
+-        result = LDAP_COMPARE_TRUE;
+-    }
+-    ldap_memfree(searchdn);
+-    return result;
+-
+-}
+-
+-/*
+- * Does an generic ldap_compare operation. It accepts a cache that it will use
+- * to lookup the compare in the cache. We cache two kinds of compares 
+- * (require group compares) and (require user compares). Each compare has a different
+- * cache node: require group includes the DN; require user does not because the
+- * require user cache is owned by the 
+- *
+- */
+-int util_ldap_cache_compare(request_rec *r, util_ldap_connection_t *ldc,
+-                          const char *url, const char *dn,
+-                          const char *attrib, const char *value)
+-{
+-    int result = 0;
+-    util_url_node_t *curl; 
+-    util_url_node_t curnode;
+-    util_compare_node_t *compare_nodep;
+-    util_compare_node_t the_compare_node;
+-    apr_time_t curtime;
+-    int failures = 0;
+-
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(r->server->module_config,
+-        &ldap_module);
+-
+-
+-    /* read lock this function */
+-    if (!util_ldap_cache_lock) {
+-        apr_lock_create(&util_ldap_cache_lock, APR_READWRITE, APR_INTRAPROCESS, NULL, st->pool);
+-    }
+-
+-    /* get cache entry (or create one) */
+-    apr_lock_acquire_rw(util_ldap_cache_lock, APR_WRITER);
+-    curnode.url = url;
+-    curl = util_ald_cache_fetch(util_ldap_cache, &curnode);
+-    if (curl == NULL) {
+-        curl = util_ald_create_caches(st, url);
+-    }
+-    apr_lock_release(util_ldap_cache_lock);
+-
+-    /* make a comparison to the cache */
+-    apr_lock_acquire_rw(util_ldap_cache_lock, APR_READER);
+-    curtime = apr_time_now();
+-
+-    the_compare_node.dn = (char *)dn;
+-    the_compare_node.attrib = (char *)attrib;
+-    the_compare_node.value = (char *)value;
+-    the_compare_node.result = 0;
+-
+-    compare_nodep = util_ald_cache_fetch(curl->compare_cache, &the_compare_node);
+-
+-    if (compare_nodep != NULL) {
+-        /* found it... */
+-        if (curtime - compare_nodep->lastcompare > st->compare_cache_ttl) {
+-            /* ...but it is too old */
+-            util_ald_cache_remove(curl->compare_cache, compare_nodep);
+-        }
+-        else {
+-            /* ...and it is good */
+-            /* unlock this read lock */
+-            apr_lock_release(util_ldap_cache_lock);
+-            if (LDAP_COMPARE_TRUE == compare_nodep->result) {
+-                ldc->reason = "Comparison true (cached)";
+-                return compare_nodep->result;
+-            }
+-            else if (LDAP_COMPARE_FALSE == compare_nodep->result) {
+-                ldc->reason = "Comparison false (cached)";
+-                return compare_nodep->result;
+-            }
+-            else if (LDAP_NO_SUCH_ATTRIBUTE == compare_nodep->result) {
+-                ldc->reason = "Comparison no such attribute (cached)";
+-                return compare_nodep->result;
+-            }
+-            else {
+-                ldc->reason = "Comparison undefined (cached)";
+-                return compare_nodep->result;
+-            }
+-        }
+-    }
+-    /* unlock this read lock */
+-    apr_lock_release(util_ldap_cache_lock);
+-    
+-
+-start_over:
+-    if (failures++ > 10) {
+-        /* too many failures */
+-        return result;
+-    }
+-    if (LDAP_SUCCESS != (result = util_ldap_connection_open(ldc))) {
+-        /* connect failed */
+-        return result;
+-    }
+-
+-    if ((result = ldap_compare_s(ldc->ldap, const_cast(dn), 
+-			         const_cast(attrib), const_cast(value)))
+-        == LDAP_SERVER_DOWN) { 
+-        /* connection failed - try again */
+-        util_ldap_connection_close(ldc);
+-        ldc->reason = "ldap_compare_s() failed with server down";
+-        goto start_over;
+-    }
+-
+-    ldc->reason = "Comparison complete";
+-    if ((LDAP_COMPARE_TRUE == result) || 
+-        (LDAP_COMPARE_FALSE == result) ||
+-        (LDAP_NO_SUCH_ATTRIBUTE == result)) {
+-        /* compare completed; caching result */
+-        apr_lock_acquire_rw(util_ldap_cache_lock, APR_WRITER);
+-        the_compare_node.lastcompare = curtime;
+-        the_compare_node.result = result;
+-        util_ald_cache_insert(curl->compare_cache, &the_compare_node);
+-        apr_lock_release(util_ldap_cache_lock);
+-        if (LDAP_COMPARE_TRUE == result) {
+-            ldc->reason = "Comparison true (adding to cache)";
+-            return LDAP_COMPARE_TRUE;
+-        }
+-        else if (LDAP_COMPARE_FALSE == result) {
+-            ldc->reason = "Comparison false (adding to cache)";
+-            return LDAP_COMPARE_FALSE;
+-        }
+-        else {
+-            ldc->reason = "Comparison no such attribute (adding to cache)";
+-            return LDAP_NO_SUCH_ATTRIBUTE;
+-        }
+-    }
+-    return result;
+-}
+-
+-int util_ldap_cache_checkuserid(request_rec *r, util_ldap_connection_t *ldc,
+-                              const char *url, const char *basedn, int scope, char **attrs,
+-                              const char *filter, const char *bindpw, const char **binddn,
+-                              const char ***retvals)
+-{
+-    const char **vals = NULL;
+-    int result = 0;
+-    LDAPMessage *res, *entry;
+-    char *dn;
+-    int count;
+-    int failures = 0;
+-    util_url_node_t *curl;		/* Cached URL node */
+-    util_url_node_t curnode;
+-    util_search_node_t *search_nodep;	/* Cached search node */
+-    util_search_node_t the_search_node;
+-    apr_time_t curtime;
+-
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(r->server->module_config,
+-        &ldap_module);
+-
+-    /* read lock this function */
+-    if (!util_ldap_cache_lock) {
+-        apr_lock_create(&util_ldap_cache_lock, APR_READWRITE, APR_INTRAPROCESS, NULL, st->pool);
+-    }
+-
+-    /* Get the cache node for this url */
+-    apr_lock_acquire_rw(util_ldap_cache_lock, APR_WRITER);
+-    curnode.url = url;
+-    curl = (util_url_node_t *)util_ald_cache_fetch(util_ldap_cache, &curnode);
+-    if (curl == NULL) {
+-        curl = util_ald_create_caches(st, url);
+-    }
+-    apr_lock_release(util_ldap_cache_lock);
+-
+-    apr_lock_acquire_rw(util_ldap_cache_lock, APR_READER);
+-    the_search_node.username = filter;
+-    search_nodep = util_ald_cache_fetch(curl->search_cache, &the_search_node);
+-    if (search_nodep != NULL && search_nodep->bindpw) {
+-
+-        /* found entry in search cache... */
+-        curtime = apr_time_now();
+-
+-        /*
+-         * Remove this item from the cache if its expired, or if the 
+-         * sent password doesn't match the storepassword.
+-         */
+-        if ((curtime - search_nodep->lastbind) > st->search_cache_ttl) {
+-            /* ...but entry is too old */
+-            util_ald_cache_remove(curl->search_cache, search_nodep);
+-        }
+-        else if (strcmp(search_nodep->bindpw, bindpw) != 0) {
+-	    /* ...but cached password doesn't match sent password */
+-            util_ald_cache_remove(curl->search_cache, search_nodep);
+-        }
+-        else {
+-            /* ...and entry is valid */
+-            *binddn = search_nodep->dn;
+-            *retvals = search_nodep->vals;
+-            apr_lock_release(util_ldap_cache_lock);
+-            ldc->reason = "Authentication successful (cached)";
+-            return LDAP_SUCCESS;
+-        }
+-    }
+-    /* unlock this read lock */
+-    apr_lock_release(util_ldap_cache_lock);
+-
+-
+-    /*	
+-     * At this point, there is no valid cached search, so lets do the search.
+-     */
+-
+-    /*
+-     * If any LDAP operation fails due to LDAP_SERVER_DOWN, control returns here.
+-     */
+-start_over:
+-    if (failures++ > 10) {
+-        return result;
+-    }
+-    if (LDAP_SUCCESS != (result = util_ldap_connection_open(ldc))) {
+-        return result;
+-    }
+-
+-    /* try do the search */
+-    if ((result = ldap_search_ext_s(ldc->ldap,
+-				    basedn, scope, 
+-				    filter, attrs, 0, 
+-				    NULL, NULL, NULL, -1, &res)) == LDAP_SERVER_DOWN) {
+-        ldc->reason = "ldap_search_ext_s() for user failed with server down";
+-        goto start_over;
+-    }
+-
+-    /* if there is an error (including LDAP_NO_SUCH_OBJECT) return now */
+-    if (result != LDAP_SUCCESS) {
+-        ldc->reason = "ldap_search_ext_s() for user failed";
+-        return result;
+-    }
+-
+-    /* 
+-     * We should have found exactly one entry; to find a different
+-     * number is an error.
+-     */
+-    count = ldap_count_entries(ldc->ldap, res);
+-    if (count != 1) {
+-        ldap_msgfree(res);
+-        ldc->reason = "User is not unique (search found two or more matches)";
+-        return LDAP_NO_SUCH_OBJECT;
+-    }
+-
+-    entry = ldap_first_entry(ldc->ldap, res);
+-
+-    /* Grab the dn, copy it into the pool, and free it again */
+-    dn = ldap_get_dn(ldc->ldap, entry);
+-    *binddn = apr_pstrdup(st->pool, dn);
+-    ldap_memfree(dn);
+-
+-    /* 
+-     * A bind to the server with an empty password always succeeds, so
+-     * we check to ensure that the password is not empty. This implies
+-     * that users who actually do have empty passwords will never be
+-     * able to authenticate with this module. I don't see this as a big
+-     * problem.
+-     */
+-    if (strlen(bindpw) <= 0) {
+-        ldap_msgfree(res);
+-        ldc->reason = "Empty password not allowed";
+-        return LDAP_INVALID_CREDENTIALS;
+-    }
+-
+-    /* 
+-     * Attempt to bind with the retrieved dn and the password. If the bind
+-     * fails, it means that the password is wrong (the dn obviously
+-     * exists, since we just retrieved it)
+-     */
+-    if ((result = 
+-         ldap_simple_bind_s(ldc->ldap, *binddn, bindpw)) == 
+-         LDAP_SERVER_DOWN) {
+-        ldc->reason = "ldap_simple_bind_s() to check user credentials failed with server down";
+-        goto start_over;
+-    }
+-
+-    /* failure? if so - return */
+-    if (result != LDAP_SUCCESS) {
+-        ldc->reason = "ldap_simple_bind_s() to check user credentials failed";
+-        return result;
+-    }
+-
+-    /*
+-     * Get values for the provided attributes.
+-     */
+-    if (attrs) {
+-        int k = 0;
+-        int i = 0;
+-        while (attrs[k++]);
+-        vals = apr_pcalloc(r->pool, sizeof(char *) * (k+1));
+-        while (attrs[i]) {
+-            char **values;
+-            int j = 0;
+-            char *str = NULL;
+-            /* get values */
+-            values = ldap_get_values(ldc->ldap, entry, attrs[i]);
+-            while (values && values[j]) {
+-                str = str ? apr_pstrcat(r->pool, str, "; ", values[j], NULL) : apr_pstrdup(r->pool, values[j]);
+-                j++;
+-            }
+-            vals[i] = str;
+-            i++;
+-        }
+-        *retvals = vals;
+-    }
+-
+-    /* 		
+-     * Add the new username to the search cache.
+-     */
+-    apr_lock_acquire_rw(util_ldap_cache_lock, APR_WRITER);
+-    the_search_node.username = filter;
+-    the_search_node.dn = *binddn;
+-    the_search_node.bindpw = bindpw;
+-    the_search_node.lastbind = apr_time_now();
+-    the_search_node.vals = vals;
+-    util_ald_cache_insert(curl->search_cache, &the_search_node);
+-    ldap_msgfree(res);
+-    apr_lock_release(util_ldap_cache_lock);
+-
+-    ldc->reason = "Authentication successful";
+-    return LDAP_SUCCESS;
+-}
+-
+-#endif /* APU_HAS_LDAP */
+-
+-
+-
+-/* ---------------------------------------- */
+-/* config directives */
+-
+-
+-static const char *util_ldap_set_cache_bytes(cmd_parms *cmd, void *dummy, const char *bytes)
+-{
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(cmd->server->module_config, 
+-						  &ldap_module);
+-
+-    st->cache_bytes = atol(bytes);
+-
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, cmd->server, 
+-                      "[%d] ldap cache: Setting shared memory cache size to %d bytes.", 
+-                      getpid(), st->cache_bytes);
+-
+-    return NULL;
+-}
+-
+-static const char *util_ldap_set_cache_ttl(cmd_parms *cmd, void *dummy, const char *ttl)
+-{
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(cmd->server->module_config, 
+-						  &ldap_module);
+-
+-    st->search_cache_ttl = atol(ttl) * 1000000;
+-
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, cmd->server, 
+-                      "[%d] ldap cache: Setting cache TTL to %ld microseconds.", 
+-                      getpid(), st->search_cache_ttl);
+-
+-    return NULL;
+-}
+-
+-static const char *util_ldap_set_cache_entries(cmd_parms *cmd, void *dummy, const char *size)
+-{
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(cmd->server->module_config, 
+-						  &ldap_module);
+-
+-
+-    st->search_cache_size = atol(size);
+-    if (st->search_cache_size < 0) {
+-        st->search_cache_size = 0;
+-    }
+-
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, cmd->server, 
+-                      "[%d] ldap cache: Setting search cache size to %ld entries.", 
+-                      getpid(), st->search_cache_size);
+-
+-    return NULL;
+-}
+-
+-static const char *util_ldap_set_opcache_ttl(cmd_parms *cmd, void *dummy, const char *ttl)
+-{
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(cmd->server->module_config, 
+-						  &ldap_module);
+-
+-    st->compare_cache_ttl = atol(ttl) * 1000000;
+-
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, cmd->server, 
+-                      "[%d] ldap cache: Setting operation cache TTL to %ld microseconds.", 
+-                      getpid(), st->compare_cache_ttl);
+-
+-    return NULL;
+-}
+-
+-static const char *util_ldap_set_opcache_entries(cmd_parms *cmd, void *dummy, const char *size)
+-{
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(cmd->server->module_config, 
+-						  &ldap_module);
+-
+-    st->compare_cache_size = atol(size);
+-    if (st->compare_cache_size < 0) {
+-        st->compare_cache_size = 0;
+-    }
+-
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, cmd->server, 
+-                      "[%d] ldap cache: Setting operation cache size to %ld entries.", 
+-                      getpid(), st->compare_cache_size);
+-
+-    return NULL;
+-}
+-
+-#ifdef APU_HAS_LDAPSSL_CLIENT_INIT
+-static const char *util_ldap_set_certdbpath(cmd_parms *cmd, void *dummy, const char *path)
+-{
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(cmd->server->module_config, 
+-						  &ldap_module);
+-
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, 0, cmd->server, 
+-                      "[%d] ldap cache: Setting LDAP SSL client certificate dbpath to %s.", 
+-                      getpid(), path);
+-
+-    st->have_certdb = 1;
+-    if (ldapssl_client_init(path, NULL) != 0) {
+-        return "Could not initialize SSL client";
+-    }
+-    else {
+-        return NULL;
+-    }
+-}
+-#endif
+-
+-void *util_ldap_create_config(apr_pool_t *p, server_rec *s)
+-{
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)apr_pcalloc(p, sizeof(util_ldap_state_t));
+-
+-    st->pool = p;
+-
+-    st->cache_bytes = 100000;
+-    st->search_cache_ttl = 600000000;
+-    st->search_cache_size = 1024;
+-    st->compare_cache_ttl = 600000000;
+-    st->compare_cache_size = 1024;
+-
+-    st->connections = NULL;
+-#ifdef APU_HAS_LDAP_NETSCAPE_SSL
+-    st->have_certdb = 0;
+-#endif
+-
+-    return st;
+-}
+-
+-static void util_ldap_init_module(apr_pool_t *pool, server_rec *s)
+-{
+-    util_ldap_state_t *st = 
+-        (util_ldap_state_t *)ap_get_module_config(s->module_config, 
+-						  &ldap_module);
+-
+-    apr_status_t result = util_ldap_cache_init(pool, st->cache_bytes);
+-    char buf[MAX_STRING_LEN];
+-
+-    apr_strerror(result, buf, sizeof(buf));
+-    ap_log_error(APLOG_MARK, APLOG_DEBUG|APLOG_NOERRNO, result, s, 
+-                      "[%d] ldap cache init: %s", 
+-                      getpid(), buf);
+-}
+-
+-
+-command_rec util_ldap_cmds[] = {
+-    AP_INIT_TAKE1("LDAPSharedCacheSize", util_ldap_set_cache_bytes, NULL, RSRC_CONF,
+-                  "Sets the size of the shared memory cache in bytes. "
+-                  "Zero means disable the shared memory cache. Defaults to 100KB."),
+-
+-    AP_INIT_TAKE1("LDAPCacheEntries", util_ldap_set_cache_entries, NULL, RSRC_CONF,
+-                  "Sets the maximum number of entries that are possible in the LDAP "
+-                  "search cache. "
+-                  "Zero means no limit; -1 disables the cache. Defaults to 1024 entries."),
+-
+-    AP_INIT_TAKE1("LDAPCacheTTL", util_ldap_set_cache_ttl, NULL, RSRC_CONF,
+-                  "Sets the maximum time (in seconds) that an item can be cached in the LDAP "
+-                  "search cache. Zero means no limit. Defaults to 600 seconds (10 minutes)."),
+-
+-    AP_INIT_TAKE1("LDAPOpCacheEntries", util_ldap_set_opcache_entries, NULL, RSRC_CONF,
+-                  "Sets the maximum number of entries that are possible in the LDAP "
+-                  "compare cache. "
+-                  "Zero means no limit; -1 disables the cache. Defaults to 1024 entries."),
+-
+-    AP_INIT_TAKE1("LDAPOpCacheTTL", util_ldap_set_opcache_ttl, NULL, RSRC_CONF,
+-                  "Sets the maximum time (in seconds) that an item is cached in the LDAP "
+-                  "operation cache. Zero means no limit. Defaults to 600 seconds (10 minutes)."),
+-
+-#ifdef APU_HAS_LDAPSSL_CLIENT_INIT
+-    AP_INIT_TAKE1("LDAPCertDBPath", util_ldap_set_certdbpath, NULL, RSRC_CONF,
+-                  "Specifies the file containing Certificate Authority certificates "
+-                  "for validating secure LDAP server certificates. This file must be the "
+-                  "cert7.db database used by Netscape Communicator"),
+-#endif
+-
+-    {NULL}
+-};
+-
+-static void util_ldap_register_hooks(apr_pool_t *p)
+-{
+-    ap_hook_child_init(util_ldap_init_module, NULL, NULL, APR_HOOK_MIDDLE);
+-    ap_hook_handler(util_ldap_handler, NULL, NULL, APR_HOOK_MIDDLE);
+-}
+-
+-module ldap_module = {
+-   STANDARD20_MODULE_STUFF,
+-   NULL,				/* dir config creater */
+-   NULL,				/* dir merger --- default is to override */
+-   util_ldap_create_config,		/* server config */
+-   NULL,				/* merge server config */
+-   util_ldap_cmds,			/* command table */
+-   util_ldap_register_hooks,		/* set up request processing hooks */
+-};
+diff --git a/modules/ldap/util_ldap_cache.c b/modules/ldap/util_ldap_cache.c
+deleted file mode 100644
+index 9d9844d..0000000
+--- a/modules/ldap/util_ldap_cache.c
++++ /dev/null
+@@ -1,309 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2001 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- */
+-
+-/*
+- * util_ldap_cache.c: LDAP cache things
+- * 
+- * Original code from auth_ldap module for Apache v1.3:
+- * Copyright 1998, 1999 Enbridge Pipelines Inc. 
+- * Copyright 1999-2001 Dave Carrigan
+- */
+-
+-#include <apr_ldap.h>
+-#include "util_ldap.h"
+-#include "util_ldap_cache.h"
+-
+-#ifdef APU_HAS_LDAP
+-
+-
+-
+-
+-/* ------------------------------------------------------------------ */
+-
+-unsigned long util_ldap_url_node_hash(void *n)
+-{
+-    util_url_node_t *node = (util_url_node_t *)n;
+-    return util_ald_hash_string(1, node->url);
+-}
+-
+-int util_ldap_url_node_compare(void *a, void *b)
+-{
+-    util_url_node_t *na = (util_url_node_t *)a;
+-    util_url_node_t *nb = (util_url_node_t *)b;
+-
+-    return(strcmp(na->url, nb->url) == 0);
+-}
+-
+-void *util_ldap_url_node_copy(void *c)
+-{
+-    util_url_node_t *n = (util_url_node_t *)c;
+-    util_url_node_t *node = (util_url_node_t *)util_ald_alloc(sizeof(util_url_node_t));
+-
+-    if (node) {
+-        if (!(node->url = util_ald_strdup(n->url))) {
+-            util_ald_free(node->url);
+-            return NULL;
+-        }
+-        node->search_cache = n->search_cache;
+-        node->compare_cache = n->compare_cache;
+-        node->dn_compare_cache = n->dn_compare_cache;
+-        return node;
+-    }
+-    else {
+-        return NULL;
+-    }
+-}
+-
+-void util_ldap_url_node_free(void *n)
+-{
+-    util_url_node_t *node = (util_url_node_t *)n;
+-
+-    util_ald_free(node->url);
+-    util_ald_destroy_cache(node->search_cache);
+-    util_ald_destroy_cache(node->compare_cache);
+-    util_ald_destroy_cache(node->dn_compare_cache);
+-    util_ald_free(node);
+-}
+-
+-/* ------------------------------------------------------------------ */
+-
+-/* Cache functions for search nodes */
+-unsigned long util_ldap_search_node_hash(void *n)
+-{
+-    util_search_node_t *node = (util_search_node_t *)n;
+-    return util_ald_hash_string(1, ((util_search_node_t *)(node))->username);
+-}
+-
+-int util_ldap_search_node_compare(void *a, void *b)
+-{
+-    return(strcmp(((util_search_node_t *)a)->username,
+-		  ((util_search_node_t *)b)->username) == 0);
+-}
+-
+-void *util_ldap_search_node_copy(void *c)
+-{
+-    util_search_node_t *node = (util_search_node_t *)c;
+-    util_search_node_t *newnode = util_ald_alloc(sizeof(util_search_node_t));
+-
+-    /* safety check */
+-    if (newnode) {
+-
+-        /* copy vals */
+-        if (node->vals) {
+-            int k = 0;
+-            int i = 0;
+-            while (node->vals[k++]);
+-            if (!(newnode->vals = util_ald_alloc(sizeof(char *) * (k+1)))) {
+-                util_ldap_search_node_free(newnode);
+-                return NULL;
+-            }
+-            while (node->vals[i]) {
+-                if (!(newnode->vals[i] = util_ald_strdup(node->vals[i]))) {
+-                    util_ldap_search_node_free(newnode);
+-                    return NULL;
+-                }
+-                i++;
+-            }
+-        }
+-        else {
+-            newnode->vals = NULL;
+-        }
+-        if (!(newnode->username = util_ald_strdup(node->username)) ||
+-            !(newnode->dn = util_ald_strdup(node->dn)) ||
+-            !(newnode->bindpw = util_ald_strdup(node->bindpw)) ) {
+-            util_ldap_search_node_free(newnode);
+-            return NULL;
+-        }
+-        newnode->lastbind = node->lastbind;
+-
+-    }
+-    return (void *)newnode;
+-}
+-
+-void util_ldap_search_node_free(void *n)
+-{
+-    int i = 0;
+-    util_search_node_t *node = (util_search_node_t *)n;
+-    if (node->vals) {
+-        while (node->vals[i]) {
+-            util_ald_free(node->vals[i++]);
+-        }
+-        util_ald_free(node->vals);
+-    }
+-    util_ald_free(node->username);
+-    util_ald_free(node->dn);
+-    util_ald_free(node->bindpw);
+-    util_ald_free(node);
+-}
+-
+-/* ------------------------------------------------------------------ */
+-
+-unsigned long util_ldap_compare_node_hash(void *n)
+-{
+-    util_compare_node_t *node = (util_compare_node_t *)n;
+-    return util_ald_hash_string(3, node->dn, node->attrib, node->value);
+-}
+-
+-int util_ldap_compare_node_compare(void *a, void *b)
+-{
+-    util_compare_node_t *na = (util_compare_node_t *)a;
+-    util_compare_node_t *nb = (util_compare_node_t *)b;
+-    return (strcmp(na->dn, nb->dn) == 0 &&
+-	    strcmp(na->attrib, nb->attrib) == 0 &&
+-	    strcmp(na->value, nb->value) == 0);
+-}
+-
+-void *util_ldap_compare_node_copy(void *c)
+-{
+-    util_compare_node_t *n = (util_compare_node_t *)c;
+-    util_compare_node_t *node = (util_compare_node_t *)util_ald_alloc(sizeof(util_compare_node_t));
+-
+-    if (node) {
+-        if (!(node->dn = util_ald_strdup(n->dn)) ||
+-            !(node->attrib = util_ald_strdup(n->attrib)) ||
+-            !(node->value = util_ald_strdup(n->value))) {
+-            util_ldap_compare_node_free(node);
+-            return NULL;
+-        }
+-        node->lastcompare = n->lastcompare;
+-        node->result = n->result;
+-        return node;
+-    }
+-    else {
+-        return NULL;
+-    }
+-}
+-
+-void util_ldap_compare_node_free(void *n)
+-{
+-    util_compare_node_t *node = (util_compare_node_t *)n;
+-    util_ald_free(node->dn);
+-    util_ald_free(node->attrib);
+-    util_ald_free(node->value);
+-    util_ald_free(node);
+-}
+-
+-/* ------------------------------------------------------------------ */
+-
+-unsigned long util_ldap_dn_compare_node_hash(void *n)
+-{
+-    return util_ald_hash_string(1, ((util_dn_compare_node_t *)n)->reqdn);
+-}
+-
+-int util_ldap_dn_compare_node_compare(void *a, void *b)
+-{
+-    return (strcmp(((util_dn_compare_node_t *)a)->reqdn,
+-		   ((util_dn_compare_node_t *)b)->reqdn) == 0);
+-}
+-
+-void *util_ldap_dn_compare_node_copy(void *c)
+-{
+-    util_dn_compare_node_t *n = (util_dn_compare_node_t *)c;
+-    util_dn_compare_node_t *node = (util_dn_compare_node_t *)util_ald_alloc(sizeof(util_dn_compare_node_t));
+-    if (node) {
+-        if (!(node->reqdn = util_ald_strdup(n->reqdn)) ||
+-            !(node->dn = util_ald_strdup(n->dn))) {
+-            util_ldap_dn_compare_node_free(node);
+-            return NULL;
+-        }
+-        return node;
+-    }
+-    else {
+-        return NULL;
+-    }
+-}
+-
+-void util_ldap_dn_compare_node_free(void *n)
+-{
+-    util_dn_compare_node_t *node = (util_dn_compare_node_t *)n;
+-    util_ald_free(node->reqdn);
+-    util_ald_free(node->dn);
+-    util_ald_free(node);
+-}
+-
+-
+-/* ------------------------------------------------------------------ */
+-apr_status_t util_ldap_cache_child_kill(void *data);
+-apr_status_t util_ldap_cache_module_kill(void *data);
+-
+-apr_status_t util_ldap_cache_module_kill(void *data)
+-{
+-#if APR_HAS_SHARED_MEMORY
+-    if (util_ldap_shm != NULL) {
+-        apr_status_t result = apr_shm_destroy(util_ldap_shm);
+-        util_ldap_shm = NULL;
+-        return result;
+-    }
+-#endif
+-    return APR_SUCCESS;
+-}
+-
+-apr_status_t util_ldap_cache_init(apr_pool_t *pool, apr_size_t reqsize)
+-{
+-    apr_status_t result = APR_SUCCESS;
+-    apr_pool_cleanup_register(pool, NULL, util_ldap_cache_module_kill, apr_pool_cleanup_null);
+-
+-#if APR_HAS_SHARED_MEMORY
+-    result = apr_shm_init(&util_ldap_shm, reqsize, "/tmp/ldap_cache", pool);
+-#endif
+-    util_ldap_cache = util_ald_create_cache(50,
+-				     util_ldap_url_node_hash,
+-				     util_ldap_url_node_compare,
+-				     util_ldap_url_node_copy,
+-				     util_ldap_url_node_free);
+-    return result;
+-}
+-
+-
+-#endif /* APU_HAS_LDAP */
+diff --git a/modules/ldap/util_ldap_cache.h b/modules/ldap/util_ldap_cache.h
+deleted file mode 100644
+index 18790eb..0000000
+--- a/modules/ldap/util_ldap_cache.h
++++ /dev/null
+@@ -1,214 +0,0 @@
+-/* ====================================================================
+- * The Apache Software License, Version 1.1
+- *
+- * Copyright (c) 2000-2001 The Apache Software Foundation.  All rights
+- * reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- *
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in
+- *    the documentation and/or other materials provided with the
+- *    distribution.
+- *
+- * 3. The end-user documentation included with the redistribution,
+- *    if any, must include the following acknowledgment:
+- *       "This product includes software developed by the
+- *        Apache Software Foundation (http://www.apache.org/)."
+- *    Alternately, this acknowledgment may appear in the software itself,
+- *    if and wherever such third-party acknowledgments normally appear.
+- *
+- * 4. The names "Apache" and "Apache Software Foundation" must
+- *    not be used to endorse or promote products derived from this
+- *    software without prior written permission. For written
+- *    permission, please contact apache@apache.org.
+- *
+- * 5. Products derived from this software may not be called "Apache",
+- *    nor may "Apache" appear in their name, without prior written
+- *    permission of the Apache Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+- * DISCLAIMED.  IN NO EVENT SHALL THE APACHE SOFTWARE FOUNDATION OR
+- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- * ====================================================================
+- *
+- * This software consists of voluntary contributions made by many
+- * individuals on behalf of the Apache Software Foundation.  For more
+- * information on the Apache Software Foundation, please see
+- * <http://www.apache.org/>.
+- */
+-
+-
+-#ifndef APU_LDAP_CACHE_H
+-#define APU_LDAP_CACHE_H
+-
+-/*
+- * This switches LDAP support on or off.
+- */
+-
+-/* this whole thing disappears if LDAP is not enabled */
+-#ifdef APU_HAS_LDAP
+-
+-
+-/*
+- * LDAP Cache Manager
+- */
+-
+-#include <apr_shmem.h>
+-
+-typedef struct util_cache_node_t {
+-    void *payload;		/* Pointer to the payload */
+-    time_t add_time;		/* Time node was added to cache */
+-    struct util_cache_node_t *next;
+-} util_cache_node_t;
+-
+-typedef struct util_ald_cache_t {
+-    unsigned long size;		/* Size of cache array */
+-    unsigned long maxentries;	/* Maximum number of cache entries */
+-    unsigned long numentries;	/* Current number of cache entries */
+-    unsigned long fullmark;	/* Used to keep track of when cache becomes 3/4 full */
+-    time_t marktime;		/* Time that the cache became 3/4 full */
+-    unsigned long (*hash)(void *);  /* Func to hash the payload */
+-    int (*compare)(void *, void *); /* Func to compare two payloads */
+-    void * (*copy)(void *);	/* Func to alloc mem and copy payload to new mem */
+-    void (*free)(void *);		/* Func to free mem used by the payload */
+-    util_cache_node_t **nodes;
+-
+-    unsigned long numpurges;	/* No. of times the cache has been purged */
+-    double avg_purgetime;		/* Average time to purge the cache */
+-    time_t last_purge;		/* Time of the last purge */
+-    unsigned long npurged;	/* Number of elements purged in last purge. This is not
+-				   obvious: it won't be 3/4 the size of the cache if 
+-				   there were a lot of expired entries. */
+-
+-    unsigned long fetches;	/* Number of fetches */
+-    unsigned long hits;		/* Number of cache hits */
+-    unsigned long inserts;	/* Number of inserts */
+-    unsigned long removes;	/* Number of removes */
+-} util_ald_cache_t;
+-
+-#if APR_HAS_SHARED_MEMORY
+-apr_shmem_t *util_ldap_shm;
+-#endif
+-util_ald_cache_t *util_ldap_cache;
+-apr_lock_t *util_ldap_cache_lock;
+-
+-#ifndef WIN32
+-#define ALD_MM_FILE_MODE ( S_IRUSR|S_IWUSR )
+-#else
+-#define ALD_MM_FILE_MODE ( _S_IREAD|_S_IWRITE )
+-#endif
+-
+-
+-/*
+- * LDAP Cache
+- */
+-
+-/*
+- * Maintain a cache of LDAP URLs that the server handles. Each node in
+- * the cache contains the search cache for that URL, and a compare cache
+- * for the URL. The compare cash is populated when doing require group
+- * compares.
+- */
+-typedef struct util_url_node_t {
+-    const char *url;
+-    util_ald_cache_t *search_cache;
+-    util_ald_cache_t *compare_cache;
+-    util_ald_cache_t *dn_compare_cache;
+-} util_url_node_t;
+-
+-/*
+- * We cache every successful search and bind operation, using the username 
+- * as the key. Each node in the cache contains the returned DN, plus the 
+- * password used to bind.
+- */
+-typedef struct util_search_node_t {
+-    const char *username;		/* Cache key */
+-    const char *dn;			/* DN returned from search */
+-    const char *bindpw;			/* The most recently used bind password; 
+-					   NULL if the bind failed */
+-    apr_time_t lastbind;		/* Time of last successful bind */
+-    const char **vals;			/* Values of queried attributes */
+-} util_search_node_t;
+-
+-/*
+- * We cache every successful compare operation, using the DN, attrib, and
+- * value as the key. 
+- */
+-typedef struct util_compare_node_t {
+-    const char *dn;			/* DN, attrib and value combine to be the key */
+-    const char *attrib;			
+-    const char *value;
+-    apr_time_t lastcompare;
+-    int result;
+-} util_compare_node_t;
+-
+-/*
+- * We cache every successful compare dn operation, using the dn in the require
+- * statement and the dn fetched based on the client-provided username.
+- */
+-typedef struct util_dn_compare_node_t {
+-    const char *reqdn;		/* The DN in the require dn statement */
+-    const char *dn;			/* The DN found in the search */
+-} util_dn_compare_node_t;
+-
+-
+-/*
+- * Function prototypes for LDAP cache
+- */
+-
+-/* util_ldap_cache.c */
+-unsigned long util_ldap_url_node_hash(void *n);
+-int util_ldap_url_node_compare(void *a, void *b);
+-void *util_ldap_url_node_copy(void *c);
+-void util_ldap_url_node_free(void *n);
+-unsigned long util_ldap_search_node_hash(void *n);
+-int util_ldap_search_node_compare(void *a, void *b);
+-void *util_ldap_search_node_copy(void *c);
+-void util_ldap_search_node_free(void *n);
+-unsigned long util_ldap_compare_node_hash(void *n);
+-int util_ldap_compare_node_compare(void *a, void *b);
+-void *util_ldap_compare_node_copy(void *c);
+-void util_ldap_compare_node_free(void *n);
+-unsigned long util_ldap_dn_compare_node_hash(void *n);
+-int util_ldap_dn_compare_node_compare(void *a, void *b);
+-void *util_ldap_dn_compare_node_copy(void *c);
+-void util_ldap_dn_compare_node_free(void *n);
+-
+-
+-/* util_ldap_cache_mgr.c */
+-
+-void util_ald_free(const void *ptr);
+-void *util_ald_alloc(unsigned long size);
+-const char *util_ald_strdup(const char *s);
+-unsigned long util_ald_hash_string(int nstr, ...);
+-void util_ald_cache_purge(util_ald_cache_t *cache);
+-util_url_node_t *util_ald_create_caches(util_ldap_state_t *s, const char *url);
+-util_ald_cache_t *util_ald_create_cache(unsigned long maxentries,
+-                                unsigned long (*hashfunc)(void *), 
+-                                int (*comparefunc)(void *, void *),
+-                                void * (*copyfunc)(void *),
+-                                void (*freefunc)(void *));
+-void util_ald_destroy_cache(util_ald_cache_t *cache);
+-void *util_ald_cache_fetch(util_ald_cache_t *cache, void *payload);
+-void util_ald_cache_insert(util_ald_cache_t *cache, void *payload);
+-void util_ald_cache_remove(util_ald_cache_t *cache, void *payload);
+-char *util_ald_cache_display_stats(apr_pool_t *p, util_ald_cache_t *cache,
+-                                 char *name);
+-
+-#endif /* APU_HAS_LDAP */
+-#endif /* APU_LDAP_CACHE_H */

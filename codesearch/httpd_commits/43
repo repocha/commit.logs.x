@@ -1,0 +1,90 @@
+commit 5d261272180e939a75ee8a45da647e0a7aa94f1c
+Author: Christophe Jaillet <jailletc36@apache.org>
+Date:   Sun Dec 1 21:13:56 2013 +0000
+
+    Fix missing spaces in messages
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1546860 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_digest.c b/modules/aaa/mod_auth_digest.c
+index 7561d8f..316da19 100644
+--- a/modules/aaa/mod_auth_digest.c
++++ b/modules/aaa/mod_auth_digest.c
+@@ -225,7 +225,7 @@ static apr_status_t cleanup_tables(void *not_used)
+ static void log_error_and_cleanup(char *msg, apr_status_t sts, server_rec *s)
+ {
+     ap_log_error(APLOG_MARK, APLOG_ERR, sts, s, APLOGNO(01760)
+-                 "%s - all nonce-count checking and one-time nonces"
++                 "%s - all nonce-count checking and one-time nonces "
+                  "disabled", msg);
+ 
+     cleanup_tables(NULL);
+diff --git a/modules/aaa/mod_authnz_ldap.c b/modules/aaa/mod_authnz_ldap.c
+index ed8feb3..3cd0ddc 100644
+--- a/modules/aaa/mod_authnz_ldap.c
++++ b/modules/aaa/mod_authnz_ldap.c
+@@ -1661,17 +1661,17 @@ static const command_rec authnz_ldap_cmds[] =
+ 
+     AP_INIT_FLAG("AuthLDAPGroupAttributeIsDN", ap_set_flag_slot,
+                  (void *)APR_OFFSETOF(authn_ldap_config_t, group_attrib_is_dn), OR_AUTHCFG,
+-                 "If set to 'on', auth_ldap uses the DN that is retrieved from the server for"
+-                 "subsequent group comparisons. If set to 'off', auth_ldap uses the string"
++                 "If set to 'on', auth_ldap uses the DN that is retrieved from the server for "
++                 "subsequent group comparisons. If set to 'off', auth_ldap uses the string "
+                  "provided by the client directly. Defaults to 'on'."),
+ 
+     AP_INIT_TAKE1("AuthLDAPDereferenceAliases", mod_auth_ldap_set_deref, NULL, OR_AUTHCFG,
+-                  "Determines how aliases are handled during a search. Can be one of the"
++                  "Determines how aliases are handled during a search. Can be one of the "
+                   "values \"never\", \"searching\", \"finding\", or \"always\". "
+                   "Defaults to always."),
+ 
+     AP_INIT_TAKE1("AuthLDAPCharsetConfig", set_charset_config, NULL, RSRC_CONF,
+-                  "Character set conversion configuration file. If omitted, character set"
++                  "Character set conversion configuration file. If omitted, character set "
+                   "conversion is disabled."),
+ 
+     AP_INIT_TAKE1("AuthLDAPAuthorizePrefix", ap_set_string_slot,
+@@ -1689,12 +1689,12 @@ static const command_rec authnz_ldap_cmds[] =
+ 
+      AP_INIT_FLAG("AuthLDAPSearchAsUser", ap_set_flag_slot,
+                   (void *)APR_OFFSETOF(authn_ldap_config_t, search_as_user), OR_AUTHCFG,
+-                   "Set to 'on' to perform authorization-based searches with the users credentials, when this module"
+-                   " has also performed authentication.  Does not affect nested groups lookup."),
++                  "Set to 'on' to perform authorization-based searches with the users credentials, when this module "
++                  "has also performed authentication.  Does not affect nested groups lookup."),
+      AP_INIT_FLAG("AuthLDAPCompareAsUser", ap_set_flag_slot,
+                   (void *)APR_OFFSETOF(authn_ldap_config_t, compare_as_user), OR_AUTHCFG,
+-                  "Set to 'on' to perform authorization-based compares with the users credentials, when this module"
+-                  " has also performed authentication.  Does not affect nested groups lookups."),
++                  "Set to 'on' to perform authorization-based compares with the users credentials, when this module "
++                  "has also performed authentication.  Does not affect nested groups lookups."),
+     {NULL}
+ };
+ 
+diff --git a/modules/mappers/mod_negotiation.c b/modules/mappers/mod_negotiation.c
+index 5ec0d4d..85650bf 100644
+--- a/modules/mappers/mod_negotiation.c
++++ b/modules/mappers/mod_negotiation.c
+@@ -1035,7 +1035,7 @@ static int read_type_map(apr_file_t **map, negotiation_state *neg,
+                     *eol = '\0';
+                 if ((mime_info.body = get_body(buffer, &len, tag, *map)) < 0) {
+                     ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(00685)
+-                                  "Syntax error in type map, no end tag '%s'"
++                                  "Syntax error in type map, no end tag '%s' "
+                                   "found in %s for Body: content.",
+                                   tag, r->filename);
+                      break;
+diff --git a/server/protocol.c b/server/protocol.c
+index 453428e..18f0afb 100644
+--- a/server/protocol.c
++++ b/server/protocol.c
+@@ -932,7 +932,7 @@ AP_DECLARE(void) ap_get_mime_headers_core(request_rec *r, apr_bucket_brigade *bb
+                     else if (ap_has_cntrl(value)) {
+                         err = HTTP_BAD_REQUEST;
+                         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, APLOGNO(02427)
+-                                      "Request header field '%.*s' contains"
++                                      "Request header field '%.*s' contains "
+                                       "control character", (int)LOG_NAME_MAX_LEN,
+                                       last_field);
+                     }

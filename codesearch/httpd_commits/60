@@ -1,0 +1,34 @@
+commit d3a19b3cd9813252c770a67466729f01fd980673
+Author: Graham Leggett <minfrin@apache.org>
+Date:   Sun Mar 17 17:58:30 2013 +0000
+
+    Remove the Authorization header should either the username or the password
+    resolve to an empty string.
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1457504 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/aaa/mod_auth_basic.c b/modules/aaa/mod_auth_basic.c
+index 39999f0..fe2c3a4 100644
+--- a/modules/aaa/mod_auth_basic.c
++++ b/modules/aaa/mod_auth_basic.c
+@@ -376,6 +376,9 @@ static int authenticate_basic_fake(request_rec *r)
+     if (!user || !*user) {
+         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, APLOGNO(02458)
+                       "AuthBasicFake: empty username expression for URI '%s', ignoring", r->uri);
++
++        apr_table_unset(r->headers_in, "Authorization");
++
+         return DECLINED;
+     }
+ 
+@@ -388,6 +391,9 @@ static int authenticate_basic_fake(request_rec *r)
+     if (!pass || !*pass) {
+         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, APLOGNO(02459)
+                       "AuthBasicFake: empty password expression for URI '%s', ignoring", r->uri);
++
++        apr_table_unset(r->headers_in, "Authorization");
++
+         return DECLINED;
+     }
+ 
