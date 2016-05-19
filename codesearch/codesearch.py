@@ -36,7 +36,7 @@ for c in gitcha.charepo:
   for logstmt in logstmts:
     if logstmt in out:
       i += 1
-      writer.writerow([str(i),c['changes']])
+      writer.writerow([str(i),c['changes'],c['version']])
       #print c['changes']
       op = os.path.join('httpd_commits', str(i))
       with open(op, 'w') as f:
