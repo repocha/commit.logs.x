@@ -4,7 +4,6 @@
 *.swn
 *.swp
 *.csv
-*.lst
 *.sort
 *.diff
 *.xxx

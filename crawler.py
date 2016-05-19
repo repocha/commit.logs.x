@@ -3,7 +3,7 @@ import time
 import os
 from lxml.html import fromstring
 
-def crawl(url, dstpath, intv=1):
+def crawl(url, dstpath, intv=2):
   """
   Utility function
   """
