@@ -49,9 +49,14 @@ class BaseParser:
         writer.writerow([cmt['commitno'], cmt['message']])
 
   def printN(self, N=2):
+    print '-----------------------------'
     print '#commits:', len(self.cmts)
+    print '-----------------------------'
     for i in range(N):
-      print 'no.', i, self.cmts[i] 
+      #print i, '| revno.', self.cmts[i]['commitno'], '| msg:', self.cmts[i]['message'] 
+      print i, self.cmts[i] 
     print '......'
-    print 'no.', len(self.cmts)-1, self.cmts[-1]
+    #print len(self.cmts)-1, '| revno', self.cmts[-1]['commitno'], '| msg:', self.cmts[-1]['message']
+    print len(self.cmts)-1, self.cmts[-1]
+    print '-----------------------------'
 

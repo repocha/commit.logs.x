@@ -23,15 +23,14 @@ class SVNParser(BaseParser):
             revno = ''
             message = ''
             chfiles = []
-          elif line.startswith('r'):
-            temp_list = line.split()
-            revno = temp_list[0]
-          elif line.startswith('Changed paths:'):
-            pass
-          elif line.startswith('   M ') or line.startswith('   A ') or line.startswith('   D ') or line.startswith('   R '):
-            chfiles.append(line)
-          else:
-            message += line.strip() + ' '
-
+        elif line.startswith('r'):
+          temp_list = line.split()
+          revno = temp_list[0]
+        elif line.startswith('Changed paths:'):
+          pass
+        elif line.startswith('   M ') or line.startswith('   A ') or line.startswith('   D ') or line.startswith('   R '):
+          chfiles.append(line)
+        else:
+          message += line.strip() + ' '
+    print len(self.cmts)
     self.printN()
-
