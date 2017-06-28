@@ -4,3 +4,4 @@ from bzr_parser import BazaarParser
 
 bzrp = BazaarParser()
 bzrp.parse('../data/squid.bzr.log')
+bzrp.printN()

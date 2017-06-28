@@ -39,5 +39,3 @@ class BazaarParser(BaseParser):
           #if line.find(': ') != -1:
           #    print line
           message += ' ' + line
-      self.printN()
-

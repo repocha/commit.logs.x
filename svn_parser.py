@@ -32,5 +32,3 @@ class SVNParser(BaseParser):
           chfiles.append(line)
         else:
           message += line.strip() + ' '
-    print len(self.cmts)
-    self.printN()

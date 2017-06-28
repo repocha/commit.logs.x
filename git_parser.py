@@ -49,6 +49,3 @@ class GitParser(BaseParser):
       cmt['date'] = date
       cmt['merge'] = merge
       self.cmts.append(cmt)
-
-    self.printN()
-
