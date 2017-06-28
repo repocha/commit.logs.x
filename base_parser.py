@@ -12,8 +12,9 @@ class BaseParser:
     """
     pass;
 
-  def select(self, kws, pop=0.1):
+  def kwselect(self, kws, pop=0.1):
     """Given a list of keywords, return the commits that contains all the keywords
+       For more complicated filter, use kwfilter
     """
     res = []
     kwmap = {}

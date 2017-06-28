@@ -18,5 +18,5 @@ def getparams(plfp):
 gitp = GitParser()
 gitp.parse('../data/hadoop.git.log')
 pl = getparams('hadoop.param.lst')
-for cmt in gitp.select(pl):
+for cmt in gitp.kwselect(pl):
   print cmt
