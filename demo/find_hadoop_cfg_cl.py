@@ -2,6 +2,10 @@ import sys
 sys.path.append('..')
 from git_parser import GitParser
 
+"""In this demo, we want to find all the commit logs 
+that contain at least one Hadoop config parameter
+"""
+
 def getparams(plfp):
   plist = []
   with open(plfp) as f:
