@@ -12,30 +12,30 @@ class BaseParser:
     """
     pass;
 
-  def select(self, kws, pop=100):
+  def select(self, kws, pop=0.1):
     """Given a list of keywords, return the commits that contains all the keywords
     """
     res = []
-    kwcount = {}
-    for cmt in cmts:
-      count = 0
+    kwmap = {}
+    for cmt in self.cmts:
+      contains = False
       for kw in kws:
         kwl = kw.lower()
         msg = cmt['message'].lower()
-        if msg.find(kwl) != -1:
-          count += 1
-          if kw not in kwcount:
-            kwcount[kw] = 1
+        if kwl in msg:
+          contains = True
+          if kw not in kwmap:
+            kwmap[kw] = 1
           else:
-            kwcount[kw] += 1
-          if count > 0:
-            res.append(cmt)
+            kwmap[kw] += 1
+      if contains == True:
+        res.append(cmt)
     print '-----------------------------------------------------------------------------'
     print 'The too popular keywords (count >= 50): '
     print '(perhaps we need to comment them out)'
-    for kw in kwcount:
-      if kwcount[kw] >= pop:
-        print kw, kwcount[kw]
+    for kw in kwmap:
+      if kwmap[kw] >= pop * len(self.cmts):
+        print kw, kwmap[kw]
     print '-----------------------------------------------------------------------------'
     print 'Number of commits we select out:'
     print len(res)
