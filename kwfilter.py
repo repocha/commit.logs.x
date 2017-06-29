@@ -40,9 +40,26 @@ class KWFilter:
         return False
     return True
 
-def cmt_selector(cmts, kwfilt):
-  res = []
-  for cmt in cmts:
-    for kwfilt.contains():
-      res.append(cmt)
-  return res
+def parser_filter_by_msg(parser, kwfilt):
+  newcmts = []
+  for cmt in parser.cmts:
+    if kwfilt.contains(cmt['message']):
+      newcmts.append(cmt)
+  parser.cmts = newcmts
+  return parser
+
+def parser_filter_by_chfiles(parser, kwfilt, name_only=False):
+  newcmts = []
+  for cmt in parser.cmts:
+    newchfl = []
+    for chfile in cmt['chfiles']:
+      nchfile = chfile
+      if name_only:
+        nchfile = nchfile[nchfile.rfind('/')+1:]
+      if kwfilt.contains(nchfile):
+        newchfl.append(chfile)
+    if len(newchfl) > 0:
+      cmt['chfiles'] = newchfl
+      newcmts.append(cmt)
+  parser.cmts = newcmts
+  return parser

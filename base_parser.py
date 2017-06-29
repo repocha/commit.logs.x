@@ -4,7 +4,8 @@ class BaseParser:
   """The base class for commit log analysis
   """
   
-  def __init__(self):
+  def __init__(self, name):
+    self.repo_name = name
     self.cmts = []
 
   def parse(self, cmtlog_fp):
