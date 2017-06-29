@@ -18,6 +18,3 @@ def pull_github_repos(repos_fp, destdir):
       os.system("git clone " + gitrepo + " " + dest)
     else:
       print '[error] repeated repo:', gitrepo
-
-
-pull_github_repos('repos_no_check_301.lst', '/home/tianyin/exp_repos/')
